@@ -32,44 +32,40 @@ class Cohort(object):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         sample_variants = {}
 
-        # Create a file to save cached_results
-        cache_dir = path.join(self.cache_dir, "cached-mutations")
-
         for i, sample_id in enumerate(self.sample_ids):
-            sample_cache_dir = path.join(cache_dir, str(sample_id))
-            variants_cache_file = path.join(sample_cache_dir,
-                                            "%s-%s-variants.pkl" % (variant_type, merge_type))
+            try:
+                if variant_type == "snv":
+                    variants = self._load_single_sample_mutations(
+                        sample_id, self.normal_bam_ids[i], self.tumor_bam_ids[i],
+                        self.snv_file_format_funcs, variant_type, merge_type)
+                elif variant_type == "indel":
+                    variants = self._load_single_sample_mutations(
+                        sample_id, self.normal_bam_ids[i], self.tumor_bam_ids[i],
+                        self.indel_file_format_funcs, variant_type, merge_type) 
+            except IOError:
+                print("Variants did not exist for %s" % sample_id)
+                continue
 
-            # If we are caching results and we have the final final files we load them
-            if self.cache_results and path.exists(variants_cache_file):
-                sample_variants[sample_id] = pickle.load(open(variants_cache_file, "rb"))
-            else:
-                if self.cache_results and not path.exists(sample_cache_dir):
-                    # Make the directory to save the results
-                    makedirs(sample_cache_dir)
-                try:
-                    if variant_type == "snv":
-                        variants = self._load_single_sample_mutations(
-                            sample_id, self.normal_bam_ids[i], self.tumor_bam_ids[i],
-                            self.snv_file_format_funcs, merge_type)
-                    elif variant_type == "indel":
-                        variants = self._load_single_sample_mutations(
-                            sample_id, self.normal_bam_ids[i], self.tumor_bam_ids[i],
-                            self.indel_file_format_funcs, merge_type) 
-                except IOError:
-                    print("Variants did not exist for %s" % sample_id)
-                    continue
-
-                sample_variants[sample_id] = variants
-
-                if self.cache_results:
-                    with open(variants_cache_file, "wb") as cache_file:
-                        pickle.dump(variants, cache_file)
-
+            sample_variants[sample_id] = variants
         return sample_variants
 
     def _load_single_sample_mutations(self, sample_id, normal_bam_id, tumor_bam_id,
-                                      file_format_funcs, merge_type):
+                                      file_format_funcs, variant_type, merge_type):
+        # Create a file to save cached_results
+        cache_dir = path.join(self.cache_dir, "cached-mutations")
+
+        sample_cache_dir = path.join(cache_dir, str(sample_id))
+        variants_cache_file = path.join(sample_cache_dir,
+                                        "%s-%s-variants.pkl" % (variant_type, merge_type))
+
+        # If we are caching results and we have the final final files we load them
+        if self.cache_results and path.exists(variants_cache_file):
+            return pickle.load(open(variants_cache_file, "rb"))
+
+        if self.cache_results and not path.exists(sample_cache_dir):
+            # Make the directory to save the results
+            makedirs(sample_cache_dir)
+
         combined_variants = []
         for file_format_func in file_format_funcs:
             file_name = file_format_func(
@@ -86,4 +82,8 @@ class Cohort(object):
                 merged_variants = VariantCollection(set.union(*combined_variants))
             elif merge_type == "intersection":
                 merged_variants = VariantCollection(set.intersection(*combined_variants))
+
+        if self.cache_results:
+            with open(variants_cache_file, "wb") as cache_file:
+                pickle.dump(variants, cache_file)
         return merged_variants
