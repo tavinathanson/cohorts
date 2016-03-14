@@ -6,6 +6,8 @@ import pickle
 
 import varcode
 from varcode import VariantCollection
+from mhctools import NetMHCcons
+from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 
 class Cohort(object):
     """Represents a cohort of patients."""
@@ -16,6 +18,7 @@ class Cohort(object):
                  sample_ids,
                  normal_bam_ids,
                  tumor_bam_ids,
+                 hla_alleles=None,
                  cache_results=True,
                  snv_file_format_funcs=None,
                  indel_file_format_funcs=None):
@@ -23,10 +26,18 @@ class Cohort(object):
         self.cache_dir = cache_dir
         self.normal_bam_ids = normal_bam_ids
         self.tumor_bam_ids = tumor_bam_ids
+        self.hla_alleles = hla_alleles
         self.cache_results = cache_results
         self.snv_file_format_funcs = snv_file_format_funcs
         self.indel_file_format_funcs = indel_file_format_funcs
         self.sample_ids = sample_ids
+
+        variant_type_to_format_funcs = {}
+        if self.snv_file_format_funcs is not None:
+            variant_type_to_format_funcs["snv"] = self.snv_file_format_funcs
+        if self.indel_file_format_funcs is not None:
+            variant_type_to_format_funcs["indel"] = self.indel_file_format_funcs
+        self.variant_type_to_format_funcs = variant_type_to_format_funcs
 
     def load_mutations(self, variant_type="snv", merge_type="union"):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
@@ -34,14 +45,8 @@ class Cohort(object):
 
         for i, sample_id in enumerate(self.sample_ids):
             try:
-                if variant_type == "snv":
-                    variants = self._load_single_sample_mutations(
-                        sample_id, self.normal_bam_ids[i], self.tumor_bam_ids[i],
-                        self.snv_file_format_funcs, variant_type, merge_type)
-                elif variant_type == "indel":
-                    variants = self._load_single_sample_mutations(
-                        sample_id, self.normal_bam_ids[i], self.tumor_bam_ids[i],
-                        self.indel_file_format_funcs, variant_type, merge_type) 
+                variants = self._load_single_sample_mutations(
+                    i, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type) 
             except IOError:
                 print("Variants did not exist for %s" % sample_id)
                 continue
@@ -49,8 +54,11 @@ class Cohort(object):
             sample_variants[sample_id] = variants
         return sample_variants
 
-    def _load_single_sample_mutations(self, sample_id, normal_bam_id, tumor_bam_id,
-                                      file_format_funcs, variant_type, merge_type):
+    def _load_single_sample_mutations(self, sample_idx, file_format_funcs, variant_type, merge_type):
+        sample_id = self.sample_ids[sample_idx]
+        normal_bam_id = self.normal_bam_ids[sample_idx]
+        tumor_bam_id = self.tumor_bam_ids[sample_idx]
+
         # Create a file to save cached_results
         cache_dir = path.join(self.cache_dir, "cached-mutations")
 
@@ -87,3 +95,56 @@ class Cohort(object):
             with open(variants_cache_file, "wb") as cache_file:
                 pickle.dump(variants, cache_file)
         return merged_variants
+
+    def load_neoantigens(self, variant_type="snv", merge_type="union",
+                         epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
+                         process_limit=10, max_file_records=None):
+        assert self.hla_alleles is not None, "Cannot predict neoantigens without HLA alleles"
+
+        dfs = []
+        for i, sample_id in enumerate(self.sample_ids):
+            df_epitopes = self._load_single_sample_neoantigens(
+                i, variant_type, merge_type, epitope_lengths, ic50_cutoff,
+                process_limit, max_file_records)
+            dfs.append(df_epitopes)
+        return pd.concat(dfs)
+
+    def _load_single_sample_neoantigens(self, sample_idx, variant_type, merge_type,
+                                        epitope_lengths, ic50_cutoff, process_limit, max_file_records):
+        sample_id = self.sample_ids[sample_idx]
+
+        # Create a file to save cached_results
+        cache_dir = path.join(self.cache_dir, "cached-neoantigens")
+
+        sample_cache_dir = path.join(cache_dir, str(sample_id))
+        neoantigens_cache_file = path.join(sample_cache_dir,
+                                           "%s-%s-neoantigens.csv" % (variant_type, merge_type))
+
+        # If we are caching results and we have the final final files we load them
+        if self.cache_results and path.exists(neoantigens_cache_file):
+            return pd.read_csv(neoantigens_cache_file)
+
+        if self.cache_results and not path.exists(sample_cache_dir):
+            # Make the directory to save the results
+            makedirs(sample_cache_dir)
+
+        variants = self._load_single_sample_mutations(
+            sample_idx, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type)
+        hla_alleles = self.hla_alleles[sample_idx]
+        mhc_model = NetMHCcons(
+            alleles=hla_alleles,
+            epitope_lengths=epitope_lengths,
+            max_file_records=max_file_records,
+            process_limit=process_limit)
+        epitopes = predict_epitopes_from_variants(
+            variants=variants,
+            mhc_model=mhc_model,
+            transcript_expression_dict=None,
+            only_novel_epitopes=False)
+        df_epitopes = epitopes_to_dataframe(epitopes)
+        df_epitopes["sample_id"] = sample_id
+
+        if self.cache_results:
+            df_epitopes.to_csv(neoantigens_cache_file, index=False)
+
+        return df_epitopes
