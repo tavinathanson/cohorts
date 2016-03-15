@@ -65,15 +65,14 @@ class Cohort(object):
         sample_cache_dir = path.join(cache_dir, str(sample_id))
         cache_file = path.join(sample_cache_dir, file_name)
 
-        if path.exists(cache_file):
-            if path.splitext(cache_file)[1] == ".csv":
-                return pd.read_csv(cache_file)
-            else:
-                with open(cache_file, "rb") as f:
-                    return pickle.load(f)
+        if not path.exists(cache_file):
+            return None
 
-        if self.cache_results and not path.exists(sample_cache_dir):
-            makedirs(sample_cache_dir)
+        if path.splitext(cache_file)[1] == ".csv":
+            return pd.read_csv(cache_file)
+        else:
+            with open(cache_file, "rb") as f:
+                return pickle.load(f)
 
     def save_to_cache(self, obj, cache_name, sample_id, file_name):
         if not self.cache_results:
@@ -82,6 +81,9 @@ class Cohort(object):
         cache_dir = path.join(self.cache_dir, cache_name)
         sample_cache_dir = path.join(cache_dir, str(sample_id))
         cache_file = path.join(sample_cache_dir, file_name)
+
+        if not path.exists(sample_cache_dir):
+            makedirs(sample_cache_dir)
 
         if type(obj) == pd.DataFrame:
             obj.to_csv(cache_file, index=False)
