@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 from os import path, makedirs
+from shutil import rmtree
 import pandas as pd
 import pickle
 
@@ -39,6 +40,9 @@ class Cohort(object):
             variant_type_to_format_funcs["indel"] = self.indel_file_format_funcs
         self.variant_type_to_format_funcs = variant_type_to_format_funcs
 
+        self.mutation_cache_name = "cached-mutation"
+        self.neoantigen_cache_name = "cached-neoantigens"
+
     def load_mutations(self, variant_type="snv", merge_type="union"):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         sample_variants = {}
@@ -60,7 +64,7 @@ class Cohort(object):
         tumor_bam_id = self.tumor_bam_ids[sample_idx]
 
         # Create a file to save cached_results
-        cache_dir = path.join(self.cache_dir, "cached-mutations")
+        cache_dir = path.join(self.cache_dir, self.mutation_cache_name)
 
         sample_cache_dir = path.join(cache_dir, str(sample_id))
         variants_cache_file = path.join(sample_cache_dir,
@@ -114,7 +118,7 @@ class Cohort(object):
         sample_id = self.sample_ids[sample_idx]
 
         # Create a file to save cached_results
-        cache_dir = path.join(self.cache_dir, "cached-neoantigens")
+        cache_dir = path.join(self.cache_dir, self.neoantigen_cache_name)
 
         sample_cache_dir = path.join(cache_dir, str(sample_id))
         neoantigens_cache_file = path.join(sample_cache_dir,
@@ -139,8 +143,9 @@ class Cohort(object):
         epitopes = predict_epitopes_from_variants(
             variants=variants,
             mhc_model=mhc_model,
-            transcript_expression_dict=None,
-            only_novel_epitopes=False)
+            ic50_cutoff=ic50_cutoff,
+            # Only include peptides with a mutation
+            only_novel_epitopes=True)
         df_epitopes = epitopes_to_dataframe(epitopes)
         df_epitopes["sample_id"] = sample_id
 
@@ -148,3 +153,18 @@ class Cohort(object):
             df_epitopes.to_csv(neoantigens_cache_file, index=False)
 
         return df_epitopes
+
+    def clear_caches(self):
+        self.clear_mutation_cache()
+        self.clear_neoantigen_cache()
+
+    def clear_cache(self, cache_name):
+        cache_path = path.join(self.cache_dir, cache_name)
+        if path.exists(cache_path):
+            rmtree(cache_path)
+
+    def clear_mutation_cache(self):
+        self.clear_cache(self.mutation_cache_name)
+
+    def clear_neoantigen_cache(self):
+        self.clear_cache(self.neoantigen_cache_name)
