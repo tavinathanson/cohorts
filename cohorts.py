@@ -160,7 +160,7 @@ class Cohort(object):
         df_epitopes = epitopes_to_dataframe(epitopes)
         df_epitopes["sample_id"] = sample_id
 
-        self.save_to_cache(merged_variants, self.neoantigen_cache_name, sample_id, cached_file_name)
+        self.save_to_cache(df_epitopes, self.neoantigen_cache_name, sample_id, cached_file_name)
 
         return df_epitopes
 
