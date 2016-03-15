@@ -56,7 +56,7 @@ if __name__ == "__main__":
             "Topic :: Scientific/Engineering :: Bio-Informatics",
         ],
         install_requires=[
-            "pandas>=0.15",
+            "pandas>=0.15", "topiary>=0.015"
         ],
         long_description=readme,
         packages=["cohorts"],
