@@ -40,16 +40,48 @@ class Cohort(object):
             variant_type_to_format_funcs["indel"] = self.indel_file_format_funcs
         self.variant_type_to_format_funcs = variant_type_to_format_funcs
 
-        self.mutation_cache_name = "cached-mutation"
+        self.variant_cache_name = "cached-variants"
         self.neoantigen_cache_name = "cached-neoantigens"
 
-    def load_mutations(self, variant_type="snv", merge_type="union"):
+    def load_from_cache(self, cache_name, sample_id, file_name):
+        if not self.cache_results:
+            return None
+
+        cache_dir = path.join(self.cache_dir, cache_name)
+        sample_cache_dir = path.join(cache_dir, str(sample_id))
+        cache_file = path.join(sample_cache_dir, file_name)
+
+        if path.exists(cache_file):
+            if path.splitext(cache_file)[1] == ".csv":
+                return pd.read_csv(cache_file)
+            else:
+                with open(cache_file, "rb") as f:
+                    return pickle.load(f)
+
+        if self.cache_results and not path.exists(sample_cache_dir):
+            makedirs(sample_cache_dir)
+
+    def save_to_cache(self, obj, cache_name, sample_id, file_name):
+        if not self.cache_results:
+            return
+
+        cache_dir = path.join(self.cache_dir, cache_name)
+        sample_cache_dir = path.join(cache_dir, str(sample_id))
+        cache_file = path.join(sample_cache_dir, file_name)
+
+        if type(obj) == pd.DataFrame:
+            obj.to_csv(cache_file, index=False)
+        else:
+            with open(cache_file, "wb") as f:
+                pickle.dump(obj, f)
+
+    def load_variants(self, variant_type="snv", merge_type="union"):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         sample_variants = {}
 
         for i, sample_id in enumerate(self.sample_ids):
             try:
-                variants = self._load_single_sample_mutations(
+                variants = self._load_single_sample_variants(
                     i, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type) 
             except IOError:
                 print("Variants did not exist for %s" % sample_id)
@@ -58,25 +90,15 @@ class Cohort(object):
             sample_variants[sample_id] = variants
         return sample_variants
 
-    def _load_single_sample_mutations(self, sample_idx, file_format_funcs, variant_type, merge_type):
+    def _load_single_sample_variants(self, sample_idx, file_format_funcs, variant_type, merge_type):
         sample_id = self.sample_ids[sample_idx]
         normal_bam_id = self.normal_bam_ids[sample_idx]
         tumor_bam_id = self.tumor_bam_ids[sample_idx]
 
-        # Create a file to save cached_results
-        cache_dir = path.join(self.cache_dir, self.mutation_cache_name)
-
-        sample_cache_dir = path.join(cache_dir, str(sample_id))
-        variants_cache_file = path.join(sample_cache_dir,
-                                        "%s-%s-variants.pkl" % (variant_type, merge_type))
-
-        # If we are caching results and we have the final final files we load them
-        if self.cache_results and path.exists(variants_cache_file):
-            return pickle.load(open(variants_cache_file, "rb"))
-
-        if self.cache_results and not path.exists(sample_cache_dir):
-            # Make the directory to save the results
-            makedirs(sample_cache_dir)
+        cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
+        cached = self.load_from_cache(self.variant_cache_name, sample_id, cached_file_name)
+        if cached is not None:
+            return cached
 
         combined_variants = []
         for file_format_func in file_format_funcs:
@@ -95,9 +117,8 @@ class Cohort(object):
             elif merge_type == "intersection":
                 merged_variants = VariantCollection(set.intersection(*combined_variants))
 
-        if self.cache_results:
-            with open(variants_cache_file, "wb") as cache_file:
-                pickle.dump(variants, cache_file)
+        self.save_to_cache(merged_variants, self.variant_cache_name, sample_id, cached_file_name)
+
         return merged_variants
 
     def load_neoantigens(self, variant_type="snv", merge_type="union",
@@ -117,22 +138,12 @@ class Cohort(object):
                                         epitope_lengths, ic50_cutoff, process_limit, max_file_records):
         sample_id = self.sample_ids[sample_idx]
 
-        # Create a file to save cached_results
-        cache_dir = path.join(self.cache_dir, self.neoantigen_cache_name)
+        cached_file_name = "%s-%s-neoantigens.csv" % (variant_type, merge_type)
+        cached = self.load_from_cache(self.neoantigen_cache_name, sample_id, cached_file_name)
+        if cached is not None:
+            return cached
 
-        sample_cache_dir = path.join(cache_dir, str(sample_id))
-        neoantigens_cache_file = path.join(sample_cache_dir,
-                                           "%s-%s-neoantigens.csv" % (variant_type, merge_type))
-
-        # If we are caching results and we have the final final files we load them
-        if self.cache_results and path.exists(neoantigens_cache_file):
-            return pd.read_csv(neoantigens_cache_file)
-
-        if self.cache_results and not path.exists(sample_cache_dir):
-            # Make the directory to save the results
-            makedirs(sample_cache_dir)
-
-        variants = self._load_single_sample_mutations(
+        variants = self._load_single_sample_variants(
             sample_idx, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type)
         hla_alleles = self.hla_alleles[sample_idx]
         mhc_model = NetMHCcons(
@@ -144,18 +155,17 @@ class Cohort(object):
             variants=variants,
             mhc_model=mhc_model,
             ic50_cutoff=ic50_cutoff,
-            # Only include peptides with a mutation
+            # Only include peptides with a variant
             only_novel_epitopes=True)
         df_epitopes = epitopes_to_dataframe(epitopes)
         df_epitopes["sample_id"] = sample_id
 
-        if self.cache_results:
-            df_epitopes.to_csv(neoantigens_cache_file, index=False)
+        self.save_to_cache(merged_variants, self.neoantigen_cache_name, sample_id, cached_file_name)
 
         return df_epitopes
 
     def clear_caches(self):
-        self.clear_mutation_cache()
+        self.clear_variant_cache()
         self.clear_neoantigen_cache()
 
     def clear_cache(self, cache_name):
@@ -163,8 +173,8 @@ class Cohort(object):
         if path.exists(cache_path):
             rmtree(cache_path)
 
-    def clear_mutation_cache(self):
-        self.clear_cache(self.mutation_cache_name)
+    def clear_variant_cache(self):
+        self.clear_cache(self.variant_cache_name)
 
     def clear_neoantigen_cache(self):
         self.clear_cache(self.neoantigen_cache_name)
