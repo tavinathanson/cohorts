@@ -251,6 +251,9 @@ class Cohort(object):
     def clear_neoantigen_cache(self):
         self.clear_cache(self.neoantigen_cache_name)
 
+    def clinical_columns(self):
+        return list(self.clinical_dataframe.columns)
+
     def plot_init(self, on, col, col_equals):
         """
         `on` is either:
