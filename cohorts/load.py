@@ -262,7 +262,7 @@ class Cohort(object):
             return on(self)
         if type(on) == str:
             if on in self.clinical_dataframe.columns:
-                return (on, self.clinical_dataframe())
+                return (on, self.clinical_dataframe)
             else:
                 return col_func(self, on, col, col_equals)
 
