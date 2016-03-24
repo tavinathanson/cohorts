@@ -252,7 +252,8 @@ class Cohort(object):
         self.clear_cache(self.neoantigen_cache_name)
 
     def clinical_columns(self):
-        return list(self.clinical_dataframe.columns)
+        column_types = [self.clinical_dataframe[col].dtype for col in self.clinical_dataframe.columns]
+        return dict(zip(list(self.clinical_dataframe.columns), column_types))
 
     def plot_init(self, on, col, col_equals):
         """
