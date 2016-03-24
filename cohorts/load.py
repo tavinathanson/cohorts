@@ -17,12 +17,19 @@ from __future__ import print_function
 from os import path, makedirs
 from shutil import rmtree
 import pandas as pd
-import pickle
+import numpy as np
+import six.moves.cPickle as pickle
+import sys
+from types import FunctionType
 
 import varcode
-from varcode import VariantCollection
+from varcode import VariantCollection, EffectCollection
 from mhctools import NetMHCcons
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
+
+from .survival import plot_kmf
+from .plot import mann_whitney_plot, fishers_exact_plot
+from .count import count, snv_count, neoantigen_count
 
 class Cohort(object):
     """Represents a cohort of patients."""
@@ -33,6 +40,13 @@ class Cohort(object):
                  sample_ids,
                  normal_bam_ids,
                  tumor_bam_ids,
+                 clinical_dataframe=None,
+                 clinical_dataframe_id_col=None,
+                 benefit_col=None,
+                 os_col=None,
+                 pfs_col=None,
+                 dead_col=None,
+                 progressed_col=None,
                  hla_alleles=None,
                  cache_results=True,
                  snv_file_format_funcs=None,
@@ -41,6 +55,13 @@ class Cohort(object):
         self.cache_dir = cache_dir
         self.normal_bam_ids = normal_bam_ids
         self.tumor_bam_ids = tumor_bam_ids
+        self.clinical_dataframe = clinical_dataframe
+        self.clinical_dataframe_id_col = clinical_dataframe_id_col
+        self.benefit_col = benefit_col
+        self.os_col = os_col
+        self.pfs_col = pfs_col
+        self.dead_col = dead_col
+        self.progressed_col = progressed_col
         self.hla_alleles = hla_alleles
         self.cache_results = cache_results
         self.snv_file_format_funcs = snv_file_format_funcs
@@ -55,6 +76,8 @@ class Cohort(object):
         self.variant_type_to_format_funcs = variant_type_to_format_funcs
 
         self.variant_cache_name = "cached-variants"
+        self.effect_cache_name = "cached-effects"
+        self.nonsynonymous_effect_cache_name = "cached-nonsynonymous-effects"
         self.neoantigen_cache_name = "cached-neoantigens"
 
     def load_from_cache(self, cache_name, sample_id, file_name):
@@ -137,6 +160,39 @@ class Cohort(object):
 
         return merged_variants
 
+    def load_effects(self, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
+        sample_effects = {}
+        for i, sample_id in enumerate(self.sample_ids):
+            effects = self._load_single_sample_effects(
+                i, self.variant_type_to_format_funcs, only_nonsynonymous, variant_type, merge_type)
+            sample_effects[sample_id] = effects
+        return sample_effects
+
+    def _load_single_sample_effects(self, sample_idx, file_format_funcs,
+                                    only_nonsynonymous, variant_type, merge_type):
+        sample_id = self.sample_ids[sample_idx]
+
+        cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
+        if only_nonsynonymous:
+            cached = self.load_from_cache(self.nonsynonymous_effect_cache_name, sample_id, cached_file_name)
+        else:
+            cached = self.load_from_cache(self.effect_cache_name, sample_id, cached_file_name)
+        if cached is not None:
+            return cached
+
+        variants = self._load_single_sample_variants(
+            sample_idx, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type)
+        effects = variants.effects()
+        nonsynonymous_effects = EffectCollection(
+            effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
+
+        self.save_to_cache(effects, self.effect_cache_name, sample_id, cached_file_name)
+        self.save_to_cache(nonsynonymous_effects, self.nonsynonymous_effect_cache_name, sample_id, cached_file_name)
+
+        if only_nonsynonymous:
+            return nonsynonymous_effects
+        return effects
+
     def load_neoantigens(self, variant_type="snv", merge_type="union",
                          epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
                          process_limit=10, max_file_records=None):
@@ -194,3 +250,61 @@ class Cohort(object):
 
     def clear_neoantigen_cache(self):
         self.clear_cache(self.neoantigen_cache_name)
+
+    def clinical_columns(self):
+        column_types = [self.clinical_dataframe[col].dtype for col in self.clinical_dataframe.columns]
+        return dict(zip(list(self.clinical_dataframe.columns), column_types))
+
+    def plot_init(self, on, col, col_equals):
+        """
+        `on` is either:
+        - a function that creates a new column for comparison, e.g. count.snv_count
+        - a string representing an existing column
+        - a string representing a new column name, created by comparing column `col` with the value `col_equals`
+        """
+        if type(on) == FunctionType:
+            return on(self)
+        if type(on) == str:
+            if on in self.clinical_dataframe.columns:
+                return (on, self.clinical_dataframe)
+            else:
+                return col_func(self, on, col, col_equals)
+
+    def plot_benefit(self, on, col=None, col_equals=None):   
+        plot_col, df = self.plot_init(on, col, col_equals)
+        original_len = len(df)
+        df = df[df[self.benefit_col].notnull()]
+        updated_len = len(df)
+        df[self.benefit_col] = df[self.benefit_col].apply(bool)
+        if updated_len < original_len:
+            print("Missing benefit for %d samples: from %d to %d" % (original_len - updated_len, original_len, updated_len))
+        if df[plot_col].dtype == "bool":    
+            results = fishers_exact_plot(
+                data=df,
+                condition1=self.benefit_col,
+                condition2=plot_col)
+        else:
+            results = mann_whitney_plot(
+                data=df,
+                condition=self.benefit_col,
+                distribution=plot_col)
+
+    def plot_survival(self, on, col=None, col_equals=None, how="os", threshold=None):
+        assert how in ["os", "pfs"]
+        plot_col, df = self.plot_init(on, col, col_equals)
+        if df[plot_col].dtype == "bool":    
+            default_threshold = None
+        else:
+            default_threshold = "median"
+        results = plot_kmf(
+            df=df,
+            condition_col=plot_col,
+            censor_col=self.dead_col if how == "os" else self.progressed_col,
+            survival_col=self.os_col if how == "os" else self.pfs_col,
+            threshold=threshold if threshold is not None else default_threshold)
+        print(results)
+                    
+def col_func(cohort, on, col, col_equals):
+    df = cohort.clinical_dataframe.copy()
+    df[on] = df[col] == col_equals
+    return on, df
