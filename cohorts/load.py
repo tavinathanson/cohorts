@@ -18,7 +18,7 @@ from os import path, makedirs
 from shutil import rmtree
 import pandas as pd
 import numpy as np
-import pickle
+import six.moves.cPickle as pickle
 import sys
 from types import FunctionType
 

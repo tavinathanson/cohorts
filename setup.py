@@ -59,7 +59,8 @@ if __name__ == "__main__":
             "pandas>=0.15",
             "seaborn>=0.7.0",
             "scipy>=0.16.1",
-            "topiary>=0.0.15"
+            "topiary>=0.0.15",
+            "six>=1.10.0",
         ],
         long_description=readme,
         packages=["cohorts"],
