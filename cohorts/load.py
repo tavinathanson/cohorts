@@ -273,7 +273,7 @@ class Cohort(object):
     def plot_benefit(self, on, col=None, col_equals=None):   
         plot_col, df = self.plot_init(on, col, col_equals)
         original_len = len(df)
-        df = df[~df[self.benefit_col].isnull()]
+        df = df[df[self.benefit_col].notnull()]
         updated_len = len(df)
         df[self.benefit_col] = df[self.benefit_col].apply(bool)
         if updated_len < original_len:
