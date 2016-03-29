@@ -47,6 +47,7 @@ class Cohort(object):
                  pfs_col=None,
                  dead_col=None,
                  progressed_col=None,
+                 progressed_or_dead_col=None,
                  hla_alleles=None,
                  cache_results=True,
                  snv_file_format_funcs=None,
@@ -55,18 +56,22 @@ class Cohort(object):
         self.cache_dir = cache_dir
         self.normal_bam_ids = normal_bam_ids
         self.tumor_bam_ids = tumor_bam_ids
-        self.clinical_dataframe = clinical_dataframe
+        self.clinical_dataframe = clinical_dataframe.copy()
         self.clinical_dataframe_id_col = clinical_dataframe_id_col
         self.benefit_col = benefit_col
         self.os_col = os_col
         self.pfs_col = pfs_col
         self.dead_col = dead_col
         self.progressed_col = progressed_col
+        self.progressed_or_dead_col = progressed_or_dead_col
         self.hla_alleles = hla_alleles
         self.cache_results = cache_results
         self.snv_file_format_funcs = snv_file_format_funcs
         self.indel_file_format_funcs = indel_file_format_funcs
         self.sample_ids = sample_ids
+
+        self.verify_survival()
+        self.add_progressed_or_dead_col()
 
         variant_type_to_format_funcs = {}
         if self.snv_file_format_funcs is not None:
@@ -79,6 +84,28 @@ class Cohort(object):
         self.effect_cache_name = "cached-effects"
         self.nonsynonymous_effect_cache_name = "cached-nonsynonymous-effects"
         self.neoantigen_cache_name = "cached-neoantigens"
+
+    def verify_survival(self):
+        assert (self.clinical_dataframe[self.pfs_col] <=
+                self.clinical_dataframe[self.os_col]).all(), (
+                    "PFS should be <= OS, but PFS is larger than OS for some patients.")
+
+        def func(row):
+            if row[self.pfs_col] < row[self.os_col]:
+                assert row[self.progressed_col], (
+                    "A patient did not progress despite PFS being less than OS. "
+                    "Full row: %s" % row)
+        self.clinical_dataframe.apply(func, axis=1)
+
+    def add_progressed_or_dead_col(self):
+        if self.progressed_or_dead_col is None:
+            self.progressed_or_dead_col = "progressed_or_dead"
+            self.clinical_dataframe[self.progressed_or_dead_col] = (
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col])
+        else:
+            assert self.clinical_dataframe[self.progressed_or_dead_col].equals(
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col]), (
+                    "progressed_or_dead_col should equal progressed_col || dead_col")
 
     def load_from_cache(self, cache_name, sample_id, file_name):
         if not self.cache_results:
@@ -290,7 +317,7 @@ class Cohort(object):
                 distribution=plot_col)
 
     def plot_survival(self, on, col=None, col_equals=None, how="os", threshold=None):
-        assert how in ["os", "pfs"]
+        assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
         plot_col, df = self.plot_init(on, col, col_equals)
         if df[plot_col].dtype == "bool":    
             default_threshold = None
@@ -299,7 +326,7 @@ class Cohort(object):
         results = plot_kmf(
             df=df,
             condition_col=plot_col,
-            censor_col=self.dead_col if how == "os" else self.progressed_col,
+            censor_col=self.dead_col if how == "os" else self.progressed_or_dead_col,
             survival_col=self.os_col if how == "os" else self.pfs_col,
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
