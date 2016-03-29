@@ -71,15 +71,7 @@ class Cohort(object):
         self.sample_ids = sample_ids
 
         self.verify_survival()
-
-        if self.progressed_or_dead_col is None:
-            self.progressed_or_dead_col = "progressed_or_dead"
-            self.clinical_dataframe[self.progressed_or_dead_col] = (
-                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col])
-        else:
-            assert self.clinical_dataframe[self.progressed_or_dead_col].equals(
-                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col]), (
-                    "progressed_or_dead_col should equal progressed_col || dead_col")
+        self.add_progressed_or_dead_col()
 
         variant_type_to_format_funcs = {}
         if self.snv_file_format_funcs is not None:
@@ -94,8 +86,8 @@ class Cohort(object):
         self.neoantigen_cache_name = "cached-neoantigens"
 
     def verify_survival(self):
-        assert (self.clinical_dataframe[self.pfs_col] -
-                self.clinical_dataframe[self.os_col] <= 0).all(), (
+        assert (self.clinical_dataframe[self.pfs_col] <=
+                self.clinical_dataframe[self.os_col]).all(), (
                     "PFS should be <= OS, but PFS is larger than OS for some patients.")
 
         def func(row):
@@ -104,6 +96,16 @@ class Cohort(object):
                     "A patient did not progress despite PFS being less than OS. "
                     "Full row: %s" % row)
         self.clinical_dataframe.apply(func, axis=1)
+
+    def add_progressed_or_dead_col(self):
+        if self.progressed_or_dead_col is None:
+            self.progressed_or_dead_col = "progressed_or_dead"
+            self.clinical_dataframe[self.progressed_or_dead_col] = (
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col])
+        else:
+            assert self.clinical_dataframe[self.progressed_or_dead_col].equals(
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col]), (
+                    "progressed_or_dead_col should equal progressed_col || dead_col")
 
     def load_from_cache(self, cache_name, sample_id, file_name):
         if not self.cache_results:
