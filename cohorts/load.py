@@ -47,6 +47,7 @@ class Cohort(object):
                  pfs_col=None,
                  dead_col=None,
                  progressed_col=None,
+                 progressed_or_dead_col=None,
                  hla_alleles=None,
                  cache_results=True,
                  snv_file_format_funcs=None,
@@ -62,6 +63,7 @@ class Cohort(object):
         self.pfs_col = pfs_col
         self.dead_col = dead_col
         self.progressed_col = progressed_col
+        self.progressed_or_dead_col = progressed_or_dead_col
         self.hla_alleles = hla_alleles
         self.cache_results = cache_results
         self.snv_file_format_funcs = snv_file_format_funcs
@@ -70,9 +72,14 @@ class Cohort(object):
 
         self.verify_survival()
 
-        self.progressed_or_dead_col = "progressed_or_dead"
-        self.clinical_dataframe[self.progressed_or_dead_col] = (
-            self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col])
+        if self.progressed_or_dead_col is None:
+            self.progressed_or_dead_col = "progressed_or_dead"
+            self.clinical_dataframe[self.progressed_or_dead_col] = (
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col])
+        else:
+            assert self.clinical_dataframe[self.progressed_or_dead_col].equals(
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col]), (
+                    "progressed_or_dead_col should equal progressed_col || dead_col")
 
         variant_type_to_format_funcs = {}
         if self.snv_file_format_funcs is not None:
@@ -87,9 +94,9 @@ class Cohort(object):
         self.neoantigen_cache_name = "cached-neoantigens"
 
     def verify_survival(self):
-        assert min(self.clinical_dataframe[self.pfs_col] -
-                   self.clinical_dataframe[self.os_col]) <= 0, (
-                       "PFS is larger than OS for some patients.")
+        assert (self.clinical_dataframe[self.pfs_col] -
+                self.clinical_dataframe[self.os_col] <= 0).all(), (
+                    "PFS should be <= OS, but PFS is larger than OS for some patients.")
 
         def func(row):
             if row[self.pfs_col] < row[self.os_col]:
