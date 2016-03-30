@@ -18,7 +18,7 @@ from scipy.stats import mannwhitneyu, fisher_exact
 import seaborn as sb
 import pandas as pd
 
-def stripboxplot(x, y, data):
+def stripboxplot(x, y, data, **kwargs):
     """
     Overlay a stripplot on top of a boxplot.
     """
@@ -31,10 +31,11 @@ def stripboxplot(x, y, data):
     sb.stripplot(
         x=x,
         y=y,
-        jitter=0.05,
-        color=".3",
         data=data,
-        ax=ax
+        ax=ax,
+        jitter=kwargs.pop("jitter", 0.05),
+        color=kwargs.pop("color", "0.3"),
+        **kwargs
     )
 
 def fishers_exact_plot(data, condition1, condition2):
