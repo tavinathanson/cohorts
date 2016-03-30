@@ -18,6 +18,26 @@ from scipy.stats import mannwhitneyu, fisher_exact
 import seaborn as sb
 import pandas as pd
 
+def stripboxplot(x, y, data, **kwargs):
+    """
+    Overlay a stripplot on top of a boxplot.
+    """
+    ax = sb.boxplot(
+        x=x,
+        y=y,
+        data=data
+    )
+
+    sb.stripplot(
+        x=x,
+        y=y,
+        data=data,
+        ax=ax,
+        jitter=kwargs.pop("jitter", 0.05),
+        color=kwargs.pop("color", "0.3"),
+        **kwargs
+    )
+
 def fishers_exact_plot(data, condition1, condition2):
     """
     Perform a Fisher's exact test to compare to binary columns
@@ -65,10 +85,9 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
         If `condition` is not a binary column, split on =/!= to condition_value
     """
 
-    sb.factorplot(
+    stripboxplot(
         x=condition,
         y=distribution,
-        kind='box',
         data=data
     )
 
