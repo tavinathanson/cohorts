@@ -282,15 +282,25 @@ class Cohort(object):
         column_types = [self.clinical_dataframe[col].dtype for col in self.clinical_dataframe.columns]
         return dict(zip(list(self.clinical_dataframe.columns), column_types))
 
+    def clinical_func(self, row_func, col):
+        df = self.clinical_dataframe.copy()
+        df[col] = df.apply(row_func, axis=1)
+        return col, df
+
     def plot_init(self, on, col, col_equals):
         """
         `on` is either:
         - a function that creates a new column for comparison, e.g. count.snv_count
+        - a function that takes a clinical dataframe row as input and returns a boolean or quantity based on that row (with col being the name of that new boolean or quantity)
         - a string representing an existing column
         - a string representing a new column name, created by comparing column `col` with the value `col_equals`
         """
         if type(on) == FunctionType:
-            return on(self)
+            try:
+                return on(self)
+            except:
+                col = col if col is not None else "untitled"
+                return self.clinical_func(on, col)
         if type(on) == str:
             if on in self.clinical_dataframe.columns:
                 return (on, self.clinical_dataframe)
