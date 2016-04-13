@@ -17,9 +17,7 @@ from __future__ import print_function
 from os import path, makedirs
 from shutil import rmtree
 import pandas as pd
-import numpy as np
 import six.moves.cPickle as pickle
-import sys
 from types import FunctionType
 
 import varcode
@@ -29,7 +27,6 @@ from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot
-from .count import count, snv_count, neoantigen_count
 
 class Cohort(object):
     """Represents a cohort of patients."""
@@ -259,7 +256,7 @@ class Cohort(object):
         df_epitopes = epitopes_to_dataframe(epitopes)
         df_epitopes["sample_id"] = sample_id
 
-        self.save_to_cache(df_epitopes, self.neoantigen_cache_name, sample_id, cached_file_name)
+        self.save_to_cache(df_epitopes, self.neoantigen_cache_name, sample_id,  cached_file_name)
 
         return df_epitopes
 
@@ -307,7 +304,28 @@ class Cohort(object):
             else:
                 return col_func(self, on, col, col_equals)
 
-    def plot_benefit(self, on, col=None, col_equals=None):   
+    def plot_benefit(self, on, col=None, col_equals=None):
+        """Plot a comparison of benefit/response in the cohort on a given variable
+
+        If the variable (through `on` or `col` is binary) this will compare
+        odds-ratios and perform a Fisher's exact test.
+
+        If the variable is numeric, this will compare the distributions through
+        a Mann-Whitney test and plot the distributions with box-strip plot
+
+        Parameters
+        ----------
+        on : See `cohort.load.plot_init`
+        col : str, optional
+            If `on` is not specified, the column name on which to split the cohort
+        col_equals : str, optional
+            Fixed value of `col` on which to split the cohort
+
+        Returns
+        -------
+        (Test statistic, p-value): (float, float)
+
+        """
         plot_col, df = self.plot_init(on, col, col_equals)
         original_len = len(df)
         df = df[df[self.benefit_col].notnull()]
@@ -326,7 +344,24 @@ class Cohort(object):
                 condition=self.benefit_col,
                 distribution=plot_col)
 
+        return results
+
     def plot_survival(self, on, col=None, col_equals=None, how="os", threshold=None):
+        """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
+
+        Parameters
+        ----------
+        on :  See `cohort.load.plot_init`
+        col : str, optional
+            If `on` is not specified, the column name on which to split the cohort
+        col_equals : str, optional
+            Fixed value of `col` on which to split the cohort
+        how : {'os', 'pfs'}, optional 
+            Whether to plot OS (overall survival) or PFS (progression free survival)
+        threshold : int or 'median', optional
+            Threshold of `col` on which to split the cohort
+
+        """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
         plot_col, df = self.plot_init(on, col, col_equals)
         if df[plot_col].dtype == "bool":    
@@ -336,11 +371,12 @@ class Cohort(object):
         results = plot_kmf(
             df=df,
             condition_col=plot_col,
+            xlabel='Overall Survival' if how == "os" else 'Progression-Free Survival',
             censor_col=self.dead_col if how == "os" else self.progressed_or_dead_col,
             survival_col=self.os_col if how == "os" else self.pfs_col,
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
-                    
+              
 def col_func(cohort, on, col, col_equals):
     df = cohort.clinical_dataframe.copy()
     df[on] = df[col] == col_equals
