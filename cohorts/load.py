@@ -325,6 +325,7 @@ class Cohort(object):
                 data=df,
                 condition=self.benefit_col,
                 distribution=plot_col)
+        return results
 
     def plot_survival(self, on, col=None, col_equals=None, how="os", threshold=None):
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
@@ -340,6 +341,7 @@ class Cohort(object):
             survival_col=self.os_col if how == "os" else self.pfs_col,
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
+        return results
                     
 def col_func(cohort, on, col, col_equals):
     df = cohort.clinical_dataframe.copy()

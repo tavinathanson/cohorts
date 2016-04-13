@@ -28,7 +28,7 @@ def stripboxplot(x, y, data, **kwargs):
         data=data
     )
 
-    sb.stripplot(
+    return sb.stripplot(
         x=x,
         y=y,
         data=data,
@@ -85,7 +85,7 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
         If `condition` is not a binary column, split on =/!= to condition_value
     """
 
-    stripboxplot(
+    plot = stripboxplot(
         x=condition,
         y=distribution,
         data=data
@@ -101,4 +101,4 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
     )
 
     print("Mann-Whitney test: U={}, p-value={}".format(U, pvalue))
-    return (U, pvalue)
+    return (U, pvalue, plot)
