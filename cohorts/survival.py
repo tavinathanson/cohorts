@@ -66,7 +66,7 @@ def plot_kmf(df,
 
     event_no_condition = (df_no_condition[censor_col].astype(bool))
     event_with_condition = (df_with_condition[censor_col].astype(bool))
-                  
+             
     kmf.fit(survival_no_condition, event_no_condition, label="")
     if ax:
         kmf.plot(ax=ax, show_censors=True, ci_show=False)
@@ -75,6 +75,9 @@ def plot_kmf(df,
 
     kmf.fit(survival_with_condition, event_with_condition, label=(label))
     kmf.plot(ax=ax, show_censors=True, ci_show=False)
+
+    # Set the y-axis to range 0 to 1
+    ax.set_ylim(0, 1)
 
     no_cond_str = "# no condition {}".format(len(survival_no_condition))
     cond_str = "# with condition {}".format(len(survival_with_condition))
