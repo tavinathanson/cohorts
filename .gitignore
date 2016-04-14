@@ -1,0 +1,6 @@
+env
+venv
+*.pyc
+.ipynb_checkpoints
+cache
+ENV.sh
