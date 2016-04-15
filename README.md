@@ -16,12 +16,12 @@ You can install Cohorts using [pip](https://pip.pypa.io/en/latest/quickstart.htm
 pip install cohorts
 ```
 
-Usage
------
+Usage Examples
+--------------
 
 ```python
 cohort = Cohort(
-    data_dir="/my/clinical/data",
+    data_dir="/my/input/data",
     cache_dir="/where/cohorts/results/get/saved",
     sample_ids=["sample_1", "sample_2"],
     clinical_dataframe=pandas_dataframe_with_clinical_data,
@@ -33,4 +33,28 @@ cohort = Cohort(
 )
 
 cohort.plot_survival(how="os")
+```
+
+```python
+def mutect_snv_file_format_func(sample_id, normal_bam_id, tumor_bam_id):
+    return "Mutect-%d-normal=%s.bam-tumor=%s.bam-merged.vcf" % (
+        sample_id, normal_bam_id, tumor_bam_id)
+
+def strelka_snv_file_format_func(...):
+    ...
+
+cohort = Cohort(
+    ...
+    benefit_col="patient_durable_benefit",
+    snv_file_format_funcs=[
+        mutect_snv_file_format_func,
+        strelka_snv_file_format_func
+    ]
+)
+
+# Comparison plot of missense mutation counts between benefit and no-benefit patients
+cohort.plot_benefit(on=missense_snv_count)
+
+# Raw missense mutations counts
+missense_snv_col, updated_dataframe = missense_snv_count(cohort)
 ```
