@@ -1,7 +1,7 @@
 #!/bin/bash
 set -o errexit
 
-find topiary test -name '*.py' \
+find cohorts test -name '*.py' \
     | xargs pylint \
             --errors-only \
             --disable=print-statement
