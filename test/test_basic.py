@@ -23,19 +23,24 @@ from cohorts.load import InvalidDataError
 import pandas as pd 
 from nose.tools import raises, eq_
 
-def make_simple_cohort(os_list=None,
-                       pfs_list=None,
-                       dead_list=None,
-                       progressed_or_dead_list=None):
+def make_simple_clinical_dataframe(
+        os_list=None,
+        pfs_list=None,
+        dead_list=None,
+        progressed_or_dead_list=None):
+    return pd.DataFrame({"id": [1, 4, 5],
+                         "OS": [100, 150, 120] if os_list is None else os_list,
+                         "PFS": [50, 40, 120] if pfs_list is None else pfs_list,
+                         "dead": [True, False, False] if dead_list is None else dead_list,
+                         "progressed_or_dead": [True, True, False] if progressed_or_dead_list is None else progressed_or_dead_list})
+
+def make_simple_cohort(**kwargs):
+    clinical_dataframe = make_simple_clinical_dataframe(**kwargs)
     return Cohort(
         data_dir=DATA_DIR,
         cache_dir=generated_data_path("cache"),
-        sample_ids=[1, 4, 5],
-        clinical_dataframe=pd.DataFrame({"id": [1, 4, 5],
-                                         "OS": [100, 150, 120] if os_list is None else os_list,
-                                         "PFS": [50, 40, 120] if pfs_list is None else pfs_list,
-                                         "dead": [True, False, False] if dead_list is None else dead_list,
-                                         "progressed_or_dead": [True, True, False] if progressed_or_dead_list is None else progressed_or_dead_list}),
+        sample_ids=list(clinical_dataframe["id"]),
+        clinical_dataframe=clinical_dataframe,
         clinical_dataframe_id_col="id",
         os_col="OS",
         pfs_col="PFS",

@@ -57,8 +57,8 @@ class Cohort(object):
         self.sample_ids = sample_ids
         self.clinical_dataframe = clinical_dataframe.copy()
         self.clinical_dataframe_id_col = clinical_dataframe_id_col
-        self.normal_bam_ids = [None] * len(sample_ids) if normal_bam_ids is None else normal_bam_ids
-        self.tumor_bam_ids = [None] * len(sample_ids) if tumor_bam_ids is None else tumor_bam_ids
+        self.normal_bam_ids = normal_bam_ids
+        self.tumor_bam_ids = tumor_bam_ids
         self.benefit_col = benefit_col
         self.os_col = os_col
         self.pfs_col = pfs_col
@@ -70,7 +70,10 @@ class Cohort(object):
         self.snv_file_format_funcs = snv_file_format_funcs
         self.indel_file_format_funcs = indel_file_format_funcs
 
-        assert len(self.sample_ids) == len(self.normal_bam_ids) == len(self.tumor_bam_ids), "All ID lists must be of equal length"
+        for bam_ids in [self.normal_bam_ids, self.tumor_bam_ids]:
+            if bam_ids is not None:
+                assert len(self.sample_ids) == len(self.bam_ids), (
+                    "All ID lists must be of equal length")
 
         self.add_progressed_or_dead_col()
         self.verify_survival()
@@ -82,10 +85,10 @@ class Cohort(object):
             variant_type_to_format_funcs["indel"] = self.indel_file_format_funcs
         self.variant_type_to_format_funcs = variant_type_to_format_funcs
 
-        self.variant_cache_name = "cached-variants"
-        self.effect_cache_name = "cached-effects"
-        self.nonsynonymous_effect_cache_name = "cached-nonsynonymous-effects"
-        self.neoantigen_cache_name = "cached-neoantigens"
+        self.cache_names = {"variant": "cached-variants",
+                            "effect": "cached-effects",
+                            "nonsynonymous_effect": "cached-nonsynonymous-effects",
+                            "neoantigen": "cached-neoantigens"}
 
     def verify_survival(self):
         if not (self.clinical_dataframe[self.pfs_col] <=
@@ -155,7 +158,7 @@ class Cohort(object):
         for i, sample_id in enumerate(self.sample_ids):
             try:
                 variants = self._load_single_sample_variants(
-                    i, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type) 
+                    i, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type)
             except IOError:
                 print("Variants did not exist for %s" % sample_id)
                 continue
@@ -165,11 +168,10 @@ class Cohort(object):
 
     def _load_single_sample_variants(self, sample_idx, file_format_funcs, variant_type, merge_type):
         sample_id = self.sample_ids[sample_idx]
-        normal_bam_id = self.normal_bam_ids.get(sample_idx)
-        tumor_bam_id = self.tumor_bam_ids.get(sample_idx)
-
+        normal_bam_id = None if self.normal_bam_ids is None else self.normal_bam_ids[sample_idx]
+        tumor_bam_id = None if self.tumor_bam_ids is None else self.tumor_bam_ids[sample_idx]
         cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
-        cached = self.load_from_cache(self.variant_cache_name, sample_id, cached_file_name)
+        cached = self.load_from_cache(self.cache_names["variant"], sample_id, cached_file_name)
         if cached is not None:
             return cached
 
@@ -181,8 +183,8 @@ class Cohort(object):
             combined_variants.append(set(variants.elements))
 
         if len(combined_variants) == 1:
-            assert merge_type == None, "Cannot specify a merge type when there is nothing to merge"
-            merged_variants =  VariantCollection(combined_variants)
+            # There is nothing to merge
+            merged_variants =  VariantCollection(*combined_variants)
         else:
             assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
             if merge_type == "union":
@@ -190,7 +192,7 @@ class Cohort(object):
             elif merge_type == "intersection":
                 merged_variants = VariantCollection(set.intersection(*combined_variants))
 
-        self.save_to_cache(merged_variants, self.variant_cache_name, sample_id, cached_file_name)
+        self.save_to_cache(merged_variants, self.cache_names["variant"], sample_id, cached_file_name)
 
         return merged_variants
 
@@ -208,9 +210,9 @@ class Cohort(object):
 
         cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
         if only_nonsynonymous:
-            cached = self.load_from_cache(self.nonsynonymous_effect_cache_name, sample_id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], sample_id, cached_file_name)
         else:
-            cached = self.load_from_cache(self.effect_cache_name, sample_id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["effect"], sample_id, cached_file_name)
         if cached is not None:
             return cached
 
@@ -220,8 +222,8 @@ class Cohort(object):
         nonsynonymous_effects = EffectCollection(
             effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
 
-        self.save_to_cache(effects, self.effect_cache_name, sample_id, cached_file_name)
-        self.save_to_cache(nonsynonymous_effects, self.nonsynonymous_effect_cache_name, sample_id, cached_file_name)
+        self.save_to_cache(effects, self.cache_names["effect"], sample_id, cached_file_name)
+        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], sample_id, cached_file_name)
 
         if only_nonsynonymous:
             return nonsynonymous_effects
@@ -245,7 +247,7 @@ class Cohort(object):
         sample_id = self.sample_ids[sample_idx]
 
         cached_file_name = "%s-%s-neoantigens.csv" % (variant_type, merge_type)
-        cached = self.load_from_cache(self.neoantigen_cache_name, sample_id, cached_file_name)
+        cached = self.load_from_cache(self.cache_names["neoantigen"], sample_id, cached_file_name)
         if cached is not None:
             return cached
 
@@ -266,24 +268,18 @@ class Cohort(object):
         df_epitopes = epitopes_to_dataframe(epitopes)
         df_epitopes["sample_id"] = sample_id
 
-        self.save_to_cache(df_epitopes, self.neoantigen_cache_name, sample_id,  cached_file_name)
+        self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], sample_id, cached_file_name)
 
         return df_epitopes
 
     def clear_caches(self):
-        self.clear_variant_cache()
-        self.clear_neoantigen_cache()
+        for cache in self.cache_names.keys():
+            self.clear_cache(cache)
 
-    def clear_cache(self, cache_name):
-        cache_path = path.join(self.cache_dir, cache_name)
+    def clear_cache(self, cache):
+        cache_path = path.join(self.cache_dir, self.cache_names[cache])
         if path.exists(cache_path):
             rmtree(cache_path)
-
-    def clear_variant_cache(self):
-        self.clear_cache(self.variant_cache_name)
-
-    def clear_neoantigen_cache(self):
-        self.clear_cache(self.neoantigen_cache_name)
 
     def clinical_columns(self):
         column_types = [self.clinical_dataframe[col].dtype for col in self.clinical_dataframe.columns]
@@ -344,7 +340,7 @@ class Cohort(object):
         df[self.benefit_col] = df[self.benefit_col].apply(bool)
         if updated_len < original_len:
             print("Missing benefit for %d samples: from %d to %d" % (original_len - updated_len, original_len, updated_len))
-        if df[plot_col].dtype == "bool":    
+        if df[plot_col].dtype == "bool":
             results = fishers_exact_plot(
                 data=df,
                 condition1=self.benefit_col,
@@ -376,7 +372,7 @@ class Cohort(object):
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
         plot_col, df = self.plot_init(on, col, col_equals)
-        if df[plot_col].dtype == "bool":    
+        if df[plot_col].dtype == "bool":
             default_threshold = None
         else:
             default_threshold = "median"
@@ -388,7 +384,7 @@ class Cohort(object):
             survival_col=self.os_col if how == "os" else self.pfs_col,
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
-            
+
 def col_func(cohort, on, col, col_equals):
     df = cohort.clinical_dataframe.copy()
     df[on] = df[col] == col_equals

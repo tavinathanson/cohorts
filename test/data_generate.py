@@ -15,14 +15,12 @@
 from . import data_path, generated_data_path
 
 import vcf
+from varcode import load_vcf_fast
 from os import path, makedirs
-from numpy.random import choice, seed
 
-BASES = ["A", "C", "T", "G"]
-
-def generate_test_vcfs(id_to_mutation_count):
+def generate_vcfs(id_to_mutation_count, file_format_func, template_name):
     """
-    Generate fake, random VCFs per-sample
+    Generate cropped VCFs from a template, for each sample.
 
     Parameters
     ----------
@@ -34,22 +32,27 @@ def generate_test_vcfs(id_to_mutation_count):
     str
         Path to the generated VCF directory
     """
-    seed(1234)
     for sample_id in id_to_mutation_count.keys():
-        vcf_reader = vcf.Reader(filename=data_path("vcf_template.vcf"))
+        template_path = data_path(template_name)
+        vcf_reader = vcf.Reader(filename=template_path)
         file_path = generated_data_path(
-            path.join("vcfs", "sample_%d.vcf" % sample_id))
+            path.join("vcfs", file_format_func(sample_id, None, None)))
         file_dir = path.dirname(file_path)
         if not path.exists(file_dir):
             makedirs(file_dir)
         with open(file_path, "w") as f:
             vcf_writer = vcf.Writer(f, vcf_reader)
-            record = list(vcf_reader)[0]
-            for i in range(id_to_mutation_count[sample_id]):
-                record.CHROM = choice(range(1, 20))
-                record.POS = choice(range(1000))
-                record.REF = choice(BASES)
-                bases_no_ref = [base for base in BASES if base != record.REF]
-                record.ALT = choice(bases_no_ref)
-                vcf_writer.write_record(record)
+            i = 0
+            num_records_in_template = len(load_vcf_fast(template_path))
+            num_records_to_generate = id_to_mutation_count[sample_id]
+            assert num_records_in_template >= num_records_to_generate, (
+                "Cannot generate more records than exist in the template: %d is less than %d" % (
+                    num_records_in_template, num_records_to_generate))
+            for record in vcf_reader:
+                if i < id_to_mutation_count[sample_id]:
+                    vcf_writer.write_record(record)
+                    i += 1
+                else:
+                    break
+
     return path.dirname(f.name)
