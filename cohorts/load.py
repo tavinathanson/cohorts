@@ -28,6 +28,9 @@ from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot
 
+class InvalidDataError(ValueError):
+    pass
+
 class Cohort(object):
     """Represents a cohort of patients."""
 
@@ -35,26 +38,27 @@ class Cohort(object):
                  data_dir,
                  cache_dir,
                  sample_ids,
-                 normal_bam_ids,
-                 tumor_bam_ids,
-                 clinical_dataframe=None,
-                 clinical_dataframe_id_col=None,
-                 benefit_col=None,
-                 os_col=None,
-                 pfs_col=None,
-                 dead_col=None,
+                 clinical_dataframe,
+                 clinical_dataframe_id_col,
+                 os_col,
+                 pfs_col,
+                 dead_col,
                  progressed_col=None,
                  progressed_or_dead_col=None,
+                 normal_bam_ids=None,
+                 tumor_bam_ids=None,
+                 benefit_col=None,
                  hla_alleles=None,
                  cache_results=True,
                  snv_file_format_funcs=None,
                  indel_file_format_funcs=None):
         self.data_dir = data_dir
         self.cache_dir = cache_dir
-        self.normal_bam_ids = normal_bam_ids
-        self.tumor_bam_ids = tumor_bam_ids
+        self.sample_ids = sample_ids
         self.clinical_dataframe = clinical_dataframe.copy()
         self.clinical_dataframe_id_col = clinical_dataframe_id_col
+        self.normal_bam_ids = [None] * len(sample_ids) if normal_bam_ids is None else normal_bam_ids
+        self.tumor_bam_ids = [None] * len(sample_ids) if tumor_bam_ids is None else tumor_bam_ids
         self.benefit_col = benefit_col
         self.os_col = os_col
         self.pfs_col = pfs_col
@@ -65,10 +69,11 @@ class Cohort(object):
         self.cache_results = cache_results
         self.snv_file_format_funcs = snv_file_format_funcs
         self.indel_file_format_funcs = indel_file_format_funcs
-        self.sample_ids = sample_ids
 
-        self.verify_survival()
+        assert len(self.sample_ids) == len(self.normal_bam_ids) == len(self.tumor_bam_ids), "All ID lists must be of equal length"
+
         self.add_progressed_or_dead_col()
+        self.verify_survival()
 
         variant_type_to_format_funcs = {}
         if self.snv_file_format_funcs is not None:
@@ -83,23 +88,28 @@ class Cohort(object):
         self.neoantigen_cache_name = "cached-neoantigens"
 
     def verify_survival(self):
-        assert (self.clinical_dataframe[self.pfs_col] <=
-                self.clinical_dataframe[self.os_col]).all(), (
-                    "PFS should be <= OS, but PFS is larger than OS for some patients.")
+        if not (self.clinical_dataframe[self.pfs_col] <=
+                self.clinical_dataframe[self.os_col]).all():
+            raise InvalidDataError("PFS should be <= OS, but PFS is larger than OS for some patients.")
 
         def func(row):
             if row[self.pfs_col] < row[self.os_col]:
-                assert row[self.progressed_col], (
-                    "A patient did not progress despite PFS being less than OS. "
-                    "Full row: %s" % row)
+                if not row[self.progressed_or_dead_col]:
+                    raise InvalidDataError(
+                        "A patient did not progress despite PFS being less than OS. "
+                        "Full row: %s" % row)
         self.clinical_dataframe.apply(func, axis=1)
 
     def add_progressed_or_dead_col(self):
+        assert self.progressed_col is not None or self.progressed_or_dead_col is not None, (
+            "Need at least one of progressed_col and progressed_or_dead_col")
         if self.progressed_or_dead_col is None:
             self.progressed_or_dead_col = "progressed_or_dead"
             self.clinical_dataframe[self.progressed_or_dead_col] = (
                 self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col])
-        else:
+
+        # If we have both of these columns, ensure that they're in sync
+        if self.progressed_or_dead_col is not None and self.progressed_col is not None:
             assert self.clinical_dataframe[self.progressed_or_dead_col].equals(
                 self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col]), (
                     "progressed_or_dead_col should equal progressed_col || dead_col")
@@ -155,8 +165,8 @@ class Cohort(object):
 
     def _load_single_sample_variants(self, sample_idx, file_format_funcs, variant_type, merge_type):
         sample_id = self.sample_ids[sample_idx]
-        normal_bam_id = self.normal_bam_ids[sample_idx]
-        tumor_bam_id = self.tumor_bam_ids[sample_idx]
+        normal_bam_id = self.normal_bam_ids.get(sample_idx)
+        tumor_bam_id = self.tumor_bam_ids.get(sample_idx)
 
         cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
         cached = self.load_from_cache(self.variant_cache_name, sample_id, cached_file_name)
