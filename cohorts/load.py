@@ -42,9 +42,9 @@ class Cohort(object):
                  clinical_dataframe_id_col,
                  os_col,
                  pfs_col,
-                 dead_col,
+                 deceased_col,
                  progressed_col=None,
-                 progressed_or_dead_col=None,
+                 progressed_or_deceased_col=None,
                  normal_bam_ids=None,
                  tumor_bam_ids=None,
                  benefit_col=None,
@@ -62,9 +62,9 @@ class Cohort(object):
         self.benefit_col = benefit_col
         self.os_col = os_col
         self.pfs_col = pfs_col
-        self.dead_col = dead_col
+        self.deceased_col = deceased_col
         self.progressed_col = progressed_col
-        self.progressed_or_dead_col = progressed_or_dead_col
+        self.progressed_or_deceased_col = progressed_or_deceased_col
         self.hla_alleles = hla_alleles
         self.cache_results = cache_results
         self.snv_file_format_funcs = snv_file_format_funcs
@@ -75,7 +75,7 @@ class Cohort(object):
                 assert len(self.sample_ids) == len(self.bam_ids), (
                     "All ID lists must be of equal length")
 
-        self.add_progressed_or_dead_col()
+        self.add_progressed_or_deceased_col()
         self.verify_survival()
 
         variant_type_to_format_funcs = {}
@@ -97,25 +97,25 @@ class Cohort(object):
 
         def func(row):
             if row[self.pfs_col] < row[self.os_col]:
-                if not row[self.progressed_or_dead_col]:
+                if not row[self.progressed_or_deceased_col]:
                     raise InvalidDataError(
                         "A patient did not progress despite PFS being less than OS. "
                         "Full row: %s" % row)
         self.clinical_dataframe.apply(func, axis=1)
 
-    def add_progressed_or_dead_col(self):
-        assert self.progressed_col is not None or self.progressed_or_dead_col is not None, (
-            "Need at least one of progressed_col and progressed_or_dead_col")
-        if self.progressed_or_dead_col is None:
-            self.progressed_or_dead_col = "progressed_or_dead"
-            self.clinical_dataframe[self.progressed_or_dead_col] = (
-                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col])
+    def add_progressed_or_deceased_col(self):
+        assert self.progressed_col is not None or self.progressed_or_deceased_col is not None, (
+            "Need at least one of progressed_col and progressed_or_deceased_col")
+        if self.progressed_or_deceased_col is None:
+            self.progressed_or_deceased_col = "progressed_or_deceased"
+            self.clinical_dataframe[self.progressed_or_deceased_col] = (
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.deceased_col])
 
         # If we have both of these columns, ensure that they're in sync
-        if self.progressed_or_dead_col is not None and self.progressed_col is not None:
-            assert self.clinical_dataframe[self.progressed_or_dead_col].equals(
-                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.dead_col]), (
-                    "progressed_or_dead_col should equal progressed_col || dead_col")
+        if self.progressed_or_deceased_col is not None and self.progressed_col is not None:
+            assert self.clinical_dataframe[self.progressed_or_deceased_col].equals(
+                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.deceased_col]), (
+                    "progressed_or_deceased_col should equal progressed_col || deceased_col")
 
     def load_from_cache(self, cache_name, sample_id, file_name):
         if not self.cache_results:
@@ -380,7 +380,7 @@ class Cohort(object):
             df=df,
             condition_col=plot_col,
             xlabel='Overall Survival' if how == "os" else 'Progression-Free Survival',
-            censor_col=self.dead_col if how == "os" else self.progressed_or_dead_col,
+            censor_col=self.deceased_col if how == "os" else self.progressed_or_deceased_col,
             survival_col=self.os_col if how == "os" else self.pfs_col,
             threshold=threshold if threshold is not None else default_threshold)
         print(results)

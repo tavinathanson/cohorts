@@ -54,8 +54,8 @@ def test_snv_counts():
             clinical_dataframe_id_col="id",
             os_col="OS",
             pfs_col="PFS",
-            dead_col="dead",
-            progressed_or_dead_col="progressed_or_dead",
+            deceased_col="deceased",
+            progressed_or_deceased_col="progressed_or_deceased",
             snv_file_format_funcs=[file_format_func_1])
 
         # The SNV count should be exactly what we generated
@@ -90,8 +90,8 @@ def make_cohort(file_format_funcs):
         clinical_dataframe_id_col="id",
         os_col="OS",
         pfs_col="PFS",
-        dead_col="dead",
-        progressed_or_dead_col="progressed_or_dead",
+        deceased_col="deceased",
+        progressed_or_deceased_col="progressed_or_deceased",
         snv_file_format_funcs=file_format_funcs))
 
 def test_merge_three():

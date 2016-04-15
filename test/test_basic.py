@@ -26,13 +26,13 @@ from nose.tools import raises, eq_
 def make_simple_clinical_dataframe(
         os_list=None,
         pfs_list=None,
-        dead_list=None,
-        progressed_or_dead_list=None):
+        deceased_list=None,
+        progressed_or_deceased_list=None):
     return pd.DataFrame({"id": [1, 4, 5],
                          "OS": [100, 150, 120] if os_list is None else os_list,
                          "PFS": [50, 40, 120] if pfs_list is None else pfs_list,
-                         "dead": [True, False, False] if dead_list is None else dead_list,
-                         "progressed_or_dead": [True, True, False] if progressed_or_dead_list is None else progressed_or_dead_list})
+                         "deceased": [True, False, False] if deceased_list is None else deceased_list,
+                         "progressed_or_deceased": [True, True, False] if progressed_or_deceased_list is None else progressed_or_deceased_list})
 
 def make_simple_cohort(**kwargs):
     clinical_dataframe = make_simple_clinical_dataframe(**kwargs)
@@ -44,8 +44,8 @@ def make_simple_cohort(**kwargs):
         clinical_dataframe_id_col="id",
         os_col="OS",
         pfs_col="PFS",
-        dead_col="dead",
-        progressed_or_dead_col="progressed_or_dead")
+        deceased_col="deceased",
+        progressed_or_deceased_col="progressed_or_deceased")
 
 def test_pfs_equal_to_os():
     # Should not error
@@ -57,7 +57,7 @@ def test_pfs_greater_than_os():
 
 @raises(InvalidDataError)
 def test_progressed_vs_pfs():
-    make_simple_cohort(progressed_or_dead_list=[True, False, False])
+    make_simple_cohort(progressed_or_deceased_list=[True, False, False])
 
 def test_simple_cohort():
     cohort = make_simple_cohort()
