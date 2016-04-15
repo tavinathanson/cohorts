@@ -317,7 +317,8 @@ class Cohort(object):
         ----------
         on : See `cohort.load.plot_init`
         col : str, optional
-            If `on` is not specified, the column name on which to split the cohort
+            If specified, store the result of `on` or compare the column specified with `col_equals`
+            See `cohort.load.plot_init`
         col_equals : str, optional
             Fixed value of `col` on which to split the cohort
 
@@ -353,7 +354,8 @@ class Cohort(object):
         ----------
         on :  See `cohort.load.plot_init`
         col : str, optional
-            If `on` is not specified, the column name on which to split the cohort
+            If specified, store the result of `on` or compare the column specified with `col_equals`
+            See `cohort.load.plot_init`
         col_equals : str, optional
             Fixed value of `col` on which to split the cohort
         how : {'os', 'pfs'}, optional 
@@ -376,7 +378,7 @@ class Cohort(object):
             survival_col=self.os_col if how == "os" else self.pfs_col,
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
-              
+            
 def col_func(cohort, on, col, col_equals):
     df = cohort.clinical_dataframe.copy()
     df[on] = df[col] == col_equals
