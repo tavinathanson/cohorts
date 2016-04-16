@@ -17,6 +17,10 @@ from __future__ import print_function
 from os import path, makedirs
 from shutil import rmtree
 import pandas as pd
+import numpy as np
+
+# pylint doesn't like this line
+# pylint: disable=no-name-in-module
 import six.moves.cPickle as pickle
 from types import FunctionType
 
@@ -72,7 +76,7 @@ class Cohort(object):
 
         for bam_ids in [self.normal_bam_ids, self.tumor_bam_ids]:
             if bam_ids is not None:
-                assert len(self.sample_ids) == len(self.bam_ids), (
+                assert len(self.sample_ids) == len(bam_ids), (
                     "All ID lists must be of equal length")
 
         self.add_progressed_or_deceased_col()
@@ -184,7 +188,7 @@ class Cohort(object):
 
         if len(combined_variants) == 1:
             # There is nothing to merge
-            merged_variants =  VariantCollection(*combined_variants)
+            merged_variants =  VariantCollection(combined_variants[0])
         else:
             assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
             if merge_type == "union":
