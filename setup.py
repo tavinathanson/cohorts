@@ -58,7 +58,7 @@ if __name__ == "__main__":
         install_requires=[
             "pandas>=0.15",
             "seaborn>=0.7.0",
-            "scipy>=0.16.1",
+            "scipy>=0.17.0",
             "topiary>=0.0.15",
             "six>=1.10.0",
             "lifelines>=0.9.1.0"
