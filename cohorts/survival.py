@@ -58,7 +58,7 @@ def plot_kmf(df,
     else:
         condition = df[condition_col]
         label = '{}'.format(condition_col)
-                       
+
     df_with_condition = df[condition]
     df_no_condition = df[~condition]
     survival_no_condition = df_no_condition[survival_col]

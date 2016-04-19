@@ -1,0 +1,64 @@
+# Copyright (c) 2016. Mount Sinai School of Medicine
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import print_function
+
+from . import data_path, generated_data_path, DATA_DIR
+from .data_generate import generate_vcfs
+
+from cohorts import Cohort
+from cohorts.load import InvalidDataError
+
+import pandas as pd 
+from nose.tools import raises, eq_
+
+def make_simple_clinical_dataframe(
+        os_list=None,
+        pfs_list=None,
+        deceased_list=None,
+        progressed_or_deceased_list=None):
+    return pd.DataFrame({"id": [1, 4, 5],
+                         "OS": [100, 150, 120] if os_list is None else os_list,
+                         "PFS": [50, 40, 120] if pfs_list is None else pfs_list,
+                         "deceased": [True, False, False] if deceased_list is None else deceased_list,
+                         "progressed_or_deceased": [True, True, False] if progressed_or_deceased_list is None else progressed_or_deceased_list})
+
+def make_simple_cohort(**kwargs):
+    clinical_dataframe = make_simple_clinical_dataframe(**kwargs)
+    return Cohort(
+        data_dir=DATA_DIR,
+        cache_dir=generated_data_path("cache"),
+        sample_ids=list(clinical_dataframe["id"]),
+        clinical_dataframe=clinical_dataframe,
+        clinical_dataframe_id_col="id",
+        os_col="OS",
+        pfs_col="PFS",
+        deceased_col="deceased",
+        progressed_or_deceased_col="progressed_or_deceased")
+
+def test_pfs_equal_to_os():
+    # Should not error
+    make_simple_cohort(pfs_list=[100, 150, 120])
+
+@raises(InvalidDataError)
+def test_pfs_greater_than_os():
+    make_simple_cohort(pfs_list=[120, 150, 120])
+
+@raises(InvalidDataError)
+def test_progressed_vs_pfs():
+    make_simple_cohort(progressed_or_deceased_list=[True, False, False])
+
+def test_simple_cohort():
+    cohort = make_simple_cohort()
+    eq_(len(cohort.clinical_dataframe), 3)

@@ -40,7 +40,7 @@ except ImportError as e:
 if __name__ == "__main__":
     setup(
         name="cohorts",
-        version="0.0.2",
+        version="0.0.3",
         description="Utilities for analyzing mutations and neoepitopes in patient cohorts",
         author="Tavi Nathanson",
         author_email="tavi {dot} nathanson {at} gmail {dot} com",
@@ -58,10 +58,10 @@ if __name__ == "__main__":
         install_requires=[
             "pandas>=0.15",
             "seaborn>=0.7.0",
-            "scipy>=0.16.1",
+            "scipy>=0.17.0",
             "topiary>=0.0.15",
             "six>=1.10.0",
-            "lifelines>=0.9.1.0,"
+            "lifelines>=0.9.1.0"
         ],
         long_description=readme,
         packages=["cohorts"],

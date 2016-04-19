@@ -20,24 +20,24 @@ import pandas as pd
 from varcode import EffectCollection
 from varcode.effects import Substitution
 
-def snv_count(cohort):
-    sample_variants = cohort.load_variants()
+def snv_count(cohort, **kwargs):
+    sample_variants = cohort.load_variants(**kwargs)
     def count_func(sample):
         if sample in sample_variants:
             return len(sample_variants[sample])
         return np.nan
     return count(cohort, count_func, count_col="snv_count")
 
-def nonsynonymous_snv_count(cohort):
-    sample_nonsynonymous_effects = cohort.load_effects(only_nonsynonymous=True)
+def nonsynonymous_snv_count(cohort, **kwargs):
+    sample_nonsynonymous_effects = cohort.load_effects(only_nonsynonymous=True, **kwargs)
     def count_func(sample):
         if sample in sample_nonsynonymous_effects:
             return len(sample_nonsynonymous_effects[sample])
         return np.nan
     return count(cohort, count_func, count_col="nonsynonymous_snv_count")
 
-def missense_snv_count(cohort):
-    sample_nonsynonymous_effects = cohort.load_effects(only_nonsynonymous=True)
+def missense_snv_count(cohort, **kwargs):
+    sample_nonsynonymous_effects = cohort.load_effects(only_nonsynonymous=True, **kwargs)
     sample_missense_effects = dict(
         [(sample,
           EffectCollection(
@@ -49,8 +49,8 @@ def missense_snv_count(cohort):
         return np.nan
     return count(cohort, count_func, count_col="missense_snv_count")
 
-def neoantigen_count(cohort):
-    sample_neoantigens = cohort.load_neoantigens()
+def neoantigen_count(cohort, **kwargs):
+    sample_neoantigens = cohort.load_neoantigens(**kwargs)
     def count_func(sample):
         if sample in sample_neoantigens["sample_id"].unique():
             return len(sample_neoantigens[sample_neoantigens["sample_id"] == sample])
