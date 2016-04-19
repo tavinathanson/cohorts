@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/tavinathanson/cohorts.svg?branch=master)](https://travis-ci.org/tavinathanson/cohorts) [![Coverage Status](https://coveralls.io/repos/tavinathanson/cohorts/badge.svg?branch=master&service=github)](https://coveralls.io/github/tavinathanson/cohorts?branch=master)
+[![Build Status](https://travis-ci.org/hammerlab/cohorts.svg?branch=master)](https://travis-ci.org/hammerlab/cohorts) [![Coverage Status](https://coveralls.io/repos/hammerlab/cohorts/badge.svg?branch=master&service=github)](https://coveralls.io/github/hammerlab/cohorts?branch=master)
 
 Cohorts
 =======

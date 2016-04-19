@@ -40,7 +40,7 @@ except ImportError as e:
 if __name__ == "__main__":
     setup(
         name="cohorts",
-        version="0.0.3",
+        version="0.0.4",
         description="Utilities for analyzing mutations and neoepitopes in patient cohorts",
         author="Tavi Nathanson",
         author_email="tavi {dot} nathanson {at} gmail {dot} com",
