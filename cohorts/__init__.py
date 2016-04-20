@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from .load import *
+
+__version__ = "0.0.5"
