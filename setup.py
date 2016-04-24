@@ -63,7 +63,8 @@ if __name__ == "__main__":
             "scipy>=0.17.0",
             "topiary>=0.0.15",
             "six>=1.10.0",
-            "lifelines>=0.9.1.0"
+            "lifelines>=0.9.1.0",
+            "isovar>=0.0.2"
         ],
         long_description=readme,
         packages=["cohorts"],
