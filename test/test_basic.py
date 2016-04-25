@@ -20,7 +20,7 @@ from .data_generate import generate_vcfs
 from cohorts import Cohort
 from cohorts.load import InvalidDataError
 
-import pandas as pd 
+import pandas as pd
 from nose.tools import raises, eq_
 
 def make_simple_clinical_dataframe(

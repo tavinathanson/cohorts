@@ -65,7 +65,8 @@ def fishers_exact_plot(data, condition1, condition2):
     print("Fisher's Exact Test: OR: {}, p-value={}".format(oddsratio, pvalue))
     return (oddsratio, pvalue, plot)
 
-def mann_whitney_plot(data, condition, distribution, condition_value=None):
+def mann_whitney_plot(data, condition, distribution,
+                      condition_value=None, alternative="two-sided"):
     """
     Create a box plot comparing a condition and perform a
     Mann Whitney test to compare the distribution in condition A v B
@@ -83,6 +84,10 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
 
     condition_value:
         If `condition` is not a binary column, split on =/!= to condition_value
+
+    alternative:
+        Specify the sidedness of the Mann-Whitney test: "two-sided", "less"
+        or "greater"
     """
 
     plot = stripboxplot(
@@ -98,6 +103,7 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
     U, pvalue = mannwhitneyu(
         data[condition_mask][distribution],
         data[~condition_mask][distribution],
+        alternative=alternative
     )
 
     print("Mann-Whitney test: U={}, p-value={}".format(U, pvalue))
