@@ -28,7 +28,7 @@ def stripboxplot(x, y, data, **kwargs):
         data=data
     )
 
-    sb.stripplot(
+    return sb.stripplot(
         x=x,
         y=y,
         data=data,
@@ -53,7 +53,7 @@ def fishers_exact_plot(data, condition1, condition2):
     condition2: str
         Second binary column to compare
     """
-    sb.factorplot(
+    plot = sb.factorplot(
         x=condition1,
         y=condition2,
         kind='bar',
@@ -63,7 +63,7 @@ def fishers_exact_plot(data, condition1, condition2):
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table)
     print("Fisher's Exact Test: OR: {}, p-value={}".format(oddsratio, pvalue))
-    return (oddsratio, pvalue)
+    return (oddsratio, pvalue, plot)
 
 def mann_whitney_plot(data, condition, distribution, condition_value=None):
     """
@@ -85,7 +85,7 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
         If `condition` is not a binary column, split on =/!= to condition_value
     """
 
-    stripboxplot(
+    plot = stripboxplot(
         x=condition,
         y=distribution,
         data=data
@@ -101,4 +101,4 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
     )
 
     print("Mann-Whitney test: U={}, p-value={}".format(U, pvalue))
-    return (U, pvalue)
+    return (U, pvalue, plot)
