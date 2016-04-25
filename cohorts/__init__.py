@@ -14,4 +14,6 @@
 
 from .load import *
 
-__version__ = "0.0.5"
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
