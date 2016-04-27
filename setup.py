@@ -14,9 +14,8 @@
 
 from __future__ import print_function
 import os
-import re
-
 from setuptools import setup
+import versioneer
 
 current_directory = os.path.dirname(__file__)
 readme_filename = "README.md"
@@ -38,16 +37,12 @@ except ImportError as e:
     print("Failed to convert %s to reStructuredText", readme_filename)
     pass
 
-with open('cohorts/__init__.py', 'r') as f:
-    version = re.search(
-        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
-        f.read(),
-        re.MULTILINE).group(1)
 
 if __name__ == "__main__":
     setup(
         name="cohorts",
-        version=version,
+        version=versioneer.get_version(),
+        cmdclass=versioneer.get_cmdclass(),
         description="Utilities for analyzing mutations and neoepitopes in patient cohorts",
         author="Tavi Nathanson",
         author_email="tavi {dot} nathanson {at} gmail {dot} com",
