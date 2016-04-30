@@ -26,7 +26,7 @@ from types import FunctionType
 from collections import defaultdict
 
 import varcode
-from varcode import VariantCollection, EffectCollection, Collection
+from varcode import VariantCollection, EffectCollection
 from mhctools import NetMHCcons, EpitopeCollection
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
@@ -35,6 +35,7 @@ from pysam import AlignmentFile
 
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot
+from .collection import Collection
 
 class InvalidDataError(ValueError):
     pass
@@ -172,10 +173,7 @@ class Cohort(Collection):
                  extra_dataframes=[]):
         Collection.__init__(
             self,
-            elements=patients,
-            path=None,
-            distinct=False,
-            sort_key=None)
+            elements=patients)
         self.cache_dir = cache_dir
         self.cache_results = cache_results
         self.extra_dataframes = extra_dataframes
