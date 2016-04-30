@@ -17,7 +17,7 @@ from __future__ import print_function
 from . import data_path, generated_data_path, DATA_DIR
 from .data_generate import generate_vcfs
 
-from cohorts import Cohort
+from cohorts import Cohort, PairedSample, DataFile
 from cohorts.count import *
 
 import pandas as pd
@@ -25,38 +25,30 @@ from nose.tools import raises, eq_
 from os import path
 from shutil import rmtree
 
-from .test_basic import make_simple_clinical_dataframe
+from .test_basic import make_simple_cohort
 
-def file_format_func_1(sample_id, normal_bam_id, tumor_bam_id):
-    return "sample_format1_%d.vcf" % sample_id
-
-def file_format_func_2(sample_id, normal_bam_id, tumor_bam_id):
-    return "sample_format2_%d.vcf" % sample_id
-
-def file_format_func_3(sample_id, normal_bam_id, tumor_bam_id):
-    return "sample_format3_%d.vcf" % sample_id
+FILE_FORMAT_1 = "patient_format1_%s.vcf"
+FILE_FORMAT_2 = "patient_format2_%s.vcf"
+FILE_FORMAT_3 = "patient_format3_%s.vcf"
 
 def test_snv_counts():
     """
     Generate VCFs per-sample, and confirm that the counting functions work as expected.
     """
-    clinical_dataframe = make_simple_clinical_dataframe()
-    sample_ids = list(clinical_dataframe["id"])
-    vcf_dir, cohort = None, None
+    cohort = make_simple_cohort()
+    vcf_dir = None
     try:
-        vcf_dir = generate_vcfs(dict(zip(sample_ids, [4, 3, 6])),
-                                file_format_func_1, template_name="vcf_template_1.vcf")
-        cohort = Cohort(
-            data_dir=vcf_dir,
-            cache_dir=generated_data_path("cache"),
-            sample_ids=sample_ids,
-            clinical_dataframe=make_simple_clinical_dataframe(),
-            clinical_dataframe_id_col="id",
-            os_col="OS",
-            pfs_col="PFS",
-            deceased_col="deceased",
-            progressed_or_deceased_col="progressed_or_deceased",
-            snv_file_format_funcs=[file_format_func_1])
+        patient_ids = [patient.id for patient in cohort]
+        vcf_dir = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [4, 3, 6])),
+                                file_format=FILE_FORMAT_1,
+                                template_name="vcf_template_1.vcf")
+        for patient in cohort:
+            vcf_filename = (FILE_FORMAT_1 % patient.id)
+            vcf_path = path.join(vcf_dir, vcf_filename)
+            vcf = DataFile(id=None, path=vcf_path)
+            patient.paired_samples = [PairedSample(
+                id=patient.id,
+                vcfs=[vcf])]
 
         # The SNV count should be exactly what we generated
         count_col, df = snv_count(cohort)

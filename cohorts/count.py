@@ -59,7 +59,7 @@ def neoantigen_count(cohort, **kwargs):
 
 def count(cohort, count_func, count_col):
     df = cohort.clinical_dataframe.copy()
-    df[count_col] = df[cohort.clinical_dataframe_id_col].map(count_func)
+    df[count_col] = df["patient_id"].map(count_func)
     original_len = len(df)
     df = df[~df[count_col].isnull()]
     updated_len = len(df)
