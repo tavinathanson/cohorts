@@ -102,7 +102,7 @@ class PairedSample(object):
 
 class Patient(object):
     """
-    Presents a patient, which contains one or more `PairedSample`s.
+    Represents a patient, which contains one or more `PairedSample`s.
     """
     def __init__(self,
                  id,
@@ -150,29 +150,38 @@ class Patient(object):
             self.__class__ == other.__class__ and
             self.id == other.id)
 
-class Cohort(Collection):
-    """Represents a cohort of patients."""
+class CohortDataFrame(object):
+    def __init__(self,
+                 name,
+                 dataframe,
+                 group_by,
+                 id_col):
+        self.name = name
+        self.dataframe = dataframe
+        self.group_by = group_by
+        self.id_col = id_col
 
+class Cohort(Collection):
+    """
+    Represents a cohort of `Patient`s.
+    """
     def __init__(self,
                  patients,
                  cache_dir,
-                 cache_results=True):
+                 cache_results=True,
+                 extra_dataframes=[]):
         Collection.__init__(
             self,
             elements=patients,
             path=None,
             distinct=False,
             sort_key=None)
+        self.cache_dir = cache_dir
+        self.cache_results = cache_results
+        self.extra_dataframes = extra_dataframes
 
         self.verify_id_uniqueness()
-
-        self.cache_dir = cache_dir
-
-        self.cache_results = cache_results
-        self.clinical_dataframe = self.as_dataframe()
-        self.verify_survival(self.clinical_dataframe)
-
-        self.paired_sample_to_patient = self.build_paired_sample_to_patient(patients)
+        self.verify_survival()
 
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
@@ -199,9 +208,10 @@ class Cohort(Collection):
         if len(sample_ids) != len(list(self.iter_samples())):
             raise ValueError("Non-unique sample IDs")
 
-    def verify_survival(self, clinical_dataframe):
-        if not (clinical_dataframe["pfs"] <=
-                clinical_dataframe["os"]).all():
+    def verify_survival(self):
+        cohort_dataframe = self.as_dataframe()
+        if not (cohort_dataframe["pfs"] <=
+                cohort_dataframe["os"]).all():
             raise InvalidDataError("PFS should be <= OS, but PFS is larger than OS for some patients.")
 
         def func(row):
@@ -210,24 +220,25 @@ class Cohort(Collection):
                     raise InvalidDataError(
                         "A patient did not progress despite PFS being less than OS. "
                         "Full row: %s" % row)
-        clinical_dataframe.apply(func, axis=1)
+        cohort_dataframe.apply(func, axis=1)
 
     def verify_cache(self, cache_names):
         bad_caches = []
         for cache_name in cache_names.values():
             cache_dir = path.join(self.cache_dir, cache_name)
-            cache_subdirs = set(listdir(cache_dir))
-            cache_int_subdirs = set([int(name) for name in cache_subdirs])
-            if len(cache_subdirs) != len(cache_int_subdirs):
-                bad_caches.append(cache_name)
+            if path.exists(cache_dir):
+                cache_subdirs = set(listdir(cache_dir))
+                cache_int_subdirs = set([int(name) for name in cache_subdirs])
+                if len(cache_subdirs) != len(cache_int_subdirs):
+                    bad_caches.append(cache_name)
 
         if len(bad_caches) > 0:
             raise ValueError("Caches %s have duplicate int/str directories" %
                              str(bad_caches))
 
-    def build_paired_sample_to_patient(self, patients):
+    def build_paired_sample_to_patient(self):
         paired_sample_to_patient = {}
-        for patient in patients:
+        for patient in self.elements:
             for paired_sample in patient.paired_samples:
                 paired_sample_to_patient[paired_sample] = patient
         return paired_sample_to_patient
@@ -243,13 +254,21 @@ class Cohort(Collection):
                 for sample in paired_sample.samples:
                     yield sample
 
-    def as_dataframe(self, group_by="patient"):
-        if group_by not in ["patient", "paired_sample"]:
-            raise ValueError("Invalid group_by: %s" % group_by)
+    def as_dataframe(self, group_by="patient", with_extra_dataframes=[],
+                     extra_join_how="outer"):
+        verify_group_by(group_by)
 
         df = pd.DataFrame()
+        filtered_extra_dataframes = []
+        for extra_dataframe in self.extra_dataframes:
+            if extra_dataframe.name in with_extra_dataframes:
+                if extra_dataframe.group_by != group_by:
+                    raise ValueError("Requested extra DataFrame %s, but wrong group_by %s" % (extra_dataframe.name, extra_dataframe.group_by))
+                filtered_extra_dataframes.append(extra_dataframe)
+
         if group_by == "paired_sample":
-            patient_samples = [(self.paired_sample_to_patient[sample], sample)
+            paired_sample_to_patient = self.build_paired_sample_to_patient()
+            patient_samples = [(paired_sample_to_patient[sample], sample)
                                 for sample in self.iter_paired_samples()]
             df["patient_id"] = pd.Series([patient.id for (patient, sample)
                                           in patient_samples])
@@ -277,7 +296,15 @@ class Cohort(Collection):
                     additional_data_all_patients[key].append(value)
 
         if len(additional_data_all_patients) > 0:
-            return df.merge(pd.DataFrame(additional_data_all_patients), on="patient_id", how="left")
+            df = df.merge(pd.DataFrame(additional_data_all_patients), on="patient_id", how="left")
+
+        for filtered_extra_dataframe in filtered_extra_dataframes:
+            left_on = "sample_id" if group_by == "paired_sample" else "patient_id"
+            df = df.merge(
+                filtered_extra_dataframe.dataframe,
+                left_on=left_on,
+                right_on=filtered_extra_dataframe.id_col,
+                how=extra_join_how)
         return df
 
     def load_from_cache(self, cache_name, sample_id, file_name):
@@ -516,12 +543,13 @@ class Cohort(Collection):
         if path.exists(cache_path):
             rmtree(cache_path)
 
-    def clinical_columns(self):
-        column_types = [self.clinical_dataframe[col].dtype for col in self.clinical_dataframe.columns]
-        return dict(zip(list(self.clinical_dataframe.columns), column_types))
+    def cohort_columns(self):
+        cohort_dataframe = self.as_dataframe()
+        column_types = [cohort_dataframe[col].dtype for col in cohort_dataframe.columns]
+        return dict(zip(list(cohort_dataframe.columns), column_types))
 
     def clinical_func(self, row_func, col):
-        df = self.clinical_dataframe.copy()
+        df = self.as_dataframe()
         df[col] = df.apply(row_func, axis=1)
         return col, df
 
@@ -540,8 +568,9 @@ class Cohort(Collection):
                 col = col if col is not None else "untitled"
                 return self.clinical_func(on, col)
         if type(on) == str:
-            if on in self.clinical_dataframe.columns:
-                return (on, self.clinical_dataframe)
+            cohort_dataframe = self.as_dataframe()
+            if on in cohort_dataframe.columns:
+                return (on, cohort_dataframe)
             else:
                 return col_func(self, on, col, col_equals)
 
@@ -620,6 +649,10 @@ class Cohort(Collection):
         print(results)
 
 def col_func(cohort, on, col, col_equals):
-    df = cohort.clinical_dataframe.copy()
+    df = cohort.as_dataframe()
     df[on] = df[col] == col_equals
     return on, df
+
+def verify_group_by(group_by):
+    if group_by not in ["patient", "paired_sample"]:
+        raise ValueError("Invalid group_by: %s" % group_by)

@@ -63,4 +63,4 @@ def test_progressed_vs_pfs():
 
 def test_simple_cohort():
     cohort = make_simple_cohort()
-    eq_(len(cohort.clinical_dataframe), 3)
+    eq_(len(cohort.as_dataframe()), 3)
