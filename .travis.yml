@@ -33,11 +33,6 @@ install:
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
-before_script:
-  # Imitate a display to allow for matplotlib plotting
-  - "export DISPLAY=:99.0"
-  - "sh -e /etc/init.d/xvfb start"
-  - sleep 3 # give xvfb some time to start
 script:
   - pyensembl install --release 75 --species human
   - nosetests test --with-coverage --cover-package=cohorts && ./lint.sh

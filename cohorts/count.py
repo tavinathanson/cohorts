@@ -57,9 +57,14 @@ def neoantigen_count(cohort, **kwargs):
         return np.nan
     return count(cohort, count_func, count_col="neoantigen_count")
 
-def count(cohort, count_func, count_col):
-    df = cohort.clinical_dataframe.copy()
-    df[count_col] = df[cohort.clinical_dataframe_id_col].map(count_func)
+def count(cohort, count_func, count_col, group_by="paired_sample"):
+    if group_by not in ["patient", "paired_sample"]:
+        raise ValueError("Invalid group_by: %s" % group_by)
+
+    id_col = "patient_id" if group_by == "patient" else "sample_id"
+
+    df = cohort.as_dataframe(group_by=group_by).copy()
+    df[count_col] = df[id_col].map(count_func)
     original_len = len(df)
     df = df[~df[count_col].isnull()]
     updated_len = len(df)

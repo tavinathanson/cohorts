@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-from os import path, makedirs
+from os import path, makedirs, listdir
 from shutil import rmtree
 import pandas as pd
 import numpy as np
@@ -23,9 +23,10 @@ import numpy as np
 # pylint: disable=no-name-in-module
 import six.moves.cPickle as pickle
 from types import FunctionType
+from collections import defaultdict
 
 import varcode
-from varcode import VariantCollection, EffectCollection
+from varcode import VariantCollection, EffectCollection, Collection
 from mhctools import NetMHCcons, EpitopeCollection
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
@@ -38,72 +39,140 @@ from .plot import mann_whitney_plot, fishers_exact_plot
 class InvalidDataError(ValueError):
     pass
 
-class Cohort(object):
+def require_id_str(id):
+    if type(id) != str:
+        raise ValueError("Expected ID string, but id = %s" % str(id))
+
+class Sample(object):
+    """
+    Represents a single tumor or normal sample. It can point to DNA and/or
+    RNA reads.
+    """
+    def __init__(self,
+                 id,
+                 is_tumor,
+                 bam_path_dna=None,
+                 bam_path_rna=None):
+        require_id_str(id)
+        assert bam_path_dna is not None or bam_path_rna is not None, (
+            "Must have DNA and/or RNA reads to create a Sample.")
+        self.id = id
+        self.is_tumor = is_tumor
+        self.bam_path_dna = bam_path_dna
+        self.bam_path_rna = bam_path_rna
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        return (
+            self.__class__ == other.__class__ and
+            self.id == other.id)
+
+class PairedSample(object):
+    """
+    Represents a tumor-normal sample pair, as well as pointing to data derived
+    from that pair (e.g. VCFs).
+    """
+    def __init__(self,
+                 id,
+                 snv_vcf_paths=[],
+                 indel_vcf_paths=[],
+                 normal_sample=None,
+                 tumor_sample=None):
+        require_id_str(id)
+        self.id = id
+        self.snv_vcf_paths = snv_vcf_paths
+        self.indel_vcf_paths = indel_vcf_paths
+        self.normal_sample = normal_sample
+        self.tumor_sample = tumor_sample
+        self.samples = [normal_sample, tumor_sample]
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        return (
+            self.__class__ == other.__class__ and
+            self.id == other.id)
+
+class Patient(object):
+    """
+    Presents a patient, which contains one or more `PairedSample`s.
+    """
+    def __init__(self,
+                 id,
+                 os,
+                 pfs,
+                 deceased,
+                 progressed=None,
+                 progressed_or_deceased=None,
+                 benefit=None,
+                 paired_samples=[],
+                 hla_alleles=None,
+                 additional_data=None):
+        require_id_str(id)
+        self.id = id
+        self.os = os
+        self.pfs = pfs
+        self.deceased = deceased
+        self.progressed = progressed
+        self.progressed_or_deceased = progressed_or_deceased
+        self.benefit = benefit
+        self.paired_samples = paired_samples
+        self.hla_alleles = hla_alleles
+        self.additional_data = additional_data
+
+        self.add_progressed_or_deceased()
+
+    def add_progressed_or_deceased(self):
+        assert self.progressed is not None or self.progressed_or_deceased is not None, (
+            "Need at least one of progressed and progressed_or_deceased")
+        if self.progressed_or_deceased is None:
+            self.progressed_or_deceased = self.progressed or self.deceased
+
+        # If we have both of these, ensure that they're in sync
+        if self.progressed_or_deceased is not None and self.progressed is not None:
+            assert self.progressed_or_deceased == self.progressed or self.deceased, (
+                    "progressed_or_deceased should equal progressed || deceased")
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        return (
+            self.__class__ == other.__class__ and
+            self.id == other.id)
+
+class Cohort(Collection):
     """Represents a cohort of patients."""
 
     def __init__(self,
-                 data_dir,
+                 patients,
                  cache_dir,
-                 sample_ids,
-                 clinical_dataframe,
-                 clinical_dataframe_id_col,
-                 os_col,
-                 pfs_col,
-                 deceased_col,
-                 progressed_col=None,
-                 progressed_or_deceased_col=None,
-                 normal_dna_bam_ids=None,
-                 tumor_dna_bam_ids=None,
-                 normal_rna_bam_ids=None,
-                 tumor_rna_bam_ids=None,
-                 benefit_col=None,
-                 hla_alleles=None,
-                 cache_results=True,
-                 snv_file_format_funcs=None,
-                 indel_file_format_funcs=None,
-                 normal_dna_bam_file_format_func=None,
-                 tumor_dna_bam_file_format_func=None,
-                 normal_rna_bam_file_format_func=None,
-                 tumor_rna_bam_file_format_func=None):
-        self.data_dir = data_dir
+                 cache_results=True):
+        Collection.__init__(
+            self,
+            elements=patients,
+            path=None,
+            distinct=False,
+            sort_key=None)
+
+        self.verify_id_uniqueness()
+
         self.cache_dir = cache_dir
-        self.sample_ids = sample_ids
-        self.clinical_dataframe = clinical_dataframe.copy()
-        self.clinical_dataframe_id_col = clinical_dataframe_id_col
-        self.normal_dna_bam_ids = normal_dna_bam_ids
-        self.tumor_dna_bam_ids = tumor_dna_bam_ids
-        self.normal_rna_bam_ids = normal_rna_bam_ids
-        self.tumor_rna_bam_ids = tumor_rna_bam_ids
-        self.benefit_col = benefit_col
-        self.os_col = os_col
-        self.pfs_col = pfs_col
-        self.deceased_col = deceased_col
-        self.progressed_col = progressed_col
-        self.progressed_or_deceased_col = progressed_or_deceased_col
-        self.hla_alleles = hla_alleles
+
         self.cache_results = cache_results
-        self.snv_file_format_funcs = snv_file_format_funcs
-        self.indel_file_format_funcs = indel_file_format_funcs
-        self.normal_dna_bam_file_format_func = normal_dna_bam_file_format_func
-        self.tumor_dna_bam_file_format_func = tumor_dna_bam_file_format_func
-        self.normal_rna_bam_file_format_func = normal_rna_bam_file_format_func
-        self.tumor_rna_bam_file_format_func = tumor_rna_bam_file_format_func
+        self.clinical_dataframe = self.as_dataframe()
+        self.verify_survival(self.clinical_dataframe)
 
-        for bam_ids in [self.normal_dna_bam_ids, self.tumor_dna_bam_ids,
-                        self.normal_rna_bam_ids, self.tumor_rna_bam_ids]:
-            if bam_ids is not None:
-                assert len(self.sample_ids) == len(bam_ids), (
-                    "All ID lists must be of equal length")
-
-        self.add_progressed_or_deceased_col()
-        self.verify_survival()
-
-        variant_type_to_format_funcs = {}
-        if self.snv_file_format_funcs is not None:
-            variant_type_to_format_funcs["snv"] = self.snv_file_format_funcs
-        if self.indel_file_format_funcs is not None:
-            variant_type_to_format_funcs["indel"] = self.indel_file_format_funcs
-        self.variant_type_to_format_funcs = variant_type_to_format_funcs
+        self.paired_sample_to_patient = self.build_paired_sample_to_patient(patients)
 
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
@@ -111,33 +180,105 @@ class Cohort(object):
                             "neoantigen": "cached-neoantigens",
                             "expressed_neoantigen": "cached-expressed-neoantigens",
                             "isovar": "cached-isovar-output"}
+        self.verify_cache(self.cache_names)
 
-    def verify_survival(self):
-        if not (self.clinical_dataframe[self.pfs_col] <=
-                self.clinical_dataframe[self.os_col]).all():
+    def verify_id_uniqueness(self):
+        patient_ids = set()
+        paired_sample_ids = set()
+        sample_ids = set()
+        for patient in self.elements:
+            patient_ids.add(patient.id)
+            for paired_sample in patient.paired_samples:
+                paired_sample_ids.add(paired_sample.id)
+                for sample in paired_sample.samples:
+                    sample_ids.add(sample.id)
+        if len(patient_ids) != len(self.elements):
+            raise ValueError("Non-unique patient IDs")
+        if len(paired_sample_ids) != len(list(self.iter_paired_samples())):
+            raise ValueError("Non-unique paired sample IDs")
+        if len(sample_ids) != len(list(self.iter_samples())):
+            raise ValueError("Non-unique sample IDs")
+
+    def verify_survival(self, clinical_dataframe):
+        if not (clinical_dataframe["pfs"] <=
+                clinical_dataframe["os"]).all():
             raise InvalidDataError("PFS should be <= OS, but PFS is larger than OS for some patients.")
 
         def func(row):
-            if row[self.pfs_col] < row[self.os_col]:
-                if not row[self.progressed_or_deceased_col]:
+            if row["pfs"] < row["os"]:
+                if not row["progressed_or_deceased"]:
                     raise InvalidDataError(
                         "A patient did not progress despite PFS being less than OS. "
                         "Full row: %s" % row)
-        self.clinical_dataframe.apply(func, axis=1)
+        clinical_dataframe.apply(func, axis=1)
 
-    def add_progressed_or_deceased_col(self):
-        assert self.progressed_col is not None or self.progressed_or_deceased_col is not None, (
-            "Need at least one of progressed_col and progressed_or_deceased_col")
-        if self.progressed_or_deceased_col is None:
-            self.progressed_or_deceased_col = "progressed_or_deceased"
-            self.clinical_dataframe[self.progressed_or_deceased_col] = (
-                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.deceased_col])
+    def verify_cache(self, cache_names):
+        bad_caches = []
+        for cache_name in cache_names.values():
+            cache_dir = path.join(self.cache_dir, cache_name)
+            cache_subdirs = set(listdir(cache_dir))
+            cache_int_subdirs = set([int(name) for name in cache_subdirs])
+            if len(cache_subdirs) != len(cache_int_subdirs):
+                bad_caches.append(cache_name)
 
-        # If we have both of these columns, ensure that they're in sync
-        if self.progressed_or_deceased_col is not None and self.progressed_col is not None:
-            assert self.clinical_dataframe[self.progressed_or_deceased_col].equals(
-                self.clinical_dataframe[self.progressed_col] | self.clinical_dataframe[self.deceased_col]), (
-                    "progressed_or_deceased_col should equal progressed_col || deceased_col")
+        if len(bad_caches) > 0:
+            raise ValueError("Caches %s have duplicate int/str directories" %
+                             str(bad_caches))
+
+    def build_paired_sample_to_patient(self, patients):
+        paired_sample_to_patient = {}
+        for patient in patients:
+            for paired_sample in patient.paired_samples:
+                paired_sample_to_patient[paired_sample] = patient
+        return paired_sample_to_patient
+
+    def iter_paired_samples(self):
+        for patient in self.elements:
+            for paired_sample in patient.paired_samples:
+                yield paired_sample
+
+    def iter_samples(self):
+        for patient in self.elements:
+            for paired_sample in patient.paired_samples:
+                for sample in paired_sample.samples:
+                    yield sample
+
+    def as_dataframe(self, group_by="patient"):
+        if group_by not in ["patient", "paired_sample"]:
+            raise ValueError("Invalid group_by: %s" % group_by)
+
+        df = pd.DataFrame()
+        if group_by == "paired_sample":
+            patient_samples = [(self.paired_sample_to_patient[sample], sample)
+                                for sample in self.iter_paired_samples()]
+            df["patient_id"] = pd.Series([patient.id for (patient, sample)
+                                          in patient_samples])
+            df["sample_id"] = pd.Series([sample.id for (patient, sample)
+                                         in patient_samples])
+            patients = [patient for (patient, sample) in patient_samples]
+            num_patients_with_samples = len(set(patients))
+            num_patients = len(set(self.elements))
+            num_patients_without_samples = len(set(self.elements).difference(set(patients)))
+            if num_patients != num_patients_with_samples:
+                print("Missing samples for %d patients: from %d to %d" % (
+                    num_patients_without_samples, num_patients, num_patients_with_samples))
+        else:
+            patients = self.elements
+            df["patient_id"] = pd.Series([patient.id for patient in patients])
+
+        for clinical_col in ["benefit", "os", "pfs", "deceased",
+                             "progressed", "progressed_or_deceased"]:
+            df[clinical_col] = pd.Series([getattr(patient, clinical_col) for patient in patients])
+
+        additional_data_all_patients = defaultdict(list)
+        for patient in patients:
+            if patient.additional_data is not None:
+                for key, value in patient.additional_data.items():
+                    additional_data_all_patients[key].append(value)
+
+        if len(additional_data_all_patients) > 0:
+            return df.merge(pd.DataFrame(additional_data_all_patients), on="patient_id", how="left")
+        return df
 
     def load_from_cache(self, cache_name, sample_id, file_name):
         if not self.cache_results:
@@ -151,7 +292,8 @@ class Cohort(object):
             return None
 
         if path.splitext(cache_file)[1] == ".csv":
-            return pd.read_csv(cache_file)
+            return pd.read_csv(cache_file, dtype={"sample_id": object,
+                                                  "patient_id": object})
         else:
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
@@ -177,31 +319,27 @@ class Cohort(object):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         sample_variants = {}
 
-        for i, sample_id in enumerate(self.sample_ids):
+        for sample in self.iter_paired_samples():
             try:
                 variants = self._load_single_sample_variants(
-                    i, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type)
+                    sample, variant_type, merge_type)
             except IOError:
-                print("Variants did not exist for %s" % sample_id)
+                print("Variants did not exist for %s" % sample)
                 continue
 
-            sample_variants[sample_id] = variants
+            sample_variants[sample.id] = variants
         return sample_variants
 
-    def _load_single_sample_variants(self, sample_idx, file_format_funcs, variant_type, merge_type):
-        sample_id = self.sample_ids[sample_idx]
-        normal_dna_bam_id = None if self.normal_dna_bam_ids is None else self.normal_dna_bam_ids[sample_idx]
-        tumor_dna_bam_id = None if self.tumor_dna_bam_ids is None else self.tumor_dna_bam_ids[sample_idx]
+    def _load_single_sample_variants(self, sample, variant_type, merge_type):
         cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
-        cached = self.load_from_cache(self.cache_names["variant"], sample_id, cached_file_name)
+        cached = self.load_from_cache(self.cache_names["variant"], sample.id, cached_file_name)
         if cached is not None:
             return cached
 
         combined_variants = []
-        for file_format_func in file_format_funcs:
-            file_name = file_format_func(
-                sample_id, normal_dna_bam_id, tumor_dna_bam_id)
-            variants = varcode.load_vcf_fast(path.join(self.data_dir, file_name))
+        vcf_paths = sample.snv_vcf_paths if variant_type == "snv" else sample.indel_vcf_paths
+        for vcf_path in vcf_paths:
+            variants = varcode.load_vcf_fast(vcf_path)
             combined_variants.append(set(variants.elements))
 
         if len(combined_variants) == 1:
@@ -214,38 +352,36 @@ class Cohort(object):
             elif merge_type == "intersection":
                 merged_variants = VariantCollection(set.intersection(*combined_variants))
 
-        self.save_to_cache(merged_variants, self.cache_names["variant"], sample_id, cached_file_name)
+        self.save_to_cache(merged_variants, self.cache_names["variant"], sample.id, cached_file_name)
 
         return merged_variants
 
     def load_effects(self, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
         sample_effects = {}
-        for i, sample_id in enumerate(self.sample_ids):
+        for sample in self.iter_paired_samples():
             effects = self._load_single_sample_effects(
-                i, self.variant_type_to_format_funcs, only_nonsynonymous, variant_type, merge_type)
-            sample_effects[sample_id] = effects
+                sample, only_nonsynonymous, variant_type, merge_type)
+            sample_effects[sample.id] = effects
         return sample_effects
 
-    def _load_single_sample_effects(self, sample_idx, file_format_funcs,
-                                    only_nonsynonymous, variant_type, merge_type):
-        sample_id = self.sample_ids[sample_idx]
-
+    def _load_single_sample_effects(self, sample, only_nonsynonymous,
+                                    variant_type, merge_type):
         cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
         if only_nonsynonymous:
-            cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], sample_id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], sample.id, cached_file_name)
         else:
-            cached = self.load_from_cache(self.cache_names["effect"], sample_id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["effect"], sample.id, cached_file_name)
         if cached is not None:
             return cached
 
         variants = self._load_single_sample_variants(
-            sample_idx, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type)
+            sample, variant_type, merge_type)
         effects = variants.effects()
         nonsynonymous_effects = EffectCollection(
             effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
 
-        self.save_to_cache(effects, self.cache_names["effect"], sample_id, cached_file_name)
-        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], sample_id, cached_file_name)
+        self.save_to_cache(effects, self.cache_names["effect"], sample.id, cached_file_name)
+        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], sample.id, cached_file_name)
 
         if only_nonsynonymous:
             return nonsynonymous_effects
@@ -254,63 +390,59 @@ class Cohort(object):
     def load_neoantigens(self, variant_type="snv", merge_type="union",
                          only_expressed=False, epitope_lengths=[8, 9, 10, 11],
                          ic50_cutoff=500, process_limit=10, max_file_records=None):
-        assert self.hla_alleles is not None, "Cannot predict neoantigens without HLA alleles"
-
         dfs = []
-        for i, sample_id in enumerate(self.sample_ids):
-            df_epitopes = self._load_single_sample_neoantigens(
-                sample_idx=i,
-                variant_type=variant_type,
-                merge_type=merge_type,
-                only_expressed=only_expressed,
-                epitope_lengths=epitope_lengths,
-                ic50_cutoff=ic50_cutoff,
-                process_limit=process_limit,
-                max_file_records=max_file_records)
-            dfs.append(df_epitopes)
+        for patient in self.elements:
+            for sample in patient.paired_samples:
+                df_epitopes = self._load_single_sample_neoantigens(
+                    patient=patient,
+                    sample=sample,
+                    variant_type=variant_type,
+                    merge_type=merge_type,
+                    only_expressed=only_expressed,
+                    epitope_lengths=epitope_lengths,
+                    ic50_cutoff=ic50_cutoff,
+                    process_limit=process_limit,
+                    max_file_records=max_file_records)
+                dfs.append(df_epitopes)
         return pd.concat(dfs)
 
-    def _load_single_sample_neoantigens(self, sample_idx, variant_type, merge_type,
-                                        only_expressed, epitope_lengths,
+    def _load_single_sample_neoantigens(self, patient, sample, variant_type,
+                                        merge_type, only_expressed, epitope_lengths,
                                         ic50_cutoff, process_limit, max_file_records):
-        sample_id = self.sample_ids[sample_idx]
-        tumor_rna_bam_id = self.tumor_rna_bam_ids[sample_idx]
-
         cached_file_name = "%s-%s-neoantigens.csv" % (variant_type, merge_type)
         if only_expressed:
-            cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], sample_id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], sample.id, cached_file_name)
         else:
-            cached = self.load_from_cache(self.cache_names["neoantigen"], sample_id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["neoantigen"], sample.id, cached_file_name)
         if cached is not None:
             return cached
 
         variants = self._load_single_sample_variants(
-            sample_idx, self.variant_type_to_format_funcs[variant_type], variant_type, merge_type)
-        hla_alleles = self.hla_alleles[sample_idx]
+            sample, variant_type, merge_type)
         mhc_model = NetMHCcons(
-            alleles=hla_alleles,
+            alleles=patient.hla_alleles,
             epitope_lengths=epitope_lengths,
             max_file_records=max_file_records,
             process_limit=process_limit)
         if only_expressed:
-            df_isovar = self.load_from_cache(self.cache_names["isovar"], sample_id, cached_file_name)
+            isovar_cached_file_name = "%s-%s-isovar.csv" % (variant_type, merge_type)
+            df_isovar = self.load_from_cache(self.cache_names["isovar"], sample.id, isovar_cached_file_name)
             if df_isovar is None:
                 import logging
                 logging.disable(logging.INFO)
-                rna_bam_file_name = self.tumor_rna_bam_file_format_func(tumor_rna_bam_id)
-                rna_bam_file = AlignmentFile(rna_bam_file_name)
+                rna_bam_file = AlignmentFile(sample.rna_bam.path)
                 from isovar.default_parameters import (
                     MIN_TRANSCRIPT_PREFIX_LENGTH,
                     MAX_REFERENCE_TRANSCRIPT_MISMATCHES
                 )
 
-                # To ensure that 8-11mers overlap substitutions, we need at least this
-                # sequence length: (11 * 2) - 1
+                # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
+                # sequence length: (max peptide length * 2) - 1
                 # Example:
                 # 123456789AB
                 #           123456789AB
                 # AAAAAAAAAAVAAAAAAAAAA
-                protein_sequence_length = (11 * 2) - 1
+                protein_sequence_length = (max(epitope_lengths) * 2) - 1
                 df_isovar = variants_to_protein_sequences_dataframe(
                     variants=variants,
                     samfile=rna_bam_file,
@@ -320,7 +452,7 @@ class Cohort(object):
                     max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
                     max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
                     min_mapping_quality=0)
-                self.save_to_cache(df_isovar, self.cache_names["isovar"], sample_id, cached_file_name)
+                self.save_to_cache(df_isovar, self.cache_names["isovar"], sample.id, isovar_cached_file_name)
 
             # Map from isovar rows to protein sequences
             isovar_rows_to_protein_sequences = dict([
@@ -334,9 +466,9 @@ class Cohort(object):
             # not overlap a variant.
             df_epitopes = self.get_filtered_isovar_epitopes(
                 epitopes, ic50_cutoff=ic50_cutoff).dataframe()
-            df_epitopes["sample_id"] = sample_id
+            df_epitopes["sample_id"] = sample.id
 
-            self.save_to_cache(df_epitopes, self.cache_names["expressed_neoantigen"], sample_id, cached_file_name)
+            self.save_to_cache(df_epitopes, self.cache_names["expressed_neoantigen"], sample.id, cached_file_name)
         else:
             epitopes = predict_epitopes_from_variants(
                 variants=variants,
@@ -345,9 +477,9 @@ class Cohort(object):
                 # Only include peptides with a variant
                 only_novel_epitopes=True)
             df_epitopes = epitopes_to_dataframe(epitopes)
-            df_epitopes["sample_id"] = sample_id
+            df_epitopes["sample_id"] = sample.id
 
-            self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], sample_id, cached_file_name)
+            self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], sample.id, cached_file_name)
 
         return df_epitopes
 
@@ -404,7 +536,7 @@ class Cohort(object):
         if type(on) == FunctionType:
             try:
                 return on(self)
-            except:
+            except TypeError:
                 col = col if col is not None else "untitled"
                 return self.clinical_func(on, col)
         if type(on) == str:
@@ -438,20 +570,20 @@ class Cohort(object):
         """
         plot_col, df = self.plot_init(on, col, col_equals)
         original_len = len(df)
-        df = df[df[self.benefit_col].notnull()]
+        df = df[df.benefit.notnull()]
         updated_len = len(df)
-        df[self.benefit_col] = df[self.benefit_col].apply(bool)
+        df.benefit = df.benefit.apply(bool)
         if updated_len < original_len:
             print("Missing benefit for %d samples: from %d to %d" % (original_len - updated_len, original_len, updated_len))
         if df[plot_col].dtype == "bool":
             results = fishers_exact_plot(
                 data=df,
-                condition1=self.benefit_col,
+                condition1="benefit",
                 condition2=plot_col)
         else:
             results = mann_whitney_plot(
                 data=df,
-                condition=self.benefit_col,
+                condition="benefit",
                 distribution=plot_col)
 
         return results
@@ -471,7 +603,6 @@ class Cohort(object):
             Whether to plot OS (overall survival) or PFS (progression free survival)
         threshold : int or 'median', optional
             Threshold of `col` on which to split the cohort
-
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
         plot_col, df = self.plot_init(on, col, col_equals)
@@ -482,9 +613,9 @@ class Cohort(object):
         results = plot_kmf(
             df=df,
             condition_col=plot_col,
-            xlabel='Overall Survival' if how == "os" else 'Progression-Free Survival',
-            censor_col=self.deceased_col if how == "os" else self.progressed_or_deceased_col,
-            survival_col=self.os_col if how == "os" else self.pfs_col,
+            xlabel="Overall Survival" if how == "os" else "Progression-Free Survival",
+            censor_col="deceased" if how == "os" else "progressed_or_deceased",
+            survival_col=how,
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
 

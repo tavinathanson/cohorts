@@ -22,12 +22,13 @@ from cohorts.plot import mann_whitney_plot
 def test_mann_whitney():
     data = pd.DataFrame({"distribution": range(1, 7),
                          "condition": [True, False] * 3})
-    U_default, p_default, _ = mann_whitney_plot(data, "condition", "distribution")
+    U_default, p_default, _ = mann_whitney_plot(data, "condition", "distribution",
+                                                skip_plot=True)
     U_two, p_two, _ = mann_whitney_plot(data, "condition", "distribution",
-                                        alternative="two-sided")
+                                        alternative="two-sided", skip_plot=True)
     U_less, p_less, _ = mann_whitney_plot(data, "condition", "distribution",
-                                          alternative="less")
+                                          alternative="less", skip_plot=True)
     U_greater, p_greater, _ = mann_whitney_plot(data, "condition", "distribution",
-                                                alternative="greater")
+                                                alternative="greater", skip_plot=True)
     eq_(p_default, p_two)
     ok_((p_default == p_less * 2) or (p_default == p_greater * 2))
