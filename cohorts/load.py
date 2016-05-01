@@ -26,8 +26,11 @@ from types import FunctionType
 
 import varcode
 from varcode import VariantCollection, EffectCollection
-from mhctools import NetMHCcons
+from mhctools import NetMHCcons, EpitopeCollection
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
+from topiary.sequence_helpers import contains_mutant_residues
+from isovar.protein_sequence import variants_to_protein_sequences_dataframe
+from pysam import AlignmentFile
 
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot
@@ -49,20 +52,28 @@ class Cohort(object):
                  deceased_col,
                  progressed_col=None,
                  progressed_or_deceased_col=None,
-                 normal_bam_ids=None,
-                 tumor_bam_ids=None,
+                 normal_dna_bam_ids=None,
+                 tumor_dna_bam_ids=None,
+                 normal_rna_bam_ids=None,
+                 tumor_rna_bam_ids=None,
                  benefit_col=None,
                  hla_alleles=None,
                  cache_results=True,
                  snv_file_format_funcs=None,
-                 indel_file_format_funcs=None):
+                 indel_file_format_funcs=None,
+                 normal_dna_bam_file_format_func=None,
+                 tumor_dna_bam_file_format_func=None,
+                 normal_rna_bam_file_format_func=None,
+                 tumor_rna_bam_file_format_func=None):
         self.data_dir = data_dir
         self.cache_dir = cache_dir
         self.sample_ids = sample_ids
         self.clinical_dataframe = clinical_dataframe.copy()
         self.clinical_dataframe_id_col = clinical_dataframe_id_col
-        self.normal_bam_ids = normal_bam_ids
-        self.tumor_bam_ids = tumor_bam_ids
+        self.normal_dna_bam_ids = normal_dna_bam_ids
+        self.tumor_dna_bam_ids = tumor_dna_bam_ids
+        self.normal_rna_bam_ids = normal_rna_bam_ids
+        self.tumor_rna_bam_ids = tumor_rna_bam_ids
         self.benefit_col = benefit_col
         self.os_col = os_col
         self.pfs_col = pfs_col
@@ -73,8 +84,13 @@ class Cohort(object):
         self.cache_results = cache_results
         self.snv_file_format_funcs = snv_file_format_funcs
         self.indel_file_format_funcs = indel_file_format_funcs
+        self.normal_dna_bam_file_format_func = normal_dna_bam_file_format_func
+        self.tumor_dna_bam_file_format_func = tumor_dna_bam_file_format_func
+        self.normal_rna_bam_file_format_func = normal_rna_bam_file_format_func
+        self.tumor_rna_bam_file_format_func = tumor_rna_bam_file_format_func
 
-        for bam_ids in [self.normal_bam_ids, self.tumor_bam_ids]:
+        for bam_ids in [self.normal_dna_bam_ids, self.tumor_dna_bam_ids,
+                        self.normal_rna_bam_ids, self.tumor_rna_bam_ids]:
             if bam_ids is not None:
                 assert len(self.sample_ids) == len(bam_ids), (
                     "All ID lists must be of equal length")
@@ -92,7 +108,9 @@ class Cohort(object):
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
                             "nonsynonymous_effect": "cached-nonsynonymous-effects",
-                            "neoantigen": "cached-neoantigens"}
+                            "neoantigen": "cached-neoantigens",
+                            "expressed_neoantigen": "cached-expressed-neoantigens",
+                            "isovar": "cached-isovar-output"}
 
     def verify_survival(self):
         if not (self.clinical_dataframe[self.pfs_col] <=
@@ -172,8 +190,8 @@ class Cohort(object):
 
     def _load_single_sample_variants(self, sample_idx, file_format_funcs, variant_type, merge_type):
         sample_id = self.sample_ids[sample_idx]
-        normal_bam_id = None if self.normal_bam_ids is None else self.normal_bam_ids[sample_idx]
-        tumor_bam_id = None if self.tumor_bam_ids is None else self.tumor_bam_ids[sample_idx]
+        normal_dna_bam_id = None if self.normal_dna_bam_ids is None else self.normal_dna_bam_ids[sample_idx]
+        tumor_dna_bam_id = None if self.tumor_dna_bam_ids is None else self.tumor_dna_bam_ids[sample_idx]
         cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
         cached = self.load_from_cache(self.cache_names["variant"], sample_id, cached_file_name)
         if cached is not None:
@@ -182,7 +200,7 @@ class Cohort(object):
         combined_variants = []
         for file_format_func in file_format_funcs:
             file_name = file_format_func(
-                sample_id, normal_bam_id, tumor_bam_id)
+                sample_id, normal_dna_bam_id, tumor_dna_bam_id)
             variants = varcode.load_vcf_fast(path.join(self.data_dir, file_name))
             combined_variants.append(set(variants.elements))
 
@@ -234,24 +252,35 @@ class Cohort(object):
         return effects
 
     def load_neoantigens(self, variant_type="snv", merge_type="union",
-                         epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
-                         process_limit=10, max_file_records=None):
+                         only_expressed=False, epitope_lengths=[8, 9, 10, 11],
+                         ic50_cutoff=500, process_limit=10, max_file_records=None):
         assert self.hla_alleles is not None, "Cannot predict neoantigens without HLA alleles"
 
         dfs = []
         for i, sample_id in enumerate(self.sample_ids):
             df_epitopes = self._load_single_sample_neoantigens(
-                i, variant_type, merge_type, epitope_lengths, ic50_cutoff,
-                process_limit, max_file_records)
+                sample_idx=i,
+                variant_type=variant_type,
+                merge_type=merge_type,
+                only_expressed=only_expressed,
+                epitope_lengths=epitope_lengths,
+                ic50_cutoff=ic50_cutoff,
+                process_limit=process_limit,
+                max_file_records=max_file_records)
             dfs.append(df_epitopes)
         return pd.concat(dfs)
 
     def _load_single_sample_neoantigens(self, sample_idx, variant_type, merge_type,
-                                        epitope_lengths, ic50_cutoff, process_limit, max_file_records):
+                                        only_expressed, epitope_lengths,
+                                        ic50_cutoff, process_limit, max_file_records):
         sample_id = self.sample_ids[sample_idx]
+        tumor_rna_bam_id = self.tumor_rna_bam_ids[sample_idx]
 
         cached_file_name = "%s-%s-neoantigens.csv" % (variant_type, merge_type)
-        cached = self.load_from_cache(self.cache_names["neoantigen"], sample_id, cached_file_name)
+        if only_expressed:
+            cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], sample_id, cached_file_name)
+        else:
+            cached = self.load_from_cache(self.cache_names["neoantigen"], sample_id, cached_file_name)
         if cached is not None:
             return cached
 
@@ -263,18 +292,88 @@ class Cohort(object):
             epitope_lengths=epitope_lengths,
             max_file_records=max_file_records,
             process_limit=process_limit)
-        epitopes = predict_epitopes_from_variants(
-            variants=variants,
-            mhc_model=mhc_model,
-            ic50_cutoff=ic50_cutoff,
-            # Only include peptides with a variant
-            only_novel_epitopes=True)
-        df_epitopes = epitopes_to_dataframe(epitopes)
-        df_epitopes["sample_id"] = sample_id
+        if only_expressed:
+            df_isovar = self.load_from_cache(self.cache_names["isovar"], sample_id, cached_file_name)
+            if df_isovar is None:
+                import logging
+                logging.disable(logging.INFO)
+                rna_bam_file_name = self.tumor_rna_bam_file_format_func(tumor_rna_bam_id)
+                rna_bam_file = AlignmentFile(rna_bam_file_name)
+                from isovar.default_parameters import (
+                    MIN_TRANSCRIPT_PREFIX_LENGTH,
+                    MAX_REFERENCE_TRANSCRIPT_MISMATCHES
+                )
 
-        self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], sample_id, cached_file_name)
+                # To ensure that 8-11mers overlap substitutions, we need at least this
+                # sequence length: (11 * 2) - 1
+                # Example:
+                # 123456789AB
+                #           123456789AB
+                # AAAAAAAAAAVAAAAAAAAAA
+                protein_sequence_length = (11 * 2) - 1
+                df_isovar = variants_to_protein_sequences_dataframe(
+                    variants=variants,
+                    samfile=rna_bam_file,
+                    protein_sequence_length=protein_sequence_length,
+                    min_reads_supporting_rna_sequence=3, # Per Alex R.'s suggestion
+                    min_transcript_prefix_length=MIN_TRANSCRIPT_PREFIX_LENGTH,
+                    max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
+                    max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
+                    min_mapping_quality=0)
+                self.save_to_cache(df_isovar, self.cache_names["isovar"], sample_id, cached_file_name)
+
+            # Map from isovar rows to protein sequences
+            isovar_rows_to_protein_sequences = dict([
+                (frozenset(row.to_dict().items()), row["amino_acids"]) for (i, row) in df_isovar.iterrows()])
+
+            # MHC binding prediction
+            epitopes = mhc_model.predict(isovar_rows_to_protein_sequences)
+
+            # Only include peptides that overlap a variant; without this filter, when we use
+            # protein_sequence_length above, some 8mers generated from a 21mer source will
+            # not overlap a variant.
+            df_epitopes = self.get_filtered_isovar_epitopes(
+                epitopes, ic50_cutoff=ic50_cutoff).dataframe()
+            df_epitopes["sample_id"] = sample_id
+
+            self.save_to_cache(df_epitopes, self.cache_names["expressed_neoantigen"], sample_id, cached_file_name)
+        else:
+            epitopes = predict_epitopes_from_variants(
+                variants=variants,
+                mhc_model=mhc_model,
+                ic50_cutoff=ic50_cutoff,
+                # Only include peptides with a variant
+                only_novel_epitopes=True)
+            df_epitopes = epitopes_to_dataframe(epitopes)
+            df_epitopes["sample_id"] = sample_id
+
+            self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], sample_id, cached_file_name)
 
         return df_epitopes
+
+    def get_filtered_isovar_epitopes(self, epitopes, ic50_cutoff):
+        """
+        Mostly replicates topiary.build_epitope_collection_from_binding_predictions
+
+        Note: topiary needs to do fancy stuff like subsequence_protein_offset + binding_prediction.offset
+        in order to figure out whether a variant is in the peptide because it only has the variant's
+        offset into the full protein; but isovar gives us the variant's offset into the protein subsequence
+        (dictated by protein_sequence_length); so all we need to do is map that onto the smaller 8-11mer
+        peptides generated by mhctools.
+        """
+        mutant_binding_predictions = []
+        for binding_prediction in epitopes:
+            peptide = binding_prediction.peptide
+            peptide_offset = binding_prediction.offset
+            isovar_row = dict(binding_prediction.source_sequence_key)
+            is_mutant = contains_mutant_residues(
+                peptide_start_in_protein=peptide_offset,
+                peptide_length=len(peptide),
+                mutation_start_in_protein=isovar_row["variant_aa_interval_start"],
+                mutation_end_in_protein=isovar_row["variant_aa_interval_end"])
+            if is_mutant and binding_prediction.value <= ic50_cutoff:
+                mutant_binding_predictions.append(binding_prediction)
+        return EpitopeCollection(mutant_binding_predictions)
 
     def clear_caches(self):
         for cache in self.cache_names.keys():
