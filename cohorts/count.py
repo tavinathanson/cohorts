@@ -20,6 +20,8 @@ import pandas as pd
 from varcode import EffectCollection
 from varcode.effects import Substitution
 
+from .load import verify_group_by
+
 def snv_count(cohort, **kwargs):
     sample_variants = cohort.load_variants(**kwargs)
     def count_func(sample):
@@ -57,13 +59,12 @@ def neoantigen_count(cohort, **kwargs):
         return np.nan
     return count(cohort, count_func, count_col="neoantigen_count")
 
-def count(cohort, count_func, count_col, group_by="paired_sample"):
-    if group_by not in ["patient", "paired_sample"]:
-        raise ValueError("Invalid group_by: %s" % group_by)
+def count(cohort, count_func, count_col, group_by="patient"):
+    verify_group_by(group_by)
 
     id_col = "patient_id" if group_by == "patient" else "sample_id"
 
-    df = cohort.as_dataframe(group_by=group_by).copy()
+    df = cohort.as_dataframe(group_by=group_by)
     df[count_col] = df[id_col].map(count_func)
     original_len = len(df)
     df = df[~df[count_col].isnull()]

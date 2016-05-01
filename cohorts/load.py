@@ -152,6 +152,9 @@ class Patient(object):
             self.id == other.id)
 
 class CohortDataFrame(object):
+    """
+    Wraps a DataFrame with some information on how to join it.
+    """
     def __init__(self,
                  name,
                  dataframe,
@@ -170,13 +173,17 @@ class Cohort(Collection):
                  patients,
                  cache_dir,
                  cache_results=True,
-                 extra_dataframes=[]):
+                 extra_dataframes=[],
+                 with_extra=None,
+                 how_extra="outer"):
         Collection.__init__(
             self,
             elements=patients)
         self.cache_dir = cache_dir
         self.cache_results = cache_results
         self.extra_dataframes = extra_dataframes
+        self.with_extra = with_extra
+        self.how_extra =  how_extra
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -252,14 +259,25 @@ class Cohort(Collection):
                 for sample in paired_sample.samples:
                     yield sample
 
-    def as_dataframe(self, group_by="patient", with_extra_dataframes=[],
-                     extra_join_how="outer"):
+    def as_dataframe(self, group_by="patient",
+                     with_extra=None, how_extra=None):
         verify_group_by(group_by)
 
         df = pd.DataFrame()
         filtered_extra_dataframes = []
+
+        if not with_extra:
+            current_extra_dataframes = self.with_extra
+        elif len(with_extra) > 1:
+            current_extra_dataframes = with_extra
+        elif len(with_extra) == 1:
+            current_extra_dataframes = [with_extra]
+
+        how_extra = self.how_extra if how_extra is None else how_extra
+        how_extra = "outer" if how_extra is None else how_extra
+
         for extra_dataframe in self.extra_dataframes:
-            if extra_dataframe.name in with_extra_dataframes:
+            if extra_dataframe.name in current_extra_dataframes:
                 if extra_dataframe.group_by != group_by:
                     raise ValueError("Requested extra DataFrame %s, but wrong group_by %s" % (extra_dataframe.name, extra_dataframe.group_by))
                 filtered_extra_dataframes.append(extra_dataframe)
@@ -298,11 +316,17 @@ class Cohort(Collection):
 
         for filtered_extra_dataframe in filtered_extra_dataframes:
             left_on = "sample_id" if group_by == "paired_sample" else "patient_id"
+            old_len_df = len(df)
             df = df.merge(
                 filtered_extra_dataframe.dataframe,
                 left_on=left_on,
                 right_on=filtered_extra_dataframe.id_col,
-                how=extra_join_how)
+                how=how_extra)
+            print("%s join with %s: %d to %d rows" % (
+                how_extra,
+                filtered_extra_dataframe.name,
+                old_len_df,
+                len(df)))
         return df
 
     def load_from_cache(self, cache_name, sample_id, file_name):
@@ -551,7 +575,7 @@ class Cohort(Collection):
         df[col] = df.apply(row_func, axis=1)
         return col, df
 
-    def plot_init(self, on, col, col_equals):
+    def plot_init(self, on, col, col_equals, **kwargs):
         """
         `on` is either:
         - a function that creates a new column for comparison, e.g. count.snv_count
@@ -566,13 +590,13 @@ class Cohort(Collection):
                 col = col if col is not None else "untitled"
                 return self.clinical_func(on, col)
         if type(on) == str:
-            cohort_dataframe = self.as_dataframe()
+            cohort_dataframe = self.as_dataframe(**kwargs)
             if on in cohort_dataframe.columns:
                 return (on, cohort_dataframe)
             else:
                 return col_func(self, on, col, col_equals)
 
-    def plot_benefit(self, on, col=None, col_equals=None):
+    def plot_benefit(self, on, col=None, col_equals=None, **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
 
         If the variable (through `on` or `col` is binary) this will compare
@@ -595,7 +619,7 @@ class Cohort(Collection):
         (Test statistic, p-value): (float, float)
 
         """
-        plot_col, df = self.plot_init(on, col, col_equals)
+        plot_col, df = self.plot_init(on, col, col_equals, **kwargs)
         original_len = len(df)
         df = df[df.benefit.notnull()]
         updated_len = len(df)
@@ -615,7 +639,8 @@ class Cohort(Collection):
 
         return results
 
-    def plot_survival(self, on, col=None, col_equals=None, how="os", threshold=None):
+    def plot_survival(self, on, col=None, col_equals=None, how="os",
+                      threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
 
         Parameters
@@ -632,7 +657,7 @@ class Cohort(Collection):
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
-        plot_col, df = self.plot_init(on, col, col_equals)
+        plot_col, df = self.plot_init(on, col, col_equals, **kwargs)
         if df[plot_col].dtype == "bool":
             default_threshold = None
         else:
