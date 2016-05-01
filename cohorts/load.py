@@ -280,15 +280,11 @@ class Cohort(Collection):
         df = pd.DataFrame()
         join_dataframes = []
 
-        if not join_with:
-            current_join_with = self.join_with
-        elif type(join_with) == list:
-            current_join_with = join_with
-        else:
-            current_join_with = [join_with]
+        current_join_with = first_not_none([join_with, self.join_with], [])
+        if type(current_join_with) == str:
+            current_join_with = [current_join_with]
 
-        current_join_how = self.join_how if join_how is None else join_how
-        current_join_how = "outer" if current_join_how is None else current_join_how
+        current_join_how = first_not_none([join_how, self.join_how], "outer")
 
         for dataframe in self.joinable_dataframes:
             if dataframe.name in current_join_with:
@@ -737,3 +733,9 @@ def col_func(cohort, on, col, col_equals):
 def verify_group_by(group_by):
     if group_by not in ["patient", "paired_sample"]:
         raise ValueError("Invalid group_by: %s" % group_by)
+
+def first_not_none(params, default):
+    for param in params:
+        if param is not None:
+            return param
+    return default
