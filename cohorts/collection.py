@@ -22,11 +22,8 @@ class Collection(object):
         collection elements.
         """
         file_str = ""
-        if self.filename:
-            file_str = " from '%s'" % self.filename
-        return "<%s%s with %d elements>" % (
+        return "<%s with %d elements>" % (
             self.__class__.__name__,
-            file_str,
             len(self))
 
     def to_string(self, limit=None):
