@@ -53,14 +53,14 @@ class Sample(object):
                  id,
                  is_tumor,
                  bam_path_dna=None,
-                 bam_path_rna=None):
+                 bam_path_rna=None,
+                 cufflinks_path=None):
         require_id_str(id)
-        assert bam_path_dna is not None or bam_path_rna is not None, (
-            "Must have DNA and/or RNA reads to create a Sample.")
         self.id = id
         self.is_tumor = is_tumor
         self.bam_path_dna = bam_path_dna
         self.bam_path_rna = bam_path_rna
+        self.cufflinks_path = cufflinks_path
 
     def __hash__(self):
         return hash(self.id)
@@ -199,19 +199,22 @@ class Cohort(Collection):
     def verify_id_uniqueness(self):
         patient_ids = set()
         paired_sample_ids = set()
-        sample_ids = set()
+        tumor_sample_ids = set()
+        normal_sample_ids = set()
         for patient in self.elements:
             patient_ids.add(patient.id)
             for paired_sample in patient.paired_samples:
                 paired_sample_ids.add(paired_sample.id)
-                for sample in paired_sample.samples:
-                    sample_ids.add(sample.id)
+                tumor_sample_ids.add(paired_sample.tumor_sample)
+                normal_sample_ids.add(paired_sample.normal_sample)
         if len(patient_ids) != len(self.elements):
             raise ValueError("Non-unique patient IDs")
         if len(paired_sample_ids) != len(list(self.iter_paired_samples())):
             raise ValueError("Non-unique paired sample IDs")
-        if len(sample_ids) != len(list(self.iter_samples())):
-            raise ValueError("Non-unique sample IDs")
+        if len(tumor_sample_ids) != len(list(self.iter_tumor_samples())):
+            raise ValueError("Non-unique tumor sample IDs")
+        if len(normal_sample_ids) != len(list(self.iter_normal_samples())):
+            raise ValueError("Non-unique normal sample IDs")
 
     def verify_survival(self):
         cohort_dataframe = self.as_dataframe()
@@ -241,22 +244,29 @@ class Cohort(Collection):
             raise ValueError("Caches %s have duplicate int/str directories" %
                              str(bad_caches))
 
-    def build_paired_sample_to_patient(self):
-        paired_sample_to_patient = {}
+    def iter_paired_samples(self, include_parents=False):
         for patient in self.elements:
             for paired_sample in patient.paired_samples:
-                paired_sample_to_patient[paired_sample] = patient
-        return paired_sample_to_patient
+                if include_parents:
+                    yield (patient, paired_sample)
+                else:
+                    yield paired_sample
 
-    def iter_paired_samples(self):
-        for patient in self.elements:
-            for paired_sample in patient.paired_samples:
-                yield paired_sample
+    def iter_tumor_samples(self, include_parents=False):
+        return self._iter_samples_attr(attr="tumor_sample",
+                                       include_parents=include_parents)
 
-    def iter_samples(self):
+    def iter_normal_samples(self, include_parents=False):
+        return self._iter_samples_attr(attr="normal_sample",
+                                       include_parents=include_parents)
+
+    def _iter_samples_attr(self, attr, **kwargs):
         for patient in self.elements:
             for paired_sample in patient.paired_samples:
-                for sample in paired_sample.samples:
+                sample = getattr(paired_sample, attr)
+                if kwargs["include_parents"]:
+                    yield (patient, paired_sample, sample)
+                else:
                     yield sample
 
     def as_dataframe(self, group_by="patient",
@@ -283,9 +293,8 @@ class Cohort(Collection):
                 filtered_extra_dataframes.append(extra_dataframe)
 
         if group_by == "paired_sample":
-            paired_sample_to_patient = self.build_paired_sample_to_patient()
-            patient_samples = [(paired_sample_to_patient[sample], sample)
-                                for sample in self.iter_paired_samples()]
+            patient_samples = [(patient, sample) for (patient, sample)
+                               in self.iter_paired_samples(include_parents=True)]
             df["patient_id"] = pd.Series([patient.id for (patient, sample)
                                           in patient_samples])
             df["sample_id"] = pd.Series([sample.id for (patient, sample)
@@ -436,23 +445,68 @@ class Cohort(Collection):
             return nonsynonymous_effects
         return effects
 
+    def load_cufflinks(self, filter_ok=True):
+        """
+        Load a Cufflinks gene expression data for a cohort
+
+        Parameters
+        ----------
+        filter_ok : bool, optional
+            If true, filter Cufflinks data to row with FPKM_status == 'OK'
+
+        Returns
+        -------
+        cufflinks_data : Pandas dataframe
+            Pandas dataframe with Cufflinks data for all samples
+            columns include sample_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
+        """
+        return \
+            pd.concat(
+                [self._load_single_sample_cufflinks(sample, filter_ok)
+                 for sample in self.iter_tumor_samples()],
+                copy=False
+        )
+
+    def _load_single_sample_cufflinks(self, sample, filter_ok):
+        """
+        Load Cufflinks gene quantification given a sample_id
+
+        Parameters
+        ----------
+        sample : Sample
+        filter_ok : bool, optional
+            If true, filter Cufflinks data to row with FPKM_status == 'OK'
+
+        Returns
+        -------
+        cufflinks_data: Pandas dataframe
+            Pandas dataframe of sample's Cufflinks data
+            columns include sample_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
+        """
+        data = pd.read_csv(sample.cufflinks_path, sep="\t")
+        data["sample_id"] = sample.id
+
+        if filter_ok:
+            # Filter to OK FPKM counts
+            data = data[data["FPKM_status"] == "OK"]
+        return data
+
     def load_neoantigens(self, variant_type="snv", merge_type="union",
                          only_expressed=False, epitope_lengths=[8, 9, 10, 11],
                          ic50_cutoff=500, process_limit=10, max_file_records=None):
         dfs = []
-        for patient in self.elements:
-            for sample in patient.paired_samples:
-                df_epitopes = self._load_single_sample_neoantigens(
-                    patient=patient,
-                    sample=sample,
-                    variant_type=variant_type,
-                    merge_type=merge_type,
-                    only_expressed=only_expressed,
-                    epitope_lengths=epitope_lengths,
-                    ic50_cutoff=ic50_cutoff,
-                    process_limit=process_limit,
-                    max_file_records=max_file_records)
-                dfs.append(df_epitopes)
+        for patient, sample in self.iter_paired_samples(include_parents=True):
+            df_epitopes = self._load_single_sample_neoantigens(
+                patient=patient,
+                sample=sample,
+                variant_type=variant_type,
+                merge_type=merge_type,
+                only_expressed=only_expressed,
+                epitope_lengths=epitope_lengths,
+                ic50_cutoff=ic50_cutoff,
+                process_limit=process_limit,
+                max_file_records=max_file_records)
+            dfs.append(df_epitopes)
         return pd.concat(dfs)
 
     def _load_single_sample_neoantigens(self, patient, sample, variant_type,
