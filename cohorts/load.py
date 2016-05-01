@@ -157,11 +157,11 @@ class CohortDataFrame(object):
     """
     def __init__(self,
                  name,
-                 dataframe,
+                 load_dataframe,
                  group_by,
                  id_col):
         self.name = name
-        self.dataframe = dataframe
+        self.load_dataframe = load_dataframe
         self.group_by = group_by
         self.id_col = id_col
 
@@ -174,16 +174,20 @@ class Cohort(Collection):
                  cache_dir,
                  cache_results=True,
                  extra_dataframes=[],
-                 with_extra=None,
-                 how_extra="outer"):
+                 join_with=None,
+                 join_how="outer"):
         Collection.__init__(
             self,
             elements=patients)
         self.cache_dir = cache_dir
         self.cache_results = cache_results
-        self.extra_dataframes = extra_dataframes
-        self.with_extra = with_extra
-        self.how_extra =  how_extra
+
+        joinable_dataframes = [
+            CohortDataFrame("cufflinks", self.load_cufflinks, group_by="patient", id_col="sample_id")]
+        joinable_dataframes.extend(extra_dataframes)
+        self.joinable_dataframes = joinable_dataframes
+        self.join_with = join_with
+        self.join_how =  join_how
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -270,27 +274,27 @@ class Cohort(Collection):
                     yield sample
 
     def as_dataframe(self, group_by="patient",
-                     with_extra=None, how_extra=None):
+                     join_with=None, join_how=None):
         verify_group_by(group_by)
 
         df = pd.DataFrame()
-        filtered_extra_dataframes = []
+        join_dataframes = []
 
-        if not with_extra:
-            current_extra_dataframes = self.with_extra
-        elif len(with_extra) > 1:
-            current_extra_dataframes = with_extra
-        elif len(with_extra) == 1:
-            current_extra_dataframes = [with_extra]
+        if not join_with:
+            current_join_with = self.join_with
+        elif type(join_with) == list:
+            current_join_with = join_with
+        else:
+            current_join_with = [join_with]
 
-        how_extra = self.how_extra if how_extra is None else how_extra
-        how_extra = "outer" if how_extra is None else how_extra
+        current_join_how = self.join_how if join_how is None else join_how
+        current_join_how = "outer" if current_join_how is None else current_join_how
 
-        for extra_dataframe in self.extra_dataframes:
-            if extra_dataframe.name in current_extra_dataframes:
-                if extra_dataframe.group_by != group_by:
-                    raise ValueError("Requested extra DataFrame %s, but wrong group_by %s" % (extra_dataframe.name, extra_dataframe.group_by))
-                filtered_extra_dataframes.append(extra_dataframe)
+        for dataframe in self.joinable_dataframes:
+            if dataframe.name in current_join_with:
+                if dataframe.group_by != group_by:
+                    raise ValueError("Requested extra DataFrame %s, but wrong group_by %s" % (dataframe.name, dataframe.group_by))
+                join_dataframes.append(dataframe)
 
         if group_by == "paired_sample":
             patient_samples = [(patient, sample) for (patient, sample)
@@ -323,17 +327,17 @@ class Cohort(Collection):
         if len(additional_data_all_patients) > 0:
             df = df.merge(pd.DataFrame(additional_data_all_patients), on="patient_id", how="left")
 
-        for filtered_extra_dataframe in filtered_extra_dataframes:
+        for dataframe in join_dataframes:
             left_on = "sample_id" if group_by == "paired_sample" else "patient_id"
             old_len_df = len(df)
             df = df.merge(
-                filtered_extra_dataframe.dataframe,
+                dataframe.load_dataframe(),
                 left_on=left_on,
-                right_on=filtered_extra_dataframe.id_col,
-                how=how_extra)
+                right_on=dataframe.id_col,
+                how=current_join_how)
             print("%s join with %s: %d to %d rows" % (
-                how_extra,
-                filtered_extra_dataframe.name,
+                current_join_how,
+                dataframe.name,
                 old_len_df,
                 len(df)))
         return df
