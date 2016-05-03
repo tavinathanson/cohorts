@@ -20,41 +20,52 @@ Usage Examples
 --------------
 
 ```python
+patient_1 = Patient(
+    id="patient_1",
+    os=70,
+    pfs=24,
+    deceased=True,
+    progressed=True,
+    benefit=False)
+patient_2 = Patient(
+    id="patient_2",
+    os=100,
+    pfs=50,
+    deceased=False,
+    progressed=True,
+    benefit=False)
+)
 cohort = Cohort(
-    data_dir="/my/input/data",
-    cache_dir="/where/cohorts/results/get/saved",
-    sample_ids=["sample_1", "sample_2"],
-    clinical_dataframe=pandas_dataframe_with_clinical_data,
-    clinical_dataframe_id_col="sample_id_in_dataframe",
-    os_col="Overall Survival",
-    pfs_col="Progression-Free Survival",
-    deceased_col="deceased",
-    progressed_or_deceased_col="progressed_or_deceased"
+    patients=[patient_1, patient_2],
+    cache_dir="/where/cohorts/results/get/saved"
 )
 
 cohort.plot_survival(how="os")
 ```
 
 ```python
-def mutect_snv_file_format_func(sample_id, normal_bam_id, tumor_bam_id):
-    return "Mutect-%d-normal=%s.bam-tumor=%s.bam-merged.vcf" % (
-        sample_id, normal_bam_id, tumor_bam_id)
-
-def strelka_snv_file_format_func(...):
+sample_1_tumor = Sample(
+    id="sample_1_tumor",
+    bam_path_dna="/path/to/dna/bam",
+    bam_path_rna="/path/to/rna/bam"
+)
+patient_1 = Patient(
+    id="patient_1",
     ...
-
+    snv_vcf_paths=["/where/my/mutect/vcfs/live",
+                   "/where/my/strelka/vcfs/live"]
+    indel_vcfs_paths=[...],
+    tumor_sample=sample_1_tumor,
+    ...
+)
 cohort = Cohort(
     ...
-    benefit_col="patient_durable_benefit",
-    snv_file_format_funcs=[
-        mutect_snv_file_format_func,
-        strelka_snv_file_format_func
-    ]
+    patients=[patient_1]
 )
 
 # Comparison plot of missense mutation counts between benefit and no-benefit patients
 cohort.plot_benefit(on=missense_snv_count)
 
 # Raw missense mutations counts
-missense_snv_col, updated_dataframe = missense_snv_count(cohort)
+missense_snv_col, dataframe = missense_snv_count(cohort)
 ```

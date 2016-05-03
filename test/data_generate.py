@@ -18,7 +18,7 @@ import vcf
 from varcode import load_vcf_fast
 from os import path, makedirs
 
-def generate_vcfs(id_to_mutation_count, file_format_func, template_name):
+def generate_vcfs(id_to_mutation_count, file_format, template_name):
     """
     Generate cropped VCFs from a template, for each sample.
 
@@ -36,7 +36,7 @@ def generate_vcfs(id_to_mutation_count, file_format_func, template_name):
         template_path = data_path(template_name)
         vcf_reader = vcf.Reader(filename=template_path)
         file_path = generated_data_path(
-            path.join("vcfs", file_format_func(sample_id, None, None)))
+            path.join("vcfs", file_format % sample_id))
         file_dir = path.dirname(file_path)
         if not path.exists(file_dir):
             makedirs(file_dir)

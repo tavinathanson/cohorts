@@ -25,74 +25,55 @@ from nose.tools import raises, eq_
 from os import path
 from shutil import rmtree
 
-from .test_basic import make_simple_clinical_dataframe
+from .test_basic import make_simple_cohort
 
-def file_format_func_1(sample_id, normal_bam_id, tumor_bam_id):
-    return "sample_format1_%d.vcf" % sample_id
+FILE_FORMAT_1 = "patient_format1_%s.vcf"
+FILE_FORMAT_2 = "patient_format2_%s.vcf"
+FILE_FORMAT_3 = "patient_format3_%s.vcf"
 
-def file_format_func_2(sample_id, normal_bam_id, tumor_bam_id):
-    return "sample_format2_%d.vcf" % sample_id
-
-def file_format_func_3(sample_id, normal_bam_id, tumor_bam_id):
-    return "sample_format3_%d.vcf" % sample_id
+def make_cohort(file_formats):
+    cohort = make_simple_cohort()
+    patient_ids = [patient.id for patient in cohort]
+    vcf_dir = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [3, 3, 6])),
+                            file_format=FILE_FORMAT_1,
+                            template_name="vcf_template_1.vcf")
+    _ = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [4, 1, 5])),
+                      file_format=FILE_FORMAT_2,
+                      template_name="vcf_template_1.vcf")
+    _ = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [5, 2, 3])),
+                      file_format=FILE_FORMAT_3,
+                      template_name="vcf_template_2.vcf")
+    for patient in cohort:
+        vcf_paths = []
+        for file_format in file_formats:
+            vcf_filename = (file_format % patient.id)
+            vcf_path = path.join(vcf_dir, vcf_filename)
+            vcf_paths.append(vcf_path)
+        patient.snv_vcf_paths = vcf_paths
+    return vcf_dir, cohort
 
 def test_snv_counts():
     """
     Generate VCFs per-sample, and confirm that the counting functions work as expected.
     """
-    clinical_dataframe = make_simple_clinical_dataframe()
-    sample_ids = list(clinical_dataframe["id"])
     vcf_dir, cohort = None, None
     try:
-        vcf_dir = generate_vcfs(dict(zip(sample_ids, [4, 3, 6])),
-                                file_format_func_1, template_name="vcf_template_1.vcf")
-        cohort = Cohort(
-            data_dir=vcf_dir,
-            cache_dir=generated_data_path("cache"),
-            sample_ids=sample_ids,
-            clinical_dataframe=make_simple_clinical_dataframe(),
-            clinical_dataframe_id_col="id",
-            os_col="OS",
-            pfs_col="PFS",
-            deceased_col="deceased",
-            progressed_or_deceased_col="progressed_or_deceased",
-            snv_file_format_funcs=[file_format_func_1])
+        # Use all three VCF sources
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
 
         # The SNV count should be exactly what we generated
         count_col, df = snv_count(cohort)
         eq_(len(df), 3)
-        eq_(list(df[count_col]), [4, 3, 6])
+        eq_(list(df[count_col]), [3, 3, 6])
 
         count_col, df = missense_snv_count(cohort)
         eq_(len(df), 3)
-        eq_(list(df[count_col]), [3, 2, 4])
+        eq_(list(df[count_col]), [2, 2, 4])
     finally:
-        if path.exists(vcf_dir):
+        if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
         if cohort is not None:
             cohort.clear_caches()
-
-def make_cohort(file_format_funcs):
-    clinical_dataframe = make_simple_clinical_dataframe()
-    sample_ids = list(clinical_dataframe["id"])
-    vcf_dir = generate_vcfs(dict(zip(sample_ids, [3, 3, 6])),
-                            file_format_func_1, template_name="vcf_template_1.vcf")
-    generate_vcfs(dict(zip(sample_ids, [4, 1, 5])),
-                  file_format_func_2, template_name="vcf_template_1.vcf")
-    generate_vcfs(dict(zip(sample_ids, [5, 2, 3])),
-                  file_format_func_3, template_name="vcf_template_2.vcf")
-
-    return (vcf_dir, Cohort(
-        data_dir=vcf_dir,
-        cache_dir=generated_data_path("cache"),
-        sample_ids=sample_ids,
-        clinical_dataframe=make_simple_clinical_dataframe(),
-        clinical_dataframe_id_col="id",
-        os_col="OS",
-        pfs_col="PFS",
-        deceased_col="deceased",
-        progressed_or_deceased_col="progressed_or_deceased",
-        snv_file_format_funcs=file_format_funcs))
 
 def test_merge_three():
     """
@@ -101,7 +82,7 @@ def test_merge_three():
     vcf_dir, cohort = None, None
     try:
         # Use all three VCF sources
-        vcf_dir, cohort = make_cohort([file_format_func_1, file_format_func_2, file_format_func_3])
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2, FILE_FORMAT_3])
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
         # [5, 2, 3] uses a separate template, resulting in a union of [4, 3, 6] + [5, 2, 3] = [9, 5, 9] unique variants
@@ -113,7 +94,7 @@ def test_merge_three():
         count_col, df = snv_count(cohort, merge_type="intersection")
         eq_(list(df[count_col]), [0, 0, 0])
     finally:
-        if path.exists(vcf_dir):
+        if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
         if cohort is not None:
             cohort.clear_caches()
@@ -125,7 +106,7 @@ def test_merge_two():
     vcf_dir, cohort = None, None
     try:
         # Now, with only two VCF sources
-        vcf_dir, cohort = make_cohort([file_format_func_1, file_format_func_2])
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2])
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
         count_col, df = snv_count(cohort)
@@ -137,7 +118,7 @@ def test_merge_two():
         eq_(len(df), 3)
         eq_(list(df[count_col]), [3, 1, 5])
     finally:
-        if path.exists(vcf_dir):
+        if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
         if cohort is not None:
             cohort.clear_caches()

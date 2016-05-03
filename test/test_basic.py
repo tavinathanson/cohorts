@@ -17,10 +17,10 @@ from __future__ import print_function
 from . import data_path, generated_data_path, DATA_DIR
 from .data_generate import generate_vcfs
 
-from cohorts import Cohort
+from cohorts import Cohort, Patient
 from cohorts.load import InvalidDataError
 
-import pandas as pd 
+import pandas as pd
 from nose.tools import raises, eq_
 
 def make_simple_clinical_dataframe(
@@ -28,7 +28,7 @@ def make_simple_clinical_dataframe(
         pfs_list=None,
         deceased_list=None,
         progressed_or_deceased_list=None):
-    return pd.DataFrame({"id": [1, 4, 5],
+    return pd.DataFrame({"id": ["1", "4", "5"],
                          "OS": [100, 150, 120] if os_list is None else os_list,
                          "PFS": [50, 40, 120] if pfs_list is None else pfs_list,
                          "deceased": [True, False, False] if deceased_list is None else deceased_list,
@@ -36,16 +36,18 @@ def make_simple_clinical_dataframe(
 
 def make_simple_cohort(**kwargs):
     clinical_dataframe = make_simple_clinical_dataframe(**kwargs)
+    patients = []
+    for i, row in clinical_dataframe.iterrows():
+        patient = Patient(id=row["id"],
+                          os=row["OS"],
+                          pfs=row["PFS"],
+                          deceased=row["deceased"],
+                          progressed_or_deceased=row["progressed_or_deceased"])
+        patients.append(patient)
+
     return Cohort(
-        data_dir=DATA_DIR,
-        cache_dir=generated_data_path("cache"),
-        sample_ids=list(clinical_dataframe["id"]),
-        clinical_dataframe=clinical_dataframe,
-        clinical_dataframe_id_col="id",
-        os_col="OS",
-        pfs_col="PFS",
-        deceased_col="deceased",
-        progressed_or_deceased_col="progressed_or_deceased")
+        patients=patients,
+        cache_dir=generated_data_path("cache"))
 
 def test_pfs_equal_to_os():
     # Should not error
@@ -61,4 +63,4 @@ def test_progressed_vs_pfs():
 
 def test_simple_cohort():
     cohort = make_simple_cohort()
-    eq_(len(cohort.clinical_dataframe), 3)
+    eq_(len(cohort.as_dataframe()), 3)

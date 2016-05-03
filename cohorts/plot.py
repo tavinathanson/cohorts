@@ -28,7 +28,7 @@ def stripboxplot(x, y, data, **kwargs):
         data=data
     )
 
-    sb.stripplot(
+    return sb.stripplot(
         x=x,
         y=y,
         data=data,
@@ -53,7 +53,7 @@ def fishers_exact_plot(data, condition1, condition2):
     condition2: str
         Second binary column to compare
     """
-    sb.factorplot(
+    plot = sb.factorplot(
         x=condition1,
         y=condition2,
         kind='bar',
@@ -63,9 +63,11 @@ def fishers_exact_plot(data, condition1, condition2):
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table)
     print("Fisher's Exact Test: OR: {}, p-value={}".format(oddsratio, pvalue))
-    return (oddsratio, pvalue)
+    return (oddsratio, pvalue, plot)
 
-def mann_whitney_plot(data, condition, distribution, condition_value=None):
+def mann_whitney_plot(data, condition, distribution,
+                      condition_value=None, alternative="two-sided",
+                      skip_plot=False):
     """
     Create a box plot comparing a condition and perform a
     Mann Whitney test to compare the distribution in condition A v B
@@ -83,13 +85,21 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
 
     condition_value:
         If `condition` is not a binary column, split on =/!= to condition_value
-    """
 
-    stripboxplot(
-        x=condition,
-        y=distribution,
-        data=data
-    )
+    alternative:
+        Specify the sidedness of the Mann-Whitney test: "two-sided", "less"
+        or "greater"
+
+    skip_plot:
+        Calculate the test statistic and p-value, but don't plot.
+    """
+    plot = None
+    if not skip_plot:
+        plot = stripboxplot(
+            x=condition,
+            y=distribution,
+            data=data
+        )
 
     if condition_value:
         condition_mask = data[condition] == condition_value
@@ -98,7 +108,8 @@ def mann_whitney_plot(data, condition, distribution, condition_value=None):
     U, pvalue = mannwhitneyu(
         data[condition_mask][distribution],
         data[~condition_mask][distribution],
+        alternative=alternative
     )
 
     print("Mann-Whitney test: U={}, p-value={}".format(U, pvalue))
-    return (U, pvalue)
+    return (U, pvalue, plot)
