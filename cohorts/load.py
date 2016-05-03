@@ -48,62 +48,61 @@ class Sample(object):
     """
     Represents a single tumor or normal sample. It can point to DNA and/or
     RNA reads.
+
+    Parameters
+    __________
+    is_tumor : bool
+        Does this `Sample` represent a tumor sample?
+    bam_path_dna : str
+        Path to the DNA BAM file.
+    bam_path_rna : str
+        Path to the RNA BAM file.
+    cufflinks_path : str
+        Path to the Cufflinks output file.
     """
     def __init__(self,
-                 id,
                  is_tumor,
                  bam_path_dna=None,
                  bam_path_rna=None,
                  cufflinks_path=None):
-        require_id_str(id)
-        self.id = id
         self.is_tumor = is_tumor
         self.bam_path_dna = bam_path_dna
         self.bam_path_rna = bam_path_rna
         self.cufflinks_path = cufflinks_path
 
-    def __hash__(self):
-        return hash(self.id)
-
-    def __eq__(self, other):
-        if self is other:
-            return True
-        return (
-            self.__class__ == other.__class__ and
-            self.id == other.id)
-
-class PairedSample(object):
-    """
-    Represents a tumor-normal sample pair, as well as pointing to data derived
-    from that pair (e.g. VCFs).
-    """
-    def __init__(self,
-                 id,
-                 snv_vcf_paths=[],
-                 indel_vcf_paths=[],
-                 normal_sample=None,
-                 tumor_sample=None):
-        require_id_str(id)
-        self.id = id
-        self.snv_vcf_paths = snv_vcf_paths
-        self.indel_vcf_paths = indel_vcf_paths
-        self.normal_sample = normal_sample
-        self.tumor_sample = tumor_sample
-        self.samples = [normal_sample, tumor_sample]
-
-    def __hash__(self):
-        return hash(self.id)
-
-    def __eq__(self, other):
-        if self is other:
-            return True
-        return (
-            self.__class__ == other.__class__ and
-            self.id == other.id)
-
 class Patient(object):
     """
-    Represents a patient, which contains one or more `PairedSample`s.
+    Represents a patient, which contains zero or more of: normal `Sample`,
+    tumor `Sample`.
+
+    Parameters
+    __________
+    id : str
+        ID of the patient.
+    os : int
+        Overall survival in days.
+    pfs : int
+        Progression-free survival in days.
+    deceased : bool
+        Is the patient deceased?
+    progressed : bool
+        Has the patient progressed?
+    progressed_or_deceased : bool
+        Has the patient either progressed or passed away?
+    benefit : bool
+        Has the patient seen a durable clinical benefit?
+    snv_vcf_paths : list
+        List of paths to SNV VCFs or this patient; multple VCFs get merged.
+    indel_vcf_paths : list
+        List of paths to indel VCFs for this patient; multple VCFs get merged.
+    normal_sample : Sample
+        This patient's normal `Sample`.
+    tumor_sample: Sample
+        This patient's tumor `Sample`.
+    hla_alleles : list
+        A list of this patient's HLA class I alleles.
+    additional_data : dict
+        A dictionary of additional data: name of datum mapping to value.
     """
     def __init__(self,
                  id,
@@ -113,7 +112,10 @@ class Patient(object):
                  progressed=None,
                  progressed_or_deceased=None,
                  benefit=None,
-                 paired_samples=[],
+                 snv_vcf_paths=None,
+                 indel_vcf_paths=None,
+                 normal_sample=None,
+                 tumor_sample=None,
                  hla_alleles=None,
                  additional_data=None):
         require_id_str(id)
@@ -124,7 +126,10 @@ class Patient(object):
         self.progressed = progressed
         self.progressed_or_deceased = progressed_or_deceased
         self.benefit = benefit
-        self.paired_samples = paired_samples
+        self.snv_vcf_paths = snv_vcf_paths
+        self.indel_vcf_paths = indel_vcf_paths
+        self.normal_sample = normal_sample
+        self.tumor_sample = tumor_sample
         self.hla_alleles = hla_alleles
         self.additional_data = additional_data
 
@@ -151,29 +156,52 @@ class Patient(object):
             self.__class__ == other.__class__ and
             self.id == other.id)
 
-class CohortDataFrame(object):
+class DataFrameLoader(object):
     """
-    Wraps a DataFrame with some information on how to join it.
+    Wraps a `DataFrame` with some information on how to join it.
+
+    Parameters
+    __________
+    name : str
+        The name of the dataframe, to easily reference it.
+    load_dataframe : function
+        A function that returns the `DataFrame` object.
+    join_on : str
+        The column of the `DataFrame` to join on (i.e. the patient
+        ID column name).
     """
     def __init__(self,
                  name,
                  load_dataframe,
-                 group_by,
-                 id_col):
+                 join_on):
         self.name = name
         self.load_dataframe = load_dataframe
-        self.group_by = group_by
-        self.id_col = id_col
+        self.join_on = join_on
 
 class Cohort(Collection):
     """
     Represents a cohort of `Patient`s.
+
+    Parameters
+    __________
+    patients : List
+        A list of `Patient`s for this cohort.
+    cache_dir : str
+        Path to store cached results, e.g. cached variant effects.
+    cache_results : bool
+        Whether or not to cache results.
+    extra_df_loaders : List
+        List of `DataFrameLoader`s to include as join options `Cohort`.
+    join_with : str or List
+        The name of one or more `DataFrameLoader`s to join with by default.
+    join_how : str
+        What type of default join to use for joining `DataFrameLoader`s.
     """
     def __init__(self,
                  patients,
                  cache_dir,
                  cache_results=True,
-                 extra_dataframes=[],
+                 extra_df_loaders=[],
                  join_with=None,
                  join_how="outer"):
         Collection.__init__(
@@ -182,10 +210,10 @@ class Cohort(Collection):
         self.cache_dir = cache_dir
         self.cache_results = cache_results
 
-        joinable_dataframes = [
-            CohortDataFrame("cufflinks", self.load_cufflinks, group_by="patient", id_col="sample_id")]
-        joinable_dataframes.extend(extra_dataframes)
-        self.joinable_dataframes = joinable_dataframes
+        df_loaders = [
+            DataFrameLoader("cufflinks", self.load_cufflinks, join_on="patient_id")]
+        df_loaders.extend(extra_df_loaders)
+        self.df_loaders = df_loaders
         self.join_with = join_with
         self.join_how =  join_how
 
@@ -201,24 +229,9 @@ class Cohort(Collection):
         self.verify_cache(self.cache_names)
 
     def verify_id_uniqueness(self):
-        patient_ids = set()
-        paired_sample_ids = set()
-        tumor_sample_ids = set()
-        normal_sample_ids = set()
-        for patient in self.elements:
-            patient_ids.add(patient.id)
-            for paired_sample in patient.paired_samples:
-                paired_sample_ids.add(paired_sample.id)
-                tumor_sample_ids.add(paired_sample.tumor_sample)
-                normal_sample_ids.add(paired_sample.normal_sample)
-        if len(patient_ids) != len(self.elements):
+        patient_ids = set([patient.id for patient in self])
+        if len(patient_ids) != len(self):
             raise ValueError("Non-unique patient IDs")
-        if len(paired_sample_ids) != len(list(self.iter_paired_samples())):
-            raise ValueError("Non-unique paired sample IDs")
-        if len(tumor_sample_ids) != len(list(self.iter_tumor_samples())):
-            raise ValueError("Non-unique tumor sample IDs")
-        if len(normal_sample_ids) != len(list(self.iter_normal_samples())):
-            raise ValueError("Non-unique normal sample IDs")
 
     def verify_survival(self):
         cohort_dataframe = self.as_dataframe()
@@ -248,74 +261,25 @@ class Cohort(Collection):
             raise ValueError("Caches %s have duplicate int/str directories" %
                              str(bad_caches))
 
-    def iter_paired_samples(self, include_parents=False):
-        for patient in self.elements:
-            for paired_sample in patient.paired_samples:
-                if include_parents:
-                    yield (patient, paired_sample)
-                else:
-                    yield paired_sample
-
-    def iter_tumor_samples(self, include_parents=False):
-        return self._iter_samples_attr(attr="tumor_sample",
-                                       include_parents=include_parents)
-
-    def iter_normal_samples(self, include_parents=False):
-        return self._iter_samples_attr(attr="normal_sample",
-                                       include_parents=include_parents)
-
-    def _iter_samples_attr(self, attr, **kwargs):
-        for patient in self.elements:
-            for paired_sample in patient.paired_samples:
-                sample = getattr(paired_sample, attr)
-                if kwargs["include_parents"]:
-                    yield (patient, paired_sample, sample)
-                else:
-                    yield sample
-
-    def as_dataframe(self, group_by="patient",
-                     join_with=None, join_how=None):
-        verify_group_by(group_by)
-
-        df = pd.DataFrame()
+    def as_dataframe(self, join_with=None, join_how=None):
         join_dataframes = []
 
-        current_join_with = first_not_none([join_with, self.join_with], [])
-        if type(current_join_with) == str:
-            current_join_with = [current_join_with]
+        # Use join_with if specified, otherwise fall back to what is defined in the class
+        join_with = first_not_none_param([join_with, self.join_with], default=[])
+        if type(join_with) == str:
+            join_with = [join_with]
 
-        current_join_how = first_not_none([join_how, self.join_how], "outer")
+        # Use join_how if specified, otherwise fall back to what is defined in the class
+        join_how = first_not_none_param([join_how, self.join_how], default="outer")
 
-        for dataframe in self.joinable_dataframes:
-            if dataframe.name in current_join_with:
-                if dataframe.group_by != group_by:
-                    raise ValueError("Requested extra DataFrame %s, but wrong group_by %s" % (dataframe.name, dataframe.group_by))
-                join_dataframes.append(dataframe)
-
-        if group_by == "paired_sample":
-            patient_samples = [(patient, sample) for (patient, sample)
-                               in self.iter_paired_samples(include_parents=True)]
-            df["patient_id"] = pd.Series([patient.id for (patient, sample)
-                                          in patient_samples])
-            df["sample_id"] = pd.Series([sample.id for (patient, sample)
-                                         in patient_samples])
-            patients = [patient for (patient, sample) in patient_samples]
-            num_patients_with_samples = len(set(patients))
-            num_patients = len(set(self.elements))
-            num_patients_without_samples = len(set(self.elements).difference(set(patients)))
-            if num_patients != num_patients_with_samples:
-                print("Missing samples for %d patients: from %d to %d" % (
-                    num_patients_without_samples, num_patients, num_patients_with_samples))
-        else:
-            patients = self.elements
-            df["patient_id"] = pd.Series([patient.id for patient in patients])
-
+        df = pd.DataFrame()
+        df["patient_id"] = pd.Series([patient.id for patient in self])
         for clinical_col in ["benefit", "os", "pfs", "deceased",
                              "progressed", "progressed_or_deceased"]:
-            df[clinical_col] = pd.Series([getattr(patient, clinical_col) for patient in patients])
+            df[clinical_col] = pd.Series([getattr(patient, clinical_col) for patient in self])
 
         additional_data_all_patients = defaultdict(list)
-        for patient in patients:
+        for patient in self:
             if patient.additional_data is not None:
                 for key, value in patient.additional_data.items():
                     additional_data_all_patients[key].append(value)
@@ -323,49 +287,47 @@ class Cohort(Collection):
         if len(additional_data_all_patients) > 0:
             df = df.merge(pd.DataFrame(additional_data_all_patients), on="patient_id", how="left")
 
-        for dataframe in join_dataframes:
-            left_on = "sample_id" if group_by == "paired_sample" else "patient_id"
+        for df_loader in join_with:
             old_len_df = len(df)
             df = df.merge(
-                dataframe.load_dataframe(),
-                left_on=left_on,
-                right_on=dataframe.id_col,
-                how=current_join_how)
+                df_loader.load_dataframe(),
+                left_on="patient_id",
+                right_on=df_loader.join_on,
+                how=join_how)
             print("%s join with %s: %d to %d rows" % (
-                current_join_how,
-                dataframe.name,
+                join_how,
+                df_loader.name,
                 old_len_df,
                 len(df)))
         return df
 
-    def load_from_cache(self, cache_name, sample_id, file_name):
+    def load_from_cache(self, cache_name, patient_id, file_name):
         if not self.cache_results:
             return None
 
         cache_dir = path.join(self.cache_dir, cache_name)
-        sample_cache_dir = path.join(cache_dir, str(sample_id))
-        cache_file = path.join(sample_cache_dir, file_name)
+        patient_cache_dir = path.join(cache_dir, str(patient_id))
+        cache_file = path.join(patient_cache_dir, file_name)
 
         if not path.exists(cache_file):
             return None
 
         if path.splitext(cache_file)[1] == ".csv":
-            return pd.read_csv(cache_file, dtype={"sample_id": object,
-                                                  "patient_id": object})
+            return pd.read_csv(cache_file, dtype={"patient_id": object})
         else:
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
 
-    def save_to_cache(self, obj, cache_name, sample_id, file_name):
+    def save_to_cache(self, obj, cache_name, patient_id, file_name):
         if not self.cache_results:
             return
 
         cache_dir = path.join(self.cache_dir, cache_name)
-        sample_cache_dir = path.join(cache_dir, str(sample_id))
-        cache_file = path.join(sample_cache_dir, file_name)
+        patient_cache_dir = path.join(cache_dir, str(patient_id))
+        cache_file = path.join(patient_cache_dir, file_name)
 
-        if not path.exists(sample_cache_dir):
-            makedirs(sample_cache_dir)
+        if not path.exists(patient_cache_dir):
+            makedirs(patient_cache_dir)
 
         if type(obj) == pd.DataFrame:
             obj.to_csv(cache_file, index=False)
@@ -375,27 +337,27 @@ class Cohort(Collection):
 
     def load_variants(self, variant_type="snv", merge_type="union"):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
-        sample_variants = {}
+        patient_variants = {}
 
-        for sample in self.iter_paired_samples():
+        for patient in self:
             try:
-                variants = self._load_single_sample_variants(
-                    sample, variant_type, merge_type)
+                variants = self._load_single_patient_variants(
+                    patient, variant_type, merge_type)
             except IOError:
-                print("Variants did not exist for %s" % sample)
+                print("Variants did not exist for %s" % patient)
                 continue
 
-            sample_variants[sample.id] = variants
-        return sample_variants
+            patient_variants[patient.id] = variants
+        return patient_variants
 
-    def _load_single_sample_variants(self, sample, variant_type, merge_type):
+    def _load_single_patient_variants(self, patient, variant_type, merge_type):
         cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
-        cached = self.load_from_cache(self.cache_names["variant"], sample.id, cached_file_name)
+        cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
         if cached is not None:
             return cached
 
         combined_variants = []
-        vcf_paths = sample.snv_vcf_paths if variant_type == "snv" else sample.indel_vcf_paths
+        vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
         for vcf_path in vcf_paths:
             variants = varcode.load_vcf_fast(vcf_path)
             combined_variants.append(set(variants.elements))
@@ -410,36 +372,36 @@ class Cohort(Collection):
             elif merge_type == "intersection":
                 merged_variants = VariantCollection(set.intersection(*combined_variants))
 
-        self.save_to_cache(merged_variants, self.cache_names["variant"], sample.id, cached_file_name)
+        self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
 
         return merged_variants
 
     def load_effects(self, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
-        sample_effects = {}
-        for sample in self.iter_paired_samples():
-            effects = self._load_single_sample_effects(
-                sample, only_nonsynonymous, variant_type, merge_type)
-            sample_effects[sample.id] = effects
-        return sample_effects
+        patient_effects = {}
+        for patient in self:
+            effects = self._load_single_patient_effects(
+                patient, only_nonsynonymous, variant_type, merge_type)
+            patient_effects[patient.id] = effects
+        return patient_effects
 
-    def _load_single_sample_effects(self, sample, only_nonsynonymous,
-                                    variant_type, merge_type):
+    def _load_single_patient_effects(self, patient, only_nonsynonymous,
+                                     variant_type, merge_type):
         cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
         if only_nonsynonymous:
-            cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], sample.id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
-            cached = self.load_from_cache(self.cache_names["effect"], sample.id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
             return cached
 
-        variants = self._load_single_sample_variants(
-            sample, variant_type, merge_type)
+        variants = self._load_single_patient_variants(
+            patient, variant_type, merge_type)
         effects = variants.effects()
         nonsynonymous_effects = EffectCollection(
             effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
 
-        self.save_to_cache(effects, self.cache_names["effect"], sample.id, cached_file_name)
-        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], sample.id, cached_file_name)
+        self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
+        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
 
         if only_nonsynonymous:
             return nonsynonymous_effects
@@ -457,23 +419,22 @@ class Cohort(Collection):
         Returns
         -------
         cufflinks_data : Pandas dataframe
-            Pandas dataframe with Cufflinks data for all samples
-            columns include sample_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
+            Pandas dataframe with Cufflinks data for all patients
+            columns include patient_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
         """
         return \
             pd.concat(
-                [self._load_single_sample_cufflinks(sample, filter_ok)
-                 for sample in self.iter_tumor_samples()],
+                [self._load_single_patient_cufflinks(patient, filter_ok) for patient in self],
                 copy=False
         )
 
-    def _load_single_sample_cufflinks(self, sample, filter_ok):
+    def _load_single_patient_cufflinks(self, patient, filter_ok):
         """
-        Load Cufflinks gene quantification given a sample_id
+        Load Cufflinks gene quantification given a patient_id
 
         Parameters
         ----------
-        sample : Sample
+        patient : Patient
         filter_ok : bool, optional
             If true, filter Cufflinks data to row with FPKM_status == 'OK'
 
@@ -481,10 +442,10 @@ class Cohort(Collection):
         -------
         cufflinks_data: Pandas dataframe
             Pandas dataframe of sample's Cufflinks data
-            columns include sample_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
+            columns include patient_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
         """
-        data = pd.read_csv(sample.cufflinks_path, sep="\t")
-        data["sample_id"] = sample.id
+        data = pd.read_csv(patient.tumor_sample.cufflinks_path, sep="\t")
+        data["patient_id"] = patient.id
 
         if filter_ok:
             # Filter to OK FPKM counts
@@ -495,10 +456,9 @@ class Cohort(Collection):
                          only_expressed=False, epitope_lengths=[8, 9, 10, 11],
                          ic50_cutoff=500, process_limit=10, max_file_records=None):
         dfs = []
-        for patient, sample in self.iter_paired_samples(include_parents=True):
-            df_epitopes = self._load_single_sample_neoantigens(
+        for patient in self:
+            df_epitopes = self._load_single_patient_neoantigens(
                 patient=patient,
-                sample=sample,
                 variant_type=variant_type,
                 merge_type=merge_type,
                 only_expressed=only_expressed,
@@ -509,19 +469,19 @@ class Cohort(Collection):
             dfs.append(df_epitopes)
         return pd.concat(dfs)
 
-    def _load_single_sample_neoantigens(self, patient, sample, variant_type,
-                                        merge_type, only_expressed, epitope_lengths,
-                                        ic50_cutoff, process_limit, max_file_records):
+    def _load_single_patient_neoantigens(self, patient, variant_type,
+                                         merge_type, only_expressed, epitope_lengths,
+                                         ic50_cutoff, process_limit, max_file_records):
         cached_file_name = "%s-%s-neoantigens.csv" % (variant_type, merge_type)
         if only_expressed:
-            cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], sample.id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
         else:
-            cached = self.load_from_cache(self.cache_names["neoantigen"], sample.id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["neoantigen"], patient.id, cached_file_name)
         if cached is not None:
             return cached
 
-        variants = self._load_single_sample_variants(
-            sample, variant_type, merge_type)
+        variants = self._load_single_patient_variants(
+            patient, variant_type, merge_type)
         mhc_model = NetMHCcons(
             alleles=patient.hla_alleles,
             epitope_lengths=epitope_lengths,
@@ -529,11 +489,11 @@ class Cohort(Collection):
             process_limit=process_limit)
         if only_expressed:
             isovar_cached_file_name = "%s-%s-isovar.csv" % (variant_type, merge_type)
-            df_isovar = self.load_from_cache(self.cache_names["isovar"], sample.id, isovar_cached_file_name)
+            df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
             if df_isovar is None:
                 import logging
                 logging.disable(logging.INFO)
-                rna_bam_file = AlignmentFile(sample.rna_bam.path)
+                rna_bam_file = AlignmentFile(patient.rna_bam.path)
                 from isovar.default_parameters import (
                     MIN_TRANSCRIPT_PREFIX_LENGTH,
                     MAX_REFERENCE_TRANSCRIPT_MISMATCHES
@@ -555,7 +515,7 @@ class Cohort(Collection):
                     max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
                     max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
                     min_mapping_quality=0)
-                self.save_to_cache(df_isovar, self.cache_names["isovar"], sample.id, isovar_cached_file_name)
+                self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
 
             # Map from isovar rows to protein sequences
             isovar_rows_to_protein_sequences = dict([
@@ -569,9 +529,9 @@ class Cohort(Collection):
             # not overlap a variant.
             df_epitopes = self.get_filtered_isovar_epitopes(
                 epitopes, ic50_cutoff=ic50_cutoff).dataframe()
-            df_epitopes["sample_id"] = sample.id
+            df_epitopes["patient_id"] = patient.id
 
-            self.save_to_cache(df_epitopes, self.cache_names["expressed_neoantigen"], sample.id, cached_file_name)
+            self.save_to_cache(df_epitopes, self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
         else:
             epitopes = predict_epitopes_from_variants(
                 variants=variants,
@@ -580,9 +540,9 @@ class Cohort(Collection):
                 # Only include peptides with a variant
                 only_novel_epitopes=True)
             df_epitopes = epitopes_to_dataframe(epitopes)
-            df_epitopes["sample_id"] = sample.id
+            df_epitopes["patient_id"] = patient.id
 
-            self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], sample.id, cached_file_name)
+            self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], patient.id, cached_file_name)
 
         return df_epitopes
 
@@ -679,7 +639,7 @@ class Cohort(Collection):
         updated_len = len(df)
         df.benefit = df.benefit.apply(bool)
         if updated_len < original_len:
-            print("Missing benefit for %d samples: from %d to %d" % (original_len - updated_len, original_len, updated_len))
+            print("Missing benefit for %d patients: from %d to %d" % (original_len - updated_len, original_len, updated_len))
         if df[plot_col].dtype == "bool":
             results = fishers_exact_plot(
                 data=df,
@@ -730,11 +690,11 @@ def col_func(cohort, on, col, col_equals):
     df[on] = df[col] == col_equals
     return on, df
 
-def verify_group_by(group_by):
-    if group_by not in ["patient", "paired_sample"]:
-        raise ValueError("Invalid group_by: %s" % group_by)
-
-def first_not_none(params, default):
+def first_not_none_param(params, default):
+    """
+    Given a list of `params`, use the first param in the list that is
+    not None. If all are None, fall back to `default`.
+    """
     for param in params:
         if param is not None:
             return param

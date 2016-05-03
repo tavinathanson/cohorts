@@ -17,7 +17,7 @@ from __future__ import print_function
 from . import data_path, generated_data_path, DATA_DIR
 from .data_generate import generate_vcfs
 
-from cohorts import Cohort, PairedSample
+from cohorts import Cohort
 from cohorts.count import *
 
 import pandas as pd
@@ -49,9 +49,7 @@ def make_cohort(file_formats):
             vcf_filename = (file_format % patient.id)
             vcf_path = path.join(vcf_dir, vcf_filename)
             vcf_paths.append(vcf_path)
-        patient.paired_samples = [PairedSample(
-            id=patient.id,
-            snv_vcf_paths=vcf_paths)]
+        patient.snv_vcf_paths = vcf_paths
     return vcf_dir, cohort
 
 def test_snv_counts():

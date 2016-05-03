@@ -49,18 +49,14 @@ sample_1_tumor = Sample(
     bam_path_dna="/path/to/dna/bam",
     bam_path_rna="/path/to/rna/bam"
 )
-sample_1 = PairedSample(
-    id="sample_1",
-    snv_vcf_paths=["/where/my/mutect/vcfs/live",
-                   "/where/my/strelka/vcfs/live"]
-    indel_vcfs_paths=[...],
-    tumor_sample=sample_1_tumor
-    ...
-)
 patient_1 = Patient(
     id="patient_1",
     ...
-    paired_samples=[sample_1]
+    snv_vcf_paths=["/where/my/mutect/vcfs/live",
+                   "/where/my/strelka/vcfs/live"]
+    indel_vcfs_paths=[...],
+    tumor_sample=sample_1_tumor,
+    ...
 )
 cohort = Cohort(
     ...
