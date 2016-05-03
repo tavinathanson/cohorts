@@ -112,8 +112,8 @@ class Patient(object):
                  progressed=None,
                  progressed_or_deceased=None,
                  benefit=None,
-                 snv_vcf_paths=None,
-                 indel_vcf_paths=None,
+                 snv_vcf_paths=[],
+                 indel_vcf_paths=[],
                  normal_sample=None,
                  tumor_sample=None,
                  hla_alleles=None,
@@ -173,7 +173,7 @@ class DataFrameLoader(object):
     def __init__(self,
                  name,
                  load_dataframe,
-                 join_on):
+                 join_on="patient_id"):
         self.name = name
         self.load_dataframe = load_dataframe
         self.join_on = join_on
@@ -211,7 +211,7 @@ class Cohort(Collection):
         self.cache_results = cache_results
 
         df_loaders = [
-            DataFrameLoader("cufflinks", self.load_cufflinks, join_on="patient_id")]
+            DataFrameLoader("cufflinks", self.load_cufflinks)]
         df_loaders.extend(extra_df_loaders)
         self.df_loaders = df_loaders
         self.join_with = join_with
@@ -340,27 +340,28 @@ class Cohort(Collection):
         patient_variants = {}
 
         for patient in self:
-            try:
-                variants = self._load_single_patient_variants(
-                    patient, variant_type, merge_type)
-            except IOError:
-                print("Variants did not exist for %s" % patient)
-                continue
-
+            variants = self._load_single_patient_variants(patient, variant_type, merge_type)
             patient_variants[patient.id] = variants
         return patient_variants
 
     def _load_single_patient_variants(self, patient, variant_type, merge_type):
-        cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
-        cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
-        if cached is not None:
-            return cached
+        failed_io = False
+        try:
+            cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
+            cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
+            if cached is not None:
+                return cached
 
-        combined_variants = []
-        vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
-        for vcf_path in vcf_paths:
-            variants = varcode.load_vcf_fast(vcf_path)
-            combined_variants.append(set(variants.elements))
+            combined_variants = []
+            vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
+            for vcf_path in vcf_paths:
+                variants = varcode.load_vcf_fast(vcf_path)
+                combined_variants.append(set(variants.elements))
+        except IOError:
+            failed_io = True
+
+        if len(combined_variants) == 0 or failed_io:
+            raise ValueError("Variants did not exist for patient %s" % patient.id)
 
         if len(combined_variants) == 1:
             # There is nothing to merge
@@ -593,16 +594,14 @@ class Cohort(Collection):
         """
         `on` is either:
         - a function that creates a new column for comparison, e.g. count.snv_count
-        - a function that takes a clinical dataframe row as input and returns a boolean or quantity based on that row (with col being the name of that new boolean or quantity)
+        - a function that takes a dataframe row as input and returns a boolean or quantity based on that row (with col being the name of that new boolean or quantity)
         - a string representing an existing column
         - a string representing a new column name, created by comparing column `col` with the value `col_equals`
         """
         if type(on) == FunctionType:
-            try:
+            if col is None:
                 return on(self)
-            except TypeError:
-                col = col if col is not None else "untitled"
-                return self.clinical_func(on, col)
+            return self.clinical_func(on, col)
         if type(on) == str:
             cohort_dataframe = self.as_dataframe(**kwargs)
             if on in cohort_dataframe.columns:
