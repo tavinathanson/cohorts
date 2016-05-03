@@ -262,8 +262,6 @@ class Cohort(Collection):
                              str(bad_caches))
 
     def as_dataframe(self, join_with=None, join_how=None):
-        join_dataframes = []
-
         # Use join_with if specified, otherwise fall back to what is defined in the class
         join_with = first_not_none_param([join_with, self.join_with], default=[])
         if type(join_with) == str:
@@ -361,7 +359,8 @@ class Cohort(Collection):
             failed_io = True
 
         if len(combined_variants) == 0 or failed_io:
-            raise ValueError("Variants did not exist for patient %s" % patient.id)
+            print("Variants did not exist for patient %s" % patient.id)
+            return VariantCollection([])
 
         if len(combined_variants) == 1:
             # There is nothing to merge
@@ -525,7 +524,8 @@ class Cohort(Collection):
             # MHC binding prediction
             epitopes = mhc_model.predict(isovar_rows_to_protein_sequences)
 
-            # Only include peptides that overlap a variant; without this filter, when we use
+            # Call `get_filtered_isovar_epitopes` in order to only include peptides that
+            # overlap a variant; without this filter, when we use
             # protein_sequence_length above, some 8mers generated from a 21mer source will
             # not overlap a variant.
             df_epitopes = self.get_filtered_isovar_epitopes(
