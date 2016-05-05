@@ -203,7 +203,7 @@ class Cohort(Collection):
                  cache_results=True,
                  extra_df_loaders=[],
                  join_with=None,
-                 join_how="outer"):
+                 join_how="inner"):
         Collection.__init__(
             self,
             elements=patients)
@@ -267,8 +267,11 @@ class Cohort(Collection):
         if type(join_with) == str:
             join_with = [join_with]
 
+        # Convert strings to DataFrameLoader objects
+        df_loaders = [df_loader for df_loader in self.df_loaders if df_loader.name in join_with]
+
         # Use join_how if specified, otherwise fall back to what is defined in the class
-        join_how = first_not_none_param([join_how, self.join_how], default="outer")
+        join_how = first_not_none_param([join_how, self.join_how], default="inner")
 
         df = pd.DataFrame()
         df["patient_id"] = pd.Series([patient.id for patient in self])
@@ -285,7 +288,7 @@ class Cohort(Collection):
         if len(additional_data_all_patients) > 0:
             df = df.merge(pd.DataFrame(additional_data_all_patients), on="patient_id", how="left")
 
-        for df_loader in join_with:
+        for df_loader in df_loaders:
             old_len_df = len(df)
             df = df.merge(
                 df_loader.load_dataframe(),
