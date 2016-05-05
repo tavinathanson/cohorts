@@ -268,10 +268,7 @@ class Cohort(Collection):
             join_with = [join_with]
 
         # Convert strings to DataFrameLoader objects
-        df_loaders = []
-        for df_loader in self.df_loaders:
-            if df_loader.name in join_with:
-                df_loaders.append(df_loader)
+        df_loaders = [df_loader for df_loader in self.df_loaders if df_loader.name in join_with]
 
         # Use join_how if specified, otherwise fall back to what is defined in the class
         join_how = first_not_none_param([join_how, self.join_how], default="inner")
