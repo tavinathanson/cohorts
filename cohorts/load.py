@@ -612,7 +612,8 @@ class Cohort(Collection):
             else:
                 return col_func(self, on, col, col_equals)
 
-    def plot_benefit(self, on, col=None, col_equals=None, **kwargs):
+    def plot_benefit(self, on, col=None, col_equals=None,
+                     mw_alternative="two-sided", **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
 
         If the variable (through `on` or `col` is binary) this will compare
@@ -629,6 +630,8 @@ class Cohort(Collection):
             See `cohort.load.plot_init`
         col_equals : str, optional
             Fixed value of `col` on which to split the cohort
+        mw_alternative : str, optional
+            Choose the sidedness of the mannwhitneyu test.
 
         Returns
         -------
@@ -651,7 +654,8 @@ class Cohort(Collection):
             results = mann_whitney_plot(
                 data=df,
                 condition="benefit",
-                distribution=plot_col)
+                distribution=plot_col,
+                alternative=mw_alternative)
 
         return results
 

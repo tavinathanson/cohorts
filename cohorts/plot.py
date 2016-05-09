@@ -111,5 +111,13 @@ def mann_whitney_plot(data, condition, distribution,
         alternative=alternative
     )
 
-    print("Mann-Whitney test: U={}, p-value={}".format(U, pvalue))
+    if alternative is None:
+        raise ValueError("Must pick a mannwhitneyu alternative")
+    if alternative == "two-sided":
+        sided_str = alternative
+    else:
+        # alternative hypothesis: condition is 'less' or 'greater' than no-condition
+        op_str = ">" if alternative == "greater" else "<"
+        sided_str = "one-sided: %s %s not %s" % (condition, op_str, condition)
+    print("Mann-Whitney test: U={}, p-value={} ({})".format(U, pvalue, sided_str))
     return (U, pvalue, plot)
