@@ -26,29 +26,33 @@ patient_1 = Patient(
     pfs=24,
     deceased=True,
     progressed=True,
-    benefit=False)
+    benefit=False
+)
+    
 patient_2 = Patient(
     id="patient_2",
     os=100,
     pfs=50,
     deceased=False,
     progressed=True,
-    benefit=False)
+    benefit=False
 )
+
 cohort = Cohort(
     patients=[patient_1, patient_2],
     cache_dir="/where/cohorts/results/get/saved"
 )
 
-cohort.plot_survival(how="os")
+cohort.plot_survival(on="os")
 ```
 
 ```python
 sample_1_tumor = Sample(
-    id="sample_1_tumor",
+    is_tumor=True,
     bam_path_dna="/path/to/dna/bam",
     bam_path_rna="/path/to/rna/bam"
 )
+
 patient_1 = Patient(
     id="patient_1",
     ...
@@ -58,6 +62,7 @@ patient_1 = Patient(
     tumor_sample=sample_1_tumor,
     ...
 )
+
 cohort = Cohort(
     ...
     patients=[patient_1]
