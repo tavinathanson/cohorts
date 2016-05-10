@@ -349,7 +349,7 @@ class Cohort(Collection):
                     patient_id, provenance_str(old_diff))
 
             if len(warn_str) > 0:
-                warnings.warn(warn_str, DeprecationWarning)
+                warnings.warn(warn_str, Warning)
 
         if path.splitext(cache_file)[1] == ".csv":
             return pd.read_csv(cache_file, dtype={"patient_id": object})
