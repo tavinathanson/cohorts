@@ -64,10 +64,10 @@ if __name__ == "__main__":
             "topiary>=0.0.15",
             "six>=1.10.0",
             "lifelines>=0.9.1.0",
-            "isovar>=0.0.2",
+            "isovar==0.0.3",
         ],
         dependency_links=[
-            "git+git://github.com/hammerlab/isovar",
+            "https://github.com/hammerlab/isovar/archive/v0.0.3.tar.gz#egg=isovar-0.0.3",
         ],
         long_description=readme,
         packages=["cohorts"],
