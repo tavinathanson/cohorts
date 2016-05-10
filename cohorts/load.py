@@ -18,7 +18,6 @@ from os import path, makedirs, listdir
 from shutil import rmtree
 import pandas as pd
 import numpy as np
-import logging
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
