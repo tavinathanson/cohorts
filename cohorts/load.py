@@ -18,6 +18,7 @@ from os import path, makedirs, listdir
 from shutil import rmtree
 import pandas as pd
 import numpy as np
+import logging
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -313,11 +314,41 @@ class Cohort(Collection):
         if not path.exists(cache_file):
             return None
 
+        df_provenance = self.generate_provenance(cache_name, patient_id)
+        df_provenance_previous = pd.read_csv(path.join(patient_cache_dir, "PROVENANCE"), index_col=None)
+
+        def provenance_set_from_df(df):
+            return set(dict(df.to_dict("split")["data"]).items())
+
+        def provenance_str_from_set(s):
+            return ["%s==%s" % (key, value) for (key, value) in s]
+
+        provenance_set = provenance_set_from_df(df_provenance)
+        provenance_set_previous = provenance_set_from_df(df_provenance_previous)
+        new_provenance_diff = provenance_set.difference(provenance_set_previous)
+        old_provenance_diff = provenance_set_previous.difference(provenance_set)
+        if new_provenance_diff != set():
+            print("Current provenance for patient %s: %s" % (
+                patient_id, provenance_str_from_set(
+                    new_provenance_diff)))
+        if old_provenance_diff != set():
+            print("Cached provenance for patient %s: %s" % (
+                patient_id, provenance_str_from_set(
+                    old_provenance_diff)))
+
         if path.splitext(cache_file)[1] == ".csv":
             return pd.read_csv(cache_file, dtype={"patient_id": object})
         else:
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
+
+    def generate_provenance(self, cache_name, patient_id):
+        df_provenance = pd.DataFrame()
+        module_names = ["cohorts", "pyensembl", "varcode", "mhctools", "topiary", "isovar", "scipy", "numpy", "pandas"]
+        module_versions = [__import__(module_name).__version__ for module_name in module_names]
+        df_provenance["module"] = module_names
+        df_provenance["version"] = module_versions
+        return df_provenance
 
     def save_to_cache(self, obj, cache_name, patient_id, file_name):
         if not self.cache_results:
@@ -336,6 +367,9 @@ class Cohort(Collection):
             with open(cache_file, "wb") as f:
                 pickle.dump(obj, f)
 
+        df_provenance = self.generate_provenance(cache_name, patient_id)
+        df_provenance.to_csv(path.join(patient_cache_dir, "PROVENANCE"), index=False)
+
     def load_variants(self, variant_type="snv", merge_type="union"):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         patient_variants = {}
@@ -347,13 +381,13 @@ class Cohort(Collection):
 
     def _load_single_patient_variants(self, patient, variant_type, merge_type):
         failed_io = False
+        combined_variants = []
         try:
             cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
                 return cached
 
-            combined_variants = []
             vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
             for vcf_path in vcf_paths:
                 variants = varcode.load_vcf_fast(vcf_path)
