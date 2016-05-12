@@ -378,6 +378,20 @@ class Cohort(Collection):
         self.save_provenance(patient_cache_dir, provenance)
 
     def load_variants(self, variant_type="snv", merge_type="union"):
+        """Load a dictionary of patient_id to varcode.VariantCollection
+        
+        Parameters
+        ----------
+        variant_type : {'snv', 'indel'}, optional
+            Load variants of a specific type, default 'snv'
+        merge_type : {'union', 'intersection'}, optional
+            Use this method to merge multiple variant sets for a single patient, default 'union'
+
+        Returns
+        -------
+        merged_variants
+            Dictionary of patient_id to VariantCollection
+        """
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         patient_variants = {}
 
@@ -421,6 +435,22 @@ class Cohort(Collection):
         return merged_variants
 
     def load_effects(self, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
+        """Load a dictionary of patient_id to varcode.EffectCollection
+  
+        Parameters
+        ----------
+        only_nonsynonymous : bool, optional
+            If true, load only nonsynonymous effects, default False 
+        variant_type : {'snv', 'indel'}, optional
+            Load variants of a specific type, default 'snv'
+        merge_type : {'union', 'intersection'}, optional
+            Use this method to merge multiple variant sets for a single patient, default 'union'
+    
+        Returns
+        -------
+        effects
+             Dictionary of patient_id to varcode.EffectCollection
+        """
         patient_effects = {}
         for patient in self:
             effects = self._load_single_patient_effects(
@@ -474,7 +504,7 @@ class Cohort(Collection):
 
     def _load_single_patient_cufflinks(self, patient, filter_ok):
         """
-        Load Cufflinks gene quantification given a patient_id
+        Load Cufflinks gene quantification given a patient
 
         Parameters
         ----------
