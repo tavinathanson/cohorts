@@ -36,7 +36,7 @@ from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
 
 from .survival import plot_kmf
-from .plot import mann_whitney_plot, fishers_exact_plot
+from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
 
 class InvalidDataError(ValueError):
@@ -687,6 +687,30 @@ class Cohort(Collection):
             else:
                 return col_func(self, on, col, col_equals)
 
+    def plot_roc_curve(self, on, bootstrap_samples=100, **kwargs):
+        """Plot an ROC curve for benefit and a given variable
+
+        Parameters
+        ----------
+        on : See `cohort.load.plot_init`
+        bootstrap_samples : int, optional
+            Number of boostrap samples to use to compute the AUC 
+
+        Returns
+        -------
+        (mean_auc_score, plot): (float, matplotlib plot)
+            Returns the average AUC for the given predictor over `bootstrap_samples`
+            and the associated ROC curve
+        """
+        plot_col, df = self.plot_init(on, col=None, col_equals=None, **kwargs)
+        original_len = len(df)
+        df = df[df.benefit.notnull()]
+        updated_len = len(df)
+        df.benefit = df.benefit.astype(bool)
+        if updated_len < original_len:
+            print("Missing benefit for %d patients: from %d to %d" % (original_len - updated_len, original_len, updated_len))
+        return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples)
+
     def plot_benefit(self, on, col=None, col_equals=None,
                      mw_alternative="two-sided", **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
@@ -717,7 +741,7 @@ class Cohort(Collection):
         original_len = len(df)
         df = df[df.benefit.notnull()]
         updated_len = len(df)
-        df.benefit = df.benefit.apply(bool)
+        df.benefit = df.benefit.astype(bool)
         if updated_len < original_len:
             print("Missing benefit for %d patients: from %d to %d" % (original_len - updated_len, original_len, updated_len))
         if df[plot_col].dtype == "bool":
