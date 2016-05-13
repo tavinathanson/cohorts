@@ -675,6 +675,10 @@ class Cohort(Collection):
         - a function that takes a dataframe row as input and returns a boolean or quantity based on that row (with col being the name of that new boolean or quantity)
         - a string representing an existing column
         - a string representing a new column name, created by comparing column `col` with the value `col_equals`
+
+        If `on` is a function that creates a new column, pass extra keyword arguments
+        through to that function. If `on` is a string, pass extra keyword arguments
+        to the internal call to `as_dataframe`.
         """
         if type(on) == FunctionType:
             if col is None:
