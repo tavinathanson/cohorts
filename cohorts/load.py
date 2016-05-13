@@ -678,7 +678,7 @@ class Cohort(Collection):
         """
         if type(on) == FunctionType:
             if col is None:
-                return on(self)
+                return on(self, **kwargs)
             return self.clinical_func(on, col)
         if type(on) == str:
             cohort_dataframe = self.as_dataframe(**kwargs)
