@@ -18,7 +18,7 @@ from . import data_path, generated_data_path, DATA_DIR
 from .data_generate import generate_vcfs
 
 from cohorts import Cohort
-from cohorts.count import *
+from cohorts.functions import *
 
 import pandas as pd
 from nose.tools import raises, eq_
@@ -62,11 +62,11 @@ def test_snv_counts():
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
 
         # The SNV count should be exactly what we generated
-        count_col, df = snv_count(cohort)
+        count_col, df = cohort.altered_dataframe(snv_count)
         eq_(len(df), 3)
         eq_(list(df[count_col]), [3, 3, 6])
 
-        count_col, df = missense_snv_count(cohort)
+        count_col, df = cohort.altered_dataframe(missense_snv_count)
         eq_(len(df), 3)
         eq_(list(df[count_col]), [2, 2, 4])
     finally:
@@ -86,12 +86,12 @@ def test_merge_three():
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
         # [5, 2, 3] uses a separate template, resulting in a union of [4, 3, 6] + [5, 2, 3] = [9, 5, 9] unique variants
-        count_col, df = snv_count(cohort)
+        count_col, df = cohort.altered_dataframe(snv_count)
         eq_(len(df), 3)
         eq_(list(df[count_col]), [9, 5, 9])
 
         # For intersection, variants need to appear in *all*, here. None of them do.
-        count_col, df = snv_count(cohort, merge_type="intersection")
+        count_col, df = cohort.altered_dataframe(lambda row: snv_count(row, cohort, merge_type="intersection"))
         eq_(list(df[count_col]), [0, 0, 0])
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
@@ -109,12 +109,12 @@ def test_merge_two():
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2])
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
-        count_col, df = snv_count(cohort)
+        count_col, df = cohort.altered_dataframe(snv_count)
         eq_(len(df), 3)
         eq_(list(df[count_col]), [4, 3, 6])
 
         # For intersection, some variants do appear in both.
-        count_col, df = snv_count(cohort, merge_type="intersection")
+        count_col, df = cohort.altered_dataframe(lambda row: snv_count(row, cohort, merge_type="intersection"))
         eq_(len(df), 3)
         eq_(list(df[count_col]), [3, 1, 5])
     finally:
