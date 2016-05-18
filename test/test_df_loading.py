@@ -15,7 +15,6 @@
 from __future__ import print_function
 
 from cohorts import Cohort, DataFrameLoader
-from cohorts.count import *
 
 import pandas as pd
 from nose.tools import eq_
