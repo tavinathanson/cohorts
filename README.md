@@ -72,6 +72,6 @@ cohort = Cohort(
 cohort.plot_benefit(on=missense_snv_count)
 
 # Raw missense mutations counts
-missense_snv_col, dataframe = cohort.altered_dataframe(missense_snv_count)
-(col_1, col_2), dataframe = cohort.altered_dataframe([missense_snv_count, neoantigen_count])
+missense_snv_col, dataframe = cohort.as_dataframe(missense_snv_count)
+(col_1, col_2), dataframe = cohort.as_dataframe([missense_snv_count, neoantigen_count])
 ```

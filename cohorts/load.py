@@ -266,7 +266,7 @@ class Cohort(Collection):
             raise ValueError("Caches %s have duplicate int/str directories" %
                              str(bad_caches))
 
-    def as_dataframe(self, join_with=None, join_how=None):
+    def _as_dataframe_unmodified(self, join_with, join_how):
         # Use join_with if specified, otherwise fall back to what is defined in the class
         join_with = first_not_none_param([join_with, self.join_with], default=[])
         if type(join_with) == str:
@@ -306,6 +306,78 @@ class Cohort(Collection):
                 old_len_df,
                 len(df)))
         return df
+
+    def as_dataframe(self, on=None, col=None, join_with=None, join_how=None, **kwargs):
+        """
+        Return this Cohort as a DataFrame, and optionally include additional columns
+        using `on`.
+
+        on : function or list or dict or str, optional
+            - A function that creates a new column for comparison, e.g. count.snv_count.
+            - Or a list of column-generating functions.
+            - Or a map of new column names to their column-generating functions.
+            - A column name that gets returned with the original dataframe as (col, df).
+        col : str, optional
+            If `on` is a function generating a column, col is the name of that column.
+            If `on` is a str specifying a column, col is the name of a copy of that column.
+            If None, defaults to the name of the function.
+
+        If `on` is a function or functions, kwargs is passed to those functions.
+        Otherwise kwargs is ignored.
+
+        Return : tuple or DataFrame
+            <dataframe>
+            or (<name of new column>, <dataframe with that new column>)
+            or (<list of names of new columns>, <dataframe with those new columns>)
+        """
+        df = self._as_dataframe_unmodified(join_with=join_with, join_how=join_how)
+        if on is None:
+            return df
+
+        if type(on) == str:
+            if col is not None:
+                df[col] = df[on]
+                return (col, df)
+            return (on, df)
+
+        def apply_func(on, col, df):
+            """
+            Sometimes we have functions that, by necessity, have more parameters
+            than just `row`. For a function like that, we assume that it has two
+            parameters: `row` and `cohort`. We use it to construct another function
+            that has only the `row` parameter so it can be sent to `DataFrame.apply`.
+            """
+            if col is None:
+                # Use the function name, or "column" for lambdas, if no
+                # name is provided for the newly created column.
+                col = on.__name__ if not is_lambda(on) else "column"
+            on_argcount = on.__code__.co_argcount
+            if on_argcount == 1:
+                func = lambda row: on(row, **kwargs)
+            elif on_argcount == 2:
+                func = lambda row: on(row, self, **kwargs)
+            else:
+                raise ValueError("Function %s has too many arguments" % on)
+            df[col] = df.apply(func, axis=1)
+            return (col, df)
+
+        def is_lambda(func):
+            return func.__name__ == (lambda: None).__name__
+
+        if type(on) == FunctionType:
+            return apply_func(on, col, df)
+        if type(on) == dict:
+            cols = []
+            for key, value in on.iteritems():
+                col, df = apply_func(on=value, col=key, df=df)
+                cols.append(col)
+            return (cols, df)
+        if type(on) == list:
+            cols = []
+            for i, elem in enumerate(on):
+                col, df = apply_func(on=elem, col="column_%d" % i, df=df)
+                cols.append(col)
+            return (cols, df)
 
     def generate_provenance(self):
         module_names = ["cohorts", "pyensembl", "varcode", "mhctools", "topiary", "isovar", "scipy", "numpy", "pandas"]
@@ -679,75 +751,13 @@ class Cohort(Collection):
         column_types = [cohort_dataframe[col].dtype for col in cohort_dataframe.columns]
         return dict(zip(list(cohort_dataframe.columns), column_types))
 
-    def altered_dataframe(self, on, col=None, **kwargs):
-        """
-        on : function or list or dict or str
-            - A function that creates a new column for comparison, e.g. count.snv_count.
-            - Or a list of column-generating functions.
-            - Or a map of new column names to their column-generating functions.
-            - A column name that gets returned with the original dataframe as (col, df).
-        col : str, optional
-            If `on` is a function generating a column, col is the name of that column.
-            If `on` is a str specifying a column, col is the name of a copy of that column.
-            If None, defaults to the name of the function.
-
-        Return : tuple
-            (<name of new column>, <dataframe with that new column>)
-            or (<list of names of new columns>, <dataframe with those new columns>)
-        """
-        df = self.as_dataframe(**kwargs)
-        if type(on) == str:
-            if col is not None:
-                df[col] = df[on]
-                return (col, df)
-            return (on, df)
-
-        def apply_func(on, col, df):
-            """
-            Sometimes we have functions that, by necessity, have more parameters
-            than just `row`. For a function like that, we assume that it has two
-            parameters: `row` and `cohort`. We use it to construct another function
-            that has only the `row` parameter so it can be sent to `DataFrame.apply`.
-            """
-            if col is None:
-                # Use the function name, or "column" for lambdas, if no
-                # name is provided for the newly created column.
-                col = on.__name__ if not is_lambda(on) else "column"
-            on_argcount = on.__code__.co_argcount
-            if on_argcount == 1:
-                func = on
-            elif on_argcount == 2:
-                func = lambda row: on(row, self)
-            else:
-                raise ValueError("Function %s has too many arguments" % on)
-            df[col] = df.apply(func, axis=1)
-            return (col, df)
-
-        def is_lambda(func):
-            return func.__name__ == (lambda: None).__name__
-
-        if type(on) == FunctionType:
-            return apply_func(on, col, df)
-        if type(on) == dict:
-            cols = []
-            for key, value in on.iteritems():
-                col, df = apply_func(on=value, col=key, df=df)
-                cols.append(col)
-            return (cols, df)
-        if type(on) == list:
-            cols = []
-            for i, elem in enumerate(on):
-                col, df = apply_func(on=elem, col="column_%d" % i, df=df)
-                cols.append(col)
-            return (cols, df)
-
     def plot_roc_curve(self, on, bootstrap_samples=100, **kwargs):
         """Plot an ROC curve for benefit and a given variable
 
         Parameters
         ----------
         on : str or function
-            See `cohort.load.altered_dataframe`
+            See `cohort.load.as_dataframe`
         bootstrap_samples : int, optional
             Number of boostrap samples to use to compute the AUC
 
@@ -757,7 +767,7 @@ class Cohort(Collection):
             Returns the average AUC for the given predictor over `bootstrap_samples`
             and the associated ROC curve
         """
-        plot_col, df = self.altered_dataframe(on, col=None, **kwargs)
+        plot_col, df = self.as_dataframe(on, col=None, **kwargs)
         df = filter_not_null(df, "benefit")
         df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
@@ -776,9 +786,9 @@ class Cohort(Collection):
         Parameters
         ----------
         on : str or function
-            See `cohort.load.altered_dataframe`
+            See `cohort.load.as_dataframe`
         col : str, optional
-            If specified, store the result of `on`. See `cohort.load.altered_dataframe`
+            If specified, store the result of `on`. See `cohort.load.as_dataframe`
         mw_alternative : str, optional
             Choose the sidedness of the mannwhitneyu test.
 
@@ -787,7 +797,7 @@ class Cohort(Collection):
         (Test statistic, p-value): (float, float)
 
         """
-        plot_col, df = self.altered_dataframe(on, col, **kwargs)
+        plot_col, df = self.as_dataframe(on, col, **kwargs)
         df = filter_not_null(df, "benefit")
         df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
@@ -811,16 +821,16 @@ class Cohort(Collection):
         Parameters
         ----------
         on : str or function
-            See `cohort.load.altered_dataframe`
+            See `cohort.load.as_dataframe`
         col : str, optional
-            If specified, store the result of `on`. See `cohort.load.altered_dataframe`
+            If specified, store the result of `on`. See `cohort.load.as_dataframe`
         how : {'os', 'pfs'}, optional
             Whether to plot OS (overall survival) or PFS (progression free survival)
         threshold : int or 'median', optional
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
-        plot_col, df = self.altered_dataframe(on, col, **kwargs)
+        plot_col, df = self.as_dataframe(on, col, **kwargs)
         if df[plot_col].dtype == "bool":
             default_threshold = None
         else:
@@ -840,13 +850,13 @@ class Cohort(Collection):
         Parameters
         ----------
         on : function or list or map of functions
-            See `cohort.load.altered_dataframe`
+            See `cohort.load.as_dataframe`
         on_two : function, optional
             Can specify the second function here rather than creating a list.
         """
         if on_two is not None:
             on = [on, on_two]
-        plot_cols, df = self.altered_dataframe(on, **kwargs)
+        plot_cols, df = self.as_dataframe(on, **kwargs)
         sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
 
 def first_not_none_param(params, default):
