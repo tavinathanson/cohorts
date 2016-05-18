@@ -17,6 +17,7 @@ from __future__ import print_function
 from os import path, makedirs, listdir
 from shutil import rmtree
 import pandas as pd
+import seaborn as sb
 import numpy as np
 import json
 import warnings
@@ -377,11 +378,24 @@ class Cohort(Collection):
         provenance = self.generate_provenance()
         self.save_provenance(patient_cache_dir, provenance)
 
-    def load_variants(self, variant_type="snv", merge_type="union"):
+    def iter_patients(self, patients):
+        if patients is None:
+            return self
+        return iter(patients)
+
+    def patient_from_id(self, id):
+        for patient in self:
+            if patient.id == id:
+                return patient
+        raise ValueError("No patient with ID %s found" % id)
+
+    def load_variants(self, patients=None, variant_type="snv", merge_type="union"):
         """Load a dictionary of patient_id to varcode.VariantCollection
-        
+
         Parameters
         ----------
+        patients : str, optional
+            Filter to a subset of patients
         variant_type : {'snv', 'indel'}, optional
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
@@ -395,7 +409,7 @@ class Cohort(Collection):
         assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         patient_variants = {}
 
-        for patient in self:
+        for patient in self.iter_patients(patients):
             variants = self._load_single_patient_variants(patient, variant_type, merge_type)
             patient_variants[patient.id] = variants
         return patient_variants
@@ -434,25 +448,27 @@ class Cohort(Collection):
 
         return merged_variants
 
-    def load_effects(self, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
+    def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
         """Load a dictionary of patient_id to varcode.EffectCollection
-  
+
         Parameters
         ----------
+        patients : str, optional
+            Filter to a subset of patients
         only_nonsynonymous : bool, optional
-            If true, load only nonsynonymous effects, default False 
+            If true, load only nonsynonymous effects, default False
         variant_type : {'snv', 'indel'}, optional
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
-    
+ 
         Returns
         -------
         effects
              Dictionary of patient_id to varcode.EffectCollection
         """
         patient_effects = {}
-        for patient in self:
+        for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
                 patient, only_nonsynonymous, variant_type, merge_type)
             patient_effects[patient.id] = effects
@@ -526,11 +542,11 @@ class Cohort(Collection):
             data = data[data["FPKM_status"] == "OK"]
         return data
 
-    def load_neoantigens(self, variant_type="snv", merge_type="union",
+    def load_neoantigens(self, patients=None, variant_type="snv", merge_type="union",
                          only_expressed=False, epitope_lengths=[8, 9, 10, 11],
                          ic50_cutoff=500, process_limit=10, max_file_records=None):
         dfs = []
-        for patient in self:
+        for patient in self.iter_patients(patients):
             df_epitopes = self._load_single_patient_neoantigens(
                 patient=patient,
                 variant_type=variant_type,
@@ -663,42 +679,60 @@ class Cohort(Collection):
         column_types = [cohort_dataframe[col].dtype for col in cohort_dataframe.columns]
         return dict(zip(list(cohort_dataframe.columns), column_types))
 
-    def clinical_func(self, row_func, col):
-        df = self.as_dataframe()
-        df[col] = df.apply(row_func, axis=1)
-        return col, df
-
-    def plot_init(self, on, col, col_equals, **kwargs):
+    def altered_dataframe(self, on, col=None, **kwargs):
         """
-        `on` is either:
-        - a function that creates a new column for comparison, e.g. count.snv_count
-        - a function that takes a dataframe row as input and returns a boolean or quantity based on that row (with col being the name of that new boolean or quantity)
-        - a string representing an existing column
-        - a string representing a new column name, created by comparing column `col` with the value `col_equals`
+        on : function or str or dict or list
+            - A function that creates a new column for comparison, e.g. count.snv_count.
+            - Or a list of column-generating functions.
+            - Or a map of new column names to their column-generating functions.
+        col : str, optional
+            If `on` is a function generating a column, col is the name of that column.
+            If None, defaults to the name of the function.
 
-        If `on` is a function that creates a new column, pass extra keyword arguments
-        through to that function. If `on` is a string, pass extra keyword arguments
-        to the internal call to `as_dataframe`.
+        Return : tuple
+            (<name of new column>, <dataframe with that new column>)
+            or (<list of names of new columns>, <dataframe with those new columns>)
         """
-        if type(on) == FunctionType:
-            if col is None:
-                return on(self, **kwargs)
-            return self.clinical_func(on, col)
-        if type(on) == str:
-            cohort_dataframe = self.as_dataframe(**kwargs)
-            if on in cohort_dataframe.columns:
-                return (on, cohort_dataframe)
+        df = self.as_dataframe(**kwargs)
+
+        def apply_func(on, col, df):
+            col = on.__name__ if not is_lambda(on) else "column"
+            on_argcount = on.__code__.co_argcount
+            if on_argcount == 1:
+                func = on
+            elif on_argcount == 2:
+                func = lambda row: on(row, self)
             else:
-                return col_func(self, on, col, col_equals)
+                raise ValueError("Function %s has too many arguments" % on)
+            df[col] = df.apply(func, axis=1)
+            return (col, df)
+
+        def is_lambda(func):
+            return func.__name__ == (lambda: None).__name__
+
+        if type(on) == FunctionType:
+            return apply_func(on, col, df)
+        if type(on) == dict:
+            cols = []
+            for key, value in on.iteritems():
+                col, df = apply_func(on=value, col=key, df=df)
+                cols.append(col)
+            return (cols, df)
+        if type(on) == list:
+            cols = []
+            for i, elem in enumerate(on):
+                col, df = apply_func(on=elem, col="column_%d" % i, df=df)
+                cols.append(col)
+            return (cols, df)
 
     def plot_roc_curve(self, on, bootstrap_samples=100, **kwargs):
         """Plot an ROC curve for benefit and a given variable
 
         Parameters
         ----------
-        on : See `cohort.load.plot_init`
+        on : See `cohort.load.altered_dataframe`
         bootstrap_samples : int, optional
-            Number of boostrap samples to use to compute the AUC 
+            Number of boostrap samples to use to compute the AUC
 
         Returns
         -------
@@ -706,16 +740,13 @@ class Cohort(Collection):
             Returns the average AUC for the given predictor over `bootstrap_samples`
             and the associated ROC curve
         """
-        plot_col, df = self.plot_init(on, col=None, col_equals=None, **kwargs)
-        original_len = len(df)
-        df = df[df.benefit.notnull()]
-        updated_len = len(df)
+        plot_col, df = self.altered_dataframe(on, col=None, **kwargs)
+        df = filter_not_null(df, "benefit")
+        df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
-        if updated_len < original_len:
-            print("Missing benefit for %d patients: from %d to %d" % (original_len - updated_len, original_len, updated_len))
         return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples)
 
-    def plot_benefit(self, on, col=None, col_equals=None,
+    def plot_benefit(self, on, col=None,
                      mw_alternative="two-sided", **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
 
@@ -727,12 +758,10 @@ class Cohort(Collection):
 
         Parameters
         ----------
-        on : See `cohort.load.plot_init`
+        on : See `cohort.load.altered_dataframe`
         col : str, optional
-            If specified, store the result of `on` or compare the column specified with `col_equals`
-            See `cohort.load.plot_init`
-        col_equals : str, optional
-            Fixed value of `col` on which to split the cohort
+            If specified, store the result of `on`
+            See `cohort.load.altered_dataframe`
         mw_alternative : str, optional
             Choose the sidedness of the mannwhitneyu test.
 
@@ -741,13 +770,10 @@ class Cohort(Collection):
         (Test statistic, p-value): (float, float)
 
         """
-        plot_col, df = self.plot_init(on, col, col_equals, **kwargs)
-        original_len = len(df)
-        df = df[df.benefit.notnull()]
-        updated_len = len(df)
+        plot_col, df = self.altered_dataframe(on, col, **kwargs)
+        df = filter_not_null(df, "benefit")
+        df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
-        if updated_len < original_len:
-            print("Missing benefit for %d patients: from %d to %d" % (original_len - updated_len, original_len, updated_len))
         if df[plot_col].dtype == "bool":
             results = fishers_exact_plot(
                 data=df,
@@ -759,28 +785,25 @@ class Cohort(Collection):
                 condition="benefit",
                 distribution=plot_col,
                 alternative=mw_alternative)
-
         return results
 
-    def plot_survival(self, on, col=None, col_equals=None, how="os",
+    def plot_survival(self, on, col=None, how="os",
                       threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
 
         Parameters
         ----------
-        on :  See `cohort.load.plot_init`
+        on :  See `cohort.altered_dataframe`
         col : str, optional
-            If specified, store the result of `on` or compare the column specified with `col_equals`
-            See `cohort.load.plot_init`
-        col_equals : str, optional
-            Fixed value of `col` on which to split the cohort
-        how : {'os', 'pfs'}, optional 
+            If specified, store the result of `on`
+            See `cohort.load.altered_dataframe`
+        how : {'os', 'pfs'}, optional
             Whether to plot OS (overall survival) or PFS (progression free survival)
         threshold : int or 'median', optional
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
-        plot_col, df = self.plot_init(on, col, col_equals, **kwargs)
+        plot_col, df = self.altered_dataframe(on, col, **kwargs)
         if df[plot_col].dtype == "bool":
             default_threshold = None
         else:
@@ -794,10 +817,12 @@ class Cohort(Collection):
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
 
-def col_func(cohort, on, col, col_equals):
-    df = cohort.as_dataframe()
-    df[on] = df[col] == col_equals
-    return on, df
+    def plot_joint(self, on_one, on_two, col_one=None, col_two=None, **kwargs):
+        if col_one is None or col_two is None:
+            plot_cols, df = self.altered_dataframe([on_one, on_two], **kwargs)
+        else:
+            plot_cols, df = self.altered_dataframe({col_one: on_one, col_two: on_two}, **kwargs)
+        sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
 
 def first_not_none_param(params, default):
     """
@@ -808,3 +833,11 @@ def first_not_none_param(params, default):
         if param is not None:
             return param
     return default
+
+def filter_not_null(df, col):
+    original_len = len(df)
+    df = df[df[col].notnull()]
+    updated_len = len(df)
+    if updated_len < original_len:
+        print("Missing %s for %d patients: from %d to %d" % (col, original_len - updated_len, original_len, updated_len))
+    return df
