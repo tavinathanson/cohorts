@@ -688,6 +688,7 @@ class Cohort(Collection):
             - A column name that gets returned with the original dataframe as (col, df).
         col : str, optional
             If `on` is a function generating a column, col is the name of that column.
+            If `on` is a str specifying a column, col is the name of a copy of that column.
             If None, defaults to the name of the function.
 
         Return : tuple
@@ -696,10 +697,22 @@ class Cohort(Collection):
         """
         df = self.as_dataframe(**kwargs)
         if type(on) == str:
+            if col is not None:
+                df[col] = df[on]
+                return (col, df)
             return (on, df)
 
         def apply_func(on, col, df):
-            col = on.__name__ if not is_lambda(on) else "column"
+            """
+            Sometimes we have functions that, by necessity, have more parameters
+            than just `row`. For a function like that, we assume that it has two
+            parameters: `row` and `cohort`. We use it to construct another function
+            that has only the `row` parameter so it can be sent to `DataFrame.apply`.
+            """
+            if col is None:
+                # Use the function name, or "column" for lambdas, if no
+                # name is provided for the newly created column.
+                col = on.__name__ if not is_lambda(on) else "column"
             on_argcount = on.__code__.co_argcount
             if on_argcount == 1:
                 func = on
