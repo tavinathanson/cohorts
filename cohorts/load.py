@@ -375,7 +375,8 @@ class Cohort(Collection):
         if type(on) == list:
             cols = []
             for i, elem in enumerate(on):
-                col, df = apply_func(on=elem, col="column_%d" % i, df=df)
+                col = elem.__name__ if not is_lambda(elem) else "column_%d" % i
+                col, df = apply_func(on=elem, col=col, df=df)
                 cols.append(col)
             return (cols, df)
 
