@@ -681,10 +681,11 @@ class Cohort(Collection):
 
     def altered_dataframe(self, on, col=None, **kwargs):
         """
-        on : function or str or dict or list
+        on : function or list or dict or str
             - A function that creates a new column for comparison, e.g. count.snv_count.
             - Or a list of column-generating functions.
             - Or a map of new column names to their column-generating functions.
+            - A column name that gets returned with the original dataframe as (col, df).
         col : str, optional
             If `on` is a function generating a column, col is the name of that column.
             If None, defaults to the name of the function.
@@ -694,6 +695,8 @@ class Cohort(Collection):
             or (<list of names of new columns>, <dataframe with those new columns>)
         """
         df = self.as_dataframe(**kwargs)
+        if type(on) == str:
+            return (on, df)
 
         def apply_func(on, col, df):
             col = on.__name__ if not is_lambda(on) else "column"
@@ -730,7 +733,8 @@ class Cohort(Collection):
 
         Parameters
         ----------
-        on : See `cohort.load.altered_dataframe`
+        on : str or function
+            See `cohort.load.altered_dataframe`
         bootstrap_samples : int, optional
             Number of boostrap samples to use to compute the AUC
 
@@ -758,10 +762,10 @@ class Cohort(Collection):
 
         Parameters
         ----------
-        on : See `cohort.load.altered_dataframe`
-        col : str, optional
-            If specified, store the result of `on`
+        on : str or function
             See `cohort.load.altered_dataframe`
+        col : str, optional
+            If specified, store the result of `on`. See `cohort.load.altered_dataframe`
         mw_alternative : str, optional
             Choose the sidedness of the mannwhitneyu test.
 
@@ -793,10 +797,10 @@ class Cohort(Collection):
 
         Parameters
         ----------
-        on :  See `cohort.altered_dataframe`
-        col : str, optional
-            If specified, store the result of `on`
+        on : str or function
             See `cohort.load.altered_dataframe`
+        col : str, optional
+            If specified, store the result of `on`. See `cohort.load.altered_dataframe`
         how : {'os', 'pfs'}, optional
             Whether to plot OS (overall survival) or PFS (progression free survival)
         threshold : int or 'median', optional
@@ -817,11 +821,19 @@ class Cohort(Collection):
             threshold=threshold if threshold is not None else default_threshold)
         print(results)
 
-    def plot_joint(self, on_one, on_two, col_one=None, col_two=None, **kwargs):
-        if col_one is None or col_two is None:
-            plot_cols, df = self.altered_dataframe([on_one, on_two], **kwargs)
-        else:
-            plot_cols, df = self.altered_dataframe({col_one: on_one, col_two: on_two}, **kwargs)
+    def plot_joint(self, on, on_two=None, **kwargs):
+        """Plot a jointplot.
+
+        Parameters
+        ----------
+        on : function or list or map of functions
+            See `cohort.load.altered_dataframe`
+        on_two : function, optional
+            Can specify the second function here rather than creating a list.
+        """
+        if on_two is not None:
+            on = [on, on_two]
+        plot_cols, df = self.altered_dataframe(on, **kwargs)
         sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
 
 def first_not_none_param(params, default):
