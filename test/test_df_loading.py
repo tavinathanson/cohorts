@@ -15,7 +15,6 @@
 from __future__ import print_function
 
 from cohorts import Cohort, DataFrameLoader
-from cohorts.count import *
 
 import pandas as pd
 from nose.tools import eq_
@@ -33,4 +32,6 @@ def test_df_loading():
 
     df = cohort.as_dataframe(join_with="hello")
     eq_(len(df), 2)
+    # pylint: disable=no-member
+    # pylint gets confused by as_dataframe's return type
     eq_(set(df.patient_id), set(["1", "5"]))
