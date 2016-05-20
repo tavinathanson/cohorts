@@ -28,6 +28,10 @@ import six.moves.cPickle as pickle
 from types import FunctionType
 from collections import defaultdict
 
+import vap  ## vcf-annotate-polyphen
+import sqlalchemy
+from sqlalchemy import create_engine
+
 import varcode
 from varcode import VariantCollection, EffectCollection
 from mhctools import NetMHCcons, EpitopeCollection
@@ -230,6 +234,7 @@ class Cohort(Collection):
                             "nonsynonymous_effect": "cached-nonsynonymous-effects",
                             "neoantigen": "cached-neoantigens",
                             "expressed_neoantigen": "cached-expressed-neoantigens",
+                            "polyphen": "cached-polyphen-annotations",
                             "isovar": "cached-isovar-output"}
         self.verify_cache(self.cache_names)
 
@@ -521,9 +526,67 @@ class Cohort(Collection):
 
         return merged_variants
 
+    def load_polyphen_annotations(self, database_file):
+        """Load a dataframe containing polyphen2 annotations for all variants
+
+        Parameters
+        ----------
+        database_file : string, sqlite
+            Path to the WHESS/Polyphen2 SQLite database.
+            Can be downloaded and bunzip2'ed from http://bit.ly/208mlIU
+
+        Returns
+        -------
+        annotations
+            Dictionary of patient_id to a DataFrame that contains annotations
+        """
+        patient_annotations = {}
+        for patient in self:
+            annotations = self._load_single_patient_polyphen(patient, database_file)
+            patient_annotations[patient.id] = annotations
+        return patient_annotations
+
+    def _load_single_patient_polyphen(self, patient, database_file):
+        cache_name = self.cache_names["polyphen"]
+        cached_file_name = "polyphen-annotations.csv"
+        cached = self.load_from_cache(cache_name, patient.id, cached_file_name)
+        if cached is not None:
+            return cached
+
+        engine = create_engine("sqlite:///{}".format(database_file))
+        conn = engine.connect()
+
+        variants = self._load_single_patient_variants(patient,
+                                                      variant_type="snv",
+                                                      merge_type="union")
+        df = pd.DataFrame(columns=["chrom", "pos", "ref", "alt",
+                                   "annotation_found", "gene", "protein",
+                                   "aa_change", "hvar_pred", "hvar_prob",
+                                   "hdiv_pred", "hdiv_prob"])
+        for variant in variants:
+            chrom = "chr{}".format(getattr(variant, "contig", None))
+            pos = getattr(variant, "start", None)
+            ref = getattr(variant, "ref", None)
+            alt = getattr(variant, "alt",  None)
+            annotation = vap.annotate_variant(conn, chrom, pos, ref, alt)
+            datum = {"chrom": chrom,
+                     "pos": pos,
+                     "ref": ref,
+                     "alt": alt,
+                     "annotation_found": annotation is not None}
+            attributes = ["gene", "protein", "aa_change",
+                          "hvar_pred", "hvar_prob",
+                          "hdiv_pred", "hdiv_prob"]
+            for attr in attributes:
+                datum[attr] = getattr(annotation, attr, None)
+            df = df.append(datum, ignore_index=True)
+        df["pos"] = df["pos"].astype("int")
+        df["annotation_found"] = df["annotation_found"].astype("bool")
+        self.save_to_cache(df, cache_name, patient.id, cached_file_name)
+        return df
+
     def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
         """Load a dictionary of patient_id to varcode.EffectCollection
-
         Parameters
         ----------
         patients : str, optional
@@ -534,7 +597,7 @@ class Cohort(Collection):
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
- 
+
         Returns
         -------
         effects
@@ -818,7 +881,6 @@ class Cohort(Collection):
     def plot_survival(self, on, col=None, how="os",
                       threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
-
         Parameters
         ----------
         on : str or function
