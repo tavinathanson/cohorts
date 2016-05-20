@@ -18,7 +18,6 @@ from os import path, makedirs, listdir
 from shutil import rmtree
 import pandas as pd
 import seaborn as sb
-import numpy as np
 import json
 import warnings
 
@@ -494,7 +493,6 @@ class Cohort(Collection):
 
     def _load_single_patient_variants(self, patient, variant_type, merge_type):
         failed_io = False
-        combined_variants = []
         try:
             cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
@@ -502,27 +500,43 @@ class Cohort(Collection):
                 return cached
 
             vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
-            for vcf_path in vcf_paths:
-                variants = varcode.load_vcf_fast(vcf_path)
-                combined_variants.append(set(variants.elements))
+            variant_collections = [
+                (vcf_path, varcode.load_vcf_fast(vcf_path)) 
+                for vcf_path in vcf_paths
+            ]
         except IOError:
             failed_io = True
 
-        if len(combined_variants) == 0 or failed_io:
+        if len(variant_collections) == 0 or failed_io:
             print("Variants did not exist for patient %s" % patient.id)
             return VariantCollection([])
 
-        if len(combined_variants) == 1:
+        if len(variant_collections) == 1:
             # There is nothing to merge
-            merged_variants =  VariantCollection(combined_variants[0])
+            merged_variants = VariantCollection(variant_collections[0][1].elements)
         else:
-            assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
-            if merge_type == "union":
-                merged_variants = VariantCollection(set.union(*combined_variants))
-            elif merge_type == "intersection":
-                merged_variants = VariantCollection(set.intersection(*combined_variants))
+            merged_variants = self._merge_variant_collections(dict(variant_collections), merge_type)
 
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
+
+        return merged_variants
+    
+    def _merge_variant_collections(self, variant_collections, merge_type):
+        assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
+        combined_variants = [set(vc.elements) for (path, vc) in variant_collections.items()]
+        if merge_type == "union":
+            merged_variants = VariantCollection(set.union(*combined_variants))
+        elif merge_type == "intersection":
+            merged_variants = VariantCollection(set.intersection(*combined_variants))
+
+        for variant in merged_variants:
+            metadata = [
+                (vcf_path, vc.metadata[variant]) 
+                for (vcf_path, vc) in variant_collections.items() 
+                if variant in vc.metadata
+            ]
+
+            merged_variants.metadata[variant] = dict(metadata)
 
         return merged_variants
 
