@@ -507,13 +507,14 @@ class Cohort(Collection):
         except IOError:
             failed_io = True
 
-        if len(variant_collections) == 0 or failed_io:
+        if failed_io or len(variant_collections) == 0:
             print("Variants did not exist for patient %s" % patient.id)
             return VariantCollection([])
 
         if len(variant_collections) == 1:
             # There is nothing to merge
-            merged_variants = VariantCollection(variant_collections[0][1].elements)
+            vcf_path, variants = variant_collections[0]
+            merged_variants = variants
         else:
             merged_variants = self._merge_variant_collections(dict(variant_collections), merge_type)
 
