@@ -521,10 +521,10 @@ class Cohort(Collection):
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
 
         return merged_variants
-    
-    def _merge_variant_collections(self, variant_collections, merge_type):
+
+    def _merge_variant_collections(self, vcf_to_variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
-        combined_variants = [set(vc.elements) for (path, vc) in variant_collections.items()]
+        combined_variants = [set(vc.elements) for (path, vc) in vcf_to_variant_collections.items()]
         if merge_type == "union":
             merged_variants = VariantCollection(set.union(*combined_variants))
         elif merge_type == "intersection":
@@ -533,7 +533,7 @@ class Cohort(Collection):
         for variant in merged_variants:
             metadata = [
                 (vcf_path, vc.metadata[variant]) 
-                for (vcf_path, vc) in variant_collections.items() 
+                for (vcf_path, vc) in vcf_to_variant_collections.items() 
                 if variant in vc.metadata
             ]
 
