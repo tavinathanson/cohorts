@@ -117,6 +117,13 @@ def test_merge_two():
         count_col, df = cohort.as_dataframe(snv_count, merge_type="intersection")
         eq_(len(df), 3)
         eq_(list(df[count_col]), [3, 1, 5])
+
+        cohort_variants = cohort.load_variants(merge_type="intersection")
+        for (sample, variants) in cohort_variants.items():
+            for variant in variants:
+                metadata = variants.metadata[variant]
+                eq_(len(metadata), 2) # Each variant has two metadata entries
+
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
