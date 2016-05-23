@@ -235,7 +235,6 @@ class Cohort(Collection):
                             "expressed_neoantigen": "cached-expressed-neoantigens",
                             "polyphen": "cached-polyphen-annotations",
                             "isovar": "cached-isovar-output"}
-        self.verify_cache(self.cache_names)
 
     def verify_id_uniqueness(self):
         patient_ids = set([patient.id for patient in self])
@@ -255,20 +254,6 @@ class Cohort(Collection):
                         "A patient did not progress despite PFS being less than OS. "
                         "Full row: %s" % row)
         cohort_dataframe.apply(func, axis=1)
-
-    def verify_cache(self, cache_names):
-        bad_caches = []
-        for cache_name in cache_names.values():
-            cache_dir = path.join(self.cache_dir, cache_name)
-            if path.exists(cache_dir):
-                cache_subdirs = set(listdir(cache_dir))
-                cache_int_subdirs = set([int(name) for name in cache_subdirs])
-                if len(cache_subdirs) != len(cache_int_subdirs):
-                    bad_caches.append(cache_name)
-
-        if len(bad_caches) > 0:
-            raise ValueError("Caches %s have duplicate int/str directories" %
-                             str(bad_caches))
 
     def _as_dataframe_unmodified(self, join_with, join_how):
         # Use join_with if specified, otherwise fall back to what is defined in the class
