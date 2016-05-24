@@ -210,7 +210,8 @@ class Cohort(Collection):
                  extra_df_loaders=[],
                  join_with=None,
                  join_how="inner",
-                 check_provenance=False):
+                 check_provenance=False,
+                 polyphen_dump_path=None):
         Collection.__init__(
             self,
             elements=patients)
@@ -224,6 +225,7 @@ class Cohort(Collection):
         self.join_with = join_with
         self.join_how = join_how
         self.check_provenance = check_provenance
+        self.polyphen_dump_path = polyphen_dump_path
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -384,6 +386,21 @@ class Cohort(Collection):
                 cols.append(col)
             return (cols, df)
 
+    def load_dataframe(self, df_loader_name):
+        """
+        Instead of joining a DataFrameJoiner with the Cohort in `as_dataframe`, sometimes
+        we may want to just directly load a particular DataFrame.
+        """
+        # Get the DataFrameLoader object corresponding to this name.
+        df_loaders = [df_loader for df_loader in self.df_loaders if df_loader.name == df_loader_name]
+
+        if len(df_loaders) == 0:
+            raise ValueError("No DataFrameLoader with name %s" % df_loader_name)
+        if len(df_loaders) > 1:
+            raise ValueError("Multiple DataFrameLoaders with name %s" % df_loader_name)
+
+        return df_loaders[0].load_dataframe()
+
     def generate_provenance(self):
         module_names = ["cohorts", "pyensembl", "varcode", "mhctools", "topiary", "isovar", "scipy", "numpy", "pandas"]
         module_versions = [__import__(module_name).__version__ for module_name in module_names]
@@ -541,7 +558,7 @@ class Cohort(Collection):
 
         return merged_variants
 
-    def load_polyphen_annotations(self, database_file):
+    def load_polyphen_annotations(self, as_dataframe=False):
         """Load a dataframe containing polyphen2 annotations for all variants
 
         Parameters
@@ -557,18 +574,21 @@ class Cohort(Collection):
         """
         patient_annotations = {}
         for patient in self:
-            annotations = self._load_single_patient_polyphen(patient, database_file)
+            annotations = self._load_single_patient_polyphen(patient)
+            annotations["patient_id"] = patient.id
             patient_annotations[patient.id] = annotations
+        if as_dataframe:
+            return pd.concat(patient_annotations.values())
         return patient_annotations
 
-    def _load_single_patient_polyphen(self, patient, database_file):
+    def _load_single_patient_polyphen(self, patient):
         cache_name = self.cache_names["polyphen"]
         cached_file_name = "polyphen-annotations.csv"
         cached = self.load_from_cache(cache_name, patient.id, cached_file_name)
         if cached is not None:
             return cached
 
-        engine = create_engine("sqlite:///{}".format(database_file))
+        engine = create_engine("sqlite:///{}".format(self.polyphen_dump_path))
         conn = engine.connect()
 
         variants = self._load_single_patient_variants(patient,
