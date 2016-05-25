@@ -601,6 +601,19 @@ class Cohort(Collection):
         self.save_to_cache(df, cache_name, patient.id, cached_file_name)
         return df
 
+    def load_effects_dataframe(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
+        all_effects = self.load_effects(patients=patients, 
+                                        only_nonsynonymous=only_nonsynonymous,
+                                        variant_type=variant_type, 
+                                        merge_type=merge_type)
+        dfs = []
+        for (patient_id, effects) in all_effects.items():
+            df = effects.to_dataframe()
+            df['patient_id'] = patient_id
+            dfs.append(df)
+        effects_df = pd.concat(dfs, copy=False)
+        return effects_df
+
     def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
         """Load a dictionary of patient_id to varcode.EffectCollection
         Parameters
