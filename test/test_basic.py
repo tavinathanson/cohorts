@@ -29,6 +29,7 @@ def make_simple_clinical_dataframe(
         deceased_list=None,
         progressed_or_deceased_list=None):
     return pd.DataFrame({"id": ["1", "4", "5"],
+                         "age": [15, 20, 25],
                          "OS": [100, 150, 120] if os_list is None else os_list,
                          "PFS": [50, 40, 120] if pfs_list is None else pfs_list,
                          "deceased": [True, False, False] if deceased_list is None else deceased_list,
@@ -42,7 +43,9 @@ def make_simple_cohort(**kwargs):
                           os=row["OS"],
                           pfs=row["PFS"],
                           deceased=row["deceased"],
-                          progressed_or_deceased=row["progressed_or_deceased"])
+                          progressed_or_deceased=row["progressed_or_deceased"],
+                          additional_data=row
+                          )
         patients.append(patient)
 
     return Cohort(
@@ -64,3 +67,10 @@ def test_progressed_vs_pfs():
 def test_simple_cohort():
     cohort = make_simple_cohort()
     eq_(len(cohort.as_dataframe()), 3)
+
+    columns = set(cohort.as_dataframe().columns)
+    assert "id" in columns
+    assert "patient_id" in columns
+    assert "age" in columns
+    assert "pfs" in columns
+    assert "os" in columns
