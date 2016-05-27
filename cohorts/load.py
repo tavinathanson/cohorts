@@ -269,20 +269,16 @@ class Cohort(Collection):
         # Use join_how if specified, otherwise fall back to what is defined in the class
         join_how = first_not_none_param([join_how, self.join_how], default="inner")
 
-        df = pd.DataFrame()
-        df["patient_id"] = pd.Series([patient.id for patient in self])
-        for clinical_col in ["benefit", "os", "pfs", "deceased",
-                             "progressed", "progressed_or_deceased"]:
-            df[clinical_col] = pd.Series([getattr(patient, clinical_col) for patient in self])
-
-        additional_data_all_patients = defaultdict(list)
+        patient_rows = []
         for patient in self:
-            if patient.additional_data is not None:
-                for key, value in patient.additional_data.items():
-                    additional_data_all_patients[key].append(value)
+            row = {} if patient.additional_data is None else patient.additional_data.copy()
+            row['patient_id'] = patient.id
+            for clinical_col in ["benefit", "os", "pfs", "deceased",
+                                "progressed", "progressed_or_deceased"]:
+                row[clinical_col] = getattr(patient, clinical_col)
 
-        if len(additional_data_all_patients) > 0:
-            df = df.merge(pd.DataFrame(additional_data_all_patients), on="patient_id", how="left")
+            patient_rows.append(row)
+        df = pd.DataFrame.from_records(patient_rows)
 
         for df_loader in df_loaders:
             old_len_df = len(df)
