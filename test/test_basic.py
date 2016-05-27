@@ -21,7 +21,7 @@ from cohorts import Cohort, Patient
 from cohorts.load import InvalidDataError
 
 import pandas as pd
-from nose.tools import raises, eq_
+from nose.tools import raises, eq_, ok_
 
 def make_simple_clinical_dataframe(
         os_list=None,
@@ -69,8 +69,8 @@ def test_simple_cohort():
     eq_(len(cohort.as_dataframe()), 3)
 
     columns = set(cohort.as_dataframe().columns)
-    assert "id" in columns
-    assert "patient_id" in columns
-    assert "age" in columns
-    assert "pfs" in columns
-    assert "os" in columns
+    ok_("id" in columns)
+    ok_("patient_id" in columns)
+    ok_("age" in columns)
+    ok_("pfs" in columns)
+    ok_("os" in columns)
