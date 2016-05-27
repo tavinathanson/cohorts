@@ -853,9 +853,20 @@ class Cohort(Collection):
         df.benefit = df.benefit.astype(bool)
         return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples)
 
-    def plot_benefit(self, on, col=None,
+    def plot_benefit(self, on, col=None, benefit_col="benefit",
                      mw_alternative="two-sided", **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
+        """
+        return self.plot_boolean(on=on,
+                                 boolean_col=benefit_col,
+                                 col=col,
+                                 mw_alternative=mw_alternative,
+                                 **kwargs)
+
+    def plot_boolean(self, on, boolean_col, col=None,
+                     mw_alternative="two-sided", **kwargs):
+        """Plot a comparison of `boolean_col` in the cohort on a given variable via
+        `on` or `col`.
 
         If the variable (through `on` or `col` is binary) this will compare
         odds-ratios and perform a Fisher's exact test.
@@ -878,18 +889,18 @@ class Cohort(Collection):
 
         """
         plot_col, df = self.as_dataframe(on, col, **kwargs)
-        df = filter_not_null(df, "benefit")
+        df = filter_not_null(df, boolean_col)
         df = filter_not_null(df, plot_col)
-        df.benefit = df.benefit.astype(bool)
+        df[boolean_col] = df[boolean_col].astype(bool)
         if df[plot_col].dtype == "bool":
             results = fishers_exact_plot(
                 data=df,
-                condition1="benefit",
+                condition1=boolean_col,
                 condition2=plot_col)
         else:
             results = mann_whitney_plot(
                 data=df,
-                condition="benefit",
+                condition=boolean_col,
                 distribution=plot_col,
                 alternative=mw_alternative)
         return results
