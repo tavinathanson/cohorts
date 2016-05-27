@@ -63,7 +63,7 @@ if __name__ == "__main__":
             "scipy>=0.17.0",
             "topiary>=0.0.16",
             "mhctools>=0.2.3",
-            "varcode>=0.4.7",
+            "varcode>=0.4.12",
             "pyensembl>=0.8.12",
             "six>=1.10.0",
             "lifelines>=0.9.1.0",
