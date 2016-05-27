@@ -899,7 +899,7 @@ class Cohort(Collection):
         if df[plot_col].dtype == "bool":
             results = fishers_exact_plot(
                 data=df,
-                condition1=binary_col,
+                condition1=boolean_col,
                 condition2=plot_col)
         else:
             results = mann_whitney_plot(
