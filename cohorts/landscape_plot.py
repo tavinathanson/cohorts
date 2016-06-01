@@ -1,5 +1,6 @@
 import seaborn as sb
 import matplotlib.pyplot as plt
+import math
 
 def _bar_plot(data,
              title=None,
@@ -57,17 +58,36 @@ def landscape_plot(cohort,
                    bar_height=4,
                    bin_columns=[],
                    indicator_columns=[],
-                   value_columns=[]):
+                   value_columns=[],):
+    """Build a figure with a plot from each of the columns specified
 
+    Parameters
+    ----------
+    cohort : Cohort
+    effects_df : str
+        Description
+    sample_col : str
+        Column that represents a sample id
+    width : int, optional
+        Width of the full figure
+    bar_height : int, optional
+        Height of each bar plot
+    bin_columns : list, optional
+         Columns to build a binned/stacked bar plot from
+    indicator_columns : list, optional
+         Columns to build a indicator bar from 
+    value_columns : list, optional
+        Columns to build a bar plot from
+    """
     cohort_size = len(cohort)
-    min_square_size = float(width) / (.9 * cohort_size)
+    min_square_size = float(width) / (.75 * cohort_size)
     num_bar_plots = len(bin_columns) + len(value_columns)
     height = len(indicator_columns) * min_square_size + num_bar_plots * bar_height 
 
-    grid_rows = int(float(height) / min_square_size)
+    grid_rows = int(math.ceil(float(height) / min_square_size)) + num_bar_plots
     indicator_column_rows = len(indicator_columns)
 
-    bar_rows = int((grid_rows - indicator_column_rows) / num_bar_plots)
+    bar_rows = int((grid_rows - indicator_column_rows - num_bar_plots) / num_bar_plots)
     gridsize = (grid_rows, 1)
 
     plt.figure(0, figsize=(width - 1, height))
@@ -82,7 +102,7 @@ def landscape_plot(cohort,
                         sample_col,
                         bin_by_col,
                         ax=ax,)
-        current_row += bar_rows
+        current_row += bar_rows + 1
 
     for on in value_columns:
         ax = plt.subplot2grid(gridsize,
@@ -91,9 +111,11 @@ def landscape_plot(cohort,
                               rowspan=bar_rows)
         plot_col, df = cohort.as_dataframe(on)
         _bar_plot(df[plot_col],
-                  ax=ax,)
-        current_row += bar_rows
+                  ax=ax,
+                  title=plot_col,)
+        current_row += bar_rows + 1
 
+    current_row -= 1
     for (idx, indicator_on) in enumerate(indicator_columns):
         ax = plt.subplot2grid(gridsize,
                               (current_row, 0))
