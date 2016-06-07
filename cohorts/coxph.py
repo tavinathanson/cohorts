@@ -26,6 +26,7 @@ def coxph_model(data, formula, time_col, event_col, penalizer = 0.1, normalize =
             cf.event_observed
             )
     except:
+        print('Error computing concordance')
         concordance = numpy.nan
     
     return(cf, sdata, concordance)
