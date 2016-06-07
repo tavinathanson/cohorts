@@ -39,13 +39,19 @@ def bootstrap_coxph(models, data, time_col, event_col, bootstrap_samples = 1000,
         sample_data = data.sample(frac = frac, replace = True)
 
         for m in models:
-            a = coxph_model(data = sample_data,
+            try:
+                fit, data, conc = coxph_model(data = sample_data,
                             formula = models[m],
                             time_col = time_col,
                             event_col = event_col,
                             **kwargs
                            )
-            scores[m][i] = a[3]
+            except Exception as err:
+                print('Error fitting coxph_model for model {0} (i = {1})'.format(m, i))
+                print(err)
+                raise
+            finally:
+                scores[m][i] = conc
     results = pandas.DataFrame(scores)
     results['metric'] = 'concordance'
     results = pandas.melt(results, id_vars=['metric'], var_name = 'model', value_name='concordance')
