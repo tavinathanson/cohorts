@@ -129,3 +129,24 @@ def test_merge_two():
             rmtree(vcf_dir)
         if cohort is not None:
             cohort.clear_caches()
+
+def test_filter_variants():
+    vcf_dir, cohort = None, None
+    try:
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2])
+
+        def filter_g_variants(variant, metadata): return variant.ref == 'G'
+        g_variants = {'1': 2, '4': 1, '5': 3}
+
+        cohort_variants = cohort.load_variants(merge_type="union", filter_fn=filter_g_variants)
+
+        for (sample, variants) in cohort_variants.items():
+            print(sample, variants)
+            print(sample, g_variants[sample])
+            eq_(len(variants), g_variants[sample])
+
+    finally:
+        if vcf_dir is not None and path.exists(vcf_dir):
+            rmtree(vcf_dir)
+        if cohort is not None:
+            cohort.clear_caches()

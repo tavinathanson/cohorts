@@ -464,7 +464,7 @@ class Cohort(Collection):
                 return patient
         raise ValueError("No patient with ID %s found" % id)
 
-    def load_variants(self, patients=None, variant_type="snv", merge_type="union"):
+    def load_variants(self, patients=None, variant_type="snv", merge_type="union", filter_fn=None):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
         Parameters
@@ -485,24 +485,28 @@ class Cohort(Collection):
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
-            variants = self._load_single_patient_variants(patient, variant_type, merge_type)
+            variants = self._load_single_patient_variants(patient, variant_type, merge_type, filter_fn)
             patient_variants[patient.id] = variants
         return patient_variants
 
-    def _load_single_patient_variants(self, patient, variant_type, merge_type):
+    def _load_single_patient_variants(self, patient, variant_type, merge_type, filter_fn=None):
         failed_io = False
         try:
             cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
-                return cached
+                if filter_fn:
+                    filtered = [variant for variant in cached if filter_fn(variant, cached.metadata[variant])]
+                    return filtered
+                else:
+                    return cached
 
             vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
                 (vcf_path, varcode.load_vcf_fast(vcf_path)) 
                 for vcf_path in vcf_paths
             ]
-        except IOError:
+        except IOError: 
             failed_io = True
 
         if failed_io or len(variant_collections) == 0:
@@ -518,7 +522,11 @@ class Cohort(Collection):
 
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
 
-        return merged_variants
+        if filter_fn:
+            filtered = [variant for variant in merged_variants if filter_fn(variant, merged_variants.metadata[variant])]
+            return filtered
+        else:
+            return merged_variants
 
     def _merge_variant_collections(self, vcf_to_variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
