@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-from os import path, makedirs, listdir
+from os import path, makedirs
 from shutil import rmtree
 import pandas as pd
 import seaborn as sb
@@ -25,10 +25,8 @@ import warnings
 # pylint: disable=no-name-in-module
 import six.moves.cPickle as pickle
 from types import FunctionType
-from collections import defaultdict
 
 import vap  ## vcf-annotate-polyphen
-import sqlalchemy
 from sqlalchemy import create_engine
 
 import varcode
@@ -42,6 +40,7 @@ from pysam import AlignmentFile
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
+from .varcode_utils import filter_variants_with_metadata, filter_effects_with_metadata
 
 class InvalidDataError(ValueError):
     pass
@@ -464,7 +463,7 @@ class Cohort(Collection):
                 return patient
         raise ValueError("No patient with ID %s found" % id)
 
-    def load_variants(self, patients=None, variant_type="snv", merge_type="union"):
+    def load_variants(self, patients=None, variant_type="snv", merge_type="union", filter_fn=None):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
         Parameters
@@ -475,6 +474,8 @@ class Cohort(Collection):
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
+        filter_fn: function
+            Takes a variant and it's metadata and returns a boolean. Only variants returning True are preserved.
 
         Returns
         -------
@@ -485,24 +486,23 @@ class Cohort(Collection):
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
-            variants = self._load_single_patient_variants(patient, variant_type, merge_type)
+            variants = self._load_single_patient_variants(patient, variant_type, merge_type, filter_fn)
             patient_variants[patient.id] = variants
         return patient_variants
 
-    def _load_single_patient_variants(self, patient, variant_type, merge_type):
+    def _load_single_patient_variants(self, patient, variant_type, merge_type, filter_fn=None):
         failed_io = False
         try:
             cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
-                return cached
-
+                return filter_variants_with_metadata(cached, filter_fn)
             vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
                 (vcf_path, varcode.load_vcf_fast(vcf_path)) 
                 for vcf_path in vcf_paths
             ]
-        except IOError:
+        except IOError: 
             failed_io = True
 
         if failed_io or len(variant_collections) == 0:
@@ -518,7 +518,7 @@ class Cohort(Collection):
 
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
 
-        return merged_variants
+        return filter_variants_with_metadata(merged_variants, filter_fn)
 
     def _merge_variant_collections(self, vcf_to_variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
@@ -601,7 +601,7 @@ class Cohort(Collection):
         self.save_to_cache(df, cache_name, patient.id, cached_file_name)
         return df
 
-    def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
+    def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union", filter_fn=None):
         """Load a dictionary of patient_id to varcode.EffectCollection
         Parameters
         ----------
@@ -613,6 +613,8 @@ class Cohort(Collection):
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
+        filter_fn: function
+            Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved.
 
         Returns
         -------
@@ -622,22 +624,22 @@ class Cohort(Collection):
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, variant_type, merge_type)
+                patient, only_nonsynonymous, variant_type, merge_type, filter_fn)
             patient_effects[patient.id] = effects
         return patient_effects
 
     def _load_single_patient_effects(self, patient, only_nonsynonymous,
-                                     variant_type, merge_type):
+                                     variant_type, merge_type, filter_fn):
         cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
+        variants = self._load_single_patient_variants(
+            patient, variant_type, merge_type)
         if only_nonsynonymous:
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
             cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            return cached
+            return filter_effects_with_metadata(cached, variants.metadata, filter_fn)
 
-        variants = self._load_single_patient_variants(
-            patient, variant_type, merge_type)
         effects = variants.effects()
         nonsynonymous_effects = EffectCollection(
             effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
@@ -646,8 +648,8 @@ class Cohort(Collection):
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
 
         if only_nonsynonymous:
-            return nonsynonymous_effects
-        return effects
+            return filter_effects_with_metadata(nonsynonymous_effects, variants.metadata, filter_fn)
+        return filter_effects_with_metadata(effects, variants.metadata, filter_fn)
 
     def load_cufflinks(self, filter_ok=True):
         """

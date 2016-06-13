@@ -38,13 +38,11 @@ def nonsynonymous_snv_count(row, cohort, **kwargs):
 
 def missense_snv_count(row, cohort, **kwargs):
     patient_id = row["patient_id"]
-    patient_nonsynonymous_effects = cohort.load_effects(
-        only_nonsynonymous=True, patients=[cohort.patient_from_id(patient_id)], **kwargs)
-    patient_missense_effects = dict(
-        [(patient_id,
-          EffectCollection(
-              [effect for effect in effects if type(effect) == Substitution]))
-         for (patient_id, effects) in patient_nonsynonymous_effects.items()])
+    patient_missense_effects = cohort.load_effects(
+        only_nonsynonymous=True, 
+        patients=[cohort.patient_from_id(patient_id)], 
+        filter_fn=lambda effect, variant_metadata: type(effect) == Substitution,
+        **kwargs)
     if patient_id in patient_missense_effects:
         return len(patient_missense_effects[patient_id])
     return np.nan
