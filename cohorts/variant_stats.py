@@ -50,7 +50,7 @@ def _strelka_variant_stats(variant, sample_info):
     ref_depth = int(sample_info[variant.ref+'U'][0])
     alt_depth = int(sample_info[variant.alt+'U'][0])
     depth = alt_depth + ref_depth
-    vaf = alt_depth / depth
+    vaf = float(alt_depth) / depth
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
 
