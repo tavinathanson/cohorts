@@ -1,0 +1,18 @@
+##fileformat=VCFv4.1
+##reference=file:///projects/ngs/resources/gatk/2.3/ucsc.hg19.fasta
+##INFO=<ID=GE,Number=.,Type=String,Description="HGNC Gene Symbol (could be more than one)">
+##INFO=<ID=EG,Number=.,Type=String,Description="Entrez Gene ID (could be more than one)">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##contig=<ID=chrM,length=16571>
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr10,length=135534747>
+##contig=<ID=chr11,length=135006516>
+##contig=<ID=chr12,length=133851895>
+##contig=<ID=chr14,length=107349540>
+##contig=<ID=chr15,length=102531392>
+##contig=<ID=chr16,length=90354753>
+##contig=<ID=chr17,length=81195210>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	N1	T1
+chr12	14794076	.	C	A	.	.	GE=SCP2;EG=6342	GT:AD:BQ:DP:FA:SS	0:115,0:.:115:0.00:0	0/1:128,5:33:133:0.038:2
+chr12	25398284	.	C	G	.	.	GE=MRPL55;EG=128308	GT:AD:BQ:DP:FA:SS	0:90,0:.:88:0.011:0	0/1:66,4:34:70:0.057:2
+chr12	42778752	.	T	A	.	.	GE=ARHGAP22;EG=58504	GT:AD:BQ:DP:FA:SS	0:50,0:.:49:0.020:0	0/1:41,4:33:45:0.089:2

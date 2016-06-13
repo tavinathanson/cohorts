@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from __future__ import print_function
-from nose.tools import ok_, raises
+from nose.tools import assert_almost_equals, eq_, ok_, raises
 from shutil import rmtree
 from os import path
 
@@ -27,19 +27,32 @@ FILE_FORMAT_1 = "patient_format1_%s.mutect.vcf"
 FILE_FORMAT_2 = "patient_format2_%s.strelka.vcf"
 FILE_FORMAT_3 = "patient_format3_%s.vcf"
 
+FILE_FORMAT_4 = "patient_format4_%s.mutect.vcf"
+
 def make_cohort(file_formats):
     cohort = make_simple_cohort()
     patient_ids = [patient.id for patient in cohort]
+
+    # Mutect VCF format
     vcf_dir = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [3, 3, 6])),
                             file_format=FILE_FORMAT_1,
                             template_name="vcf_template_1.vcf")
+
+    # Strelka VCF format
     _ = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [5, 2, 3])),
                       file_format=FILE_FORMAT_2,
                       template_name="vcf_template_2.vcf")
 
+    # Strelka VCF format, but without Strelka in the name (mimic unsupported)
     _ = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [5, 2, 3])),
                       file_format=FILE_FORMAT_3,
                       template_name="vcf_template_2.vcf")
+
+    # Mutect VCF format with overlapping variants from the Strelka set (template 2)
+    _ = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [3, 2, 3])),
+                      file_format=FILE_FORMAT_4,
+                      template_name="vcf_template_3.vcf")
+
     for patient in cohort:
         vcf_paths = []
         for file_format in file_formats:
@@ -110,6 +123,35 @@ def test_extract_strelka_mutect_stats():
         # Use Mutect and Strelka VCF format
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2])
         extraction(cohort, extractor=variant_stats_from_variant)
+
+    finally:
+        if vcf_dir is not None and path.exists(vcf_dir):
+            rmtree(vcf_dir)
+        if cohort is not None:
+            cohort.clear_caches()
+
+def test_extract_and_merge_strelka_mutect_stats():
+    vcf_dir, cohort = None, None
+    try:
+        # Use Mutect and Strelka VCF format with overlapping variants
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_2, FILE_FORMAT_4])
+        variants = cohort.load_variants()
+        patient_1_variants = variants['1']
+
+        def test_stats(variant_index, expected_tumor_depth, expected_tumor_vaf):
+            variant = patient_1_variants[variant_index]
+            stats = variant_stats_from_variant(variant, patient_1_variants.metadata[variant])
+            eq_(stats.tumor_stats.depth, expected_tumor_depth)
+            assert_almost_equals(stats.tumor_stats.variant_allele_frequency, expected_tumor_vaf, places=3)
+
+        # The first 3 variants (all on chr12) are in both Mutect and Strelka VCFs
+        test_stats(0, expected_tumor_depth=133, expected_tumor_vaf=0.038) # Higher depth in Mutect file
+        test_stats(1, expected_tumor_depth=144, expected_tumor_vaf=0.0486) # Higher depth in Strelka file
+        test_stats(2, expected_tumor_depth=45, expected_tumor_vaf=0.089) # Higher depth in Mutect file
+
+        # The next 2 variants only appear in the Strelka VCFs
+        test_stats(3, expected_tumor_depth=104, expected_tumor_vaf=0.058)
+        test_stats(4, expected_tumor_depth=117, expected_tumor_vaf=0.077)
 
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
