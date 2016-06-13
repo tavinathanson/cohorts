@@ -29,6 +29,7 @@ addons:
 install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy nose pandas matplotlib
   - source activate test-environment
+  - conda install -c bioconda pysam=0.9.0
   - pip install pypandoc
   - pip install -r requirements.txt
   - pip install .
