@@ -1,12 +1,12 @@
 from collections import namedtuple
 
 
-VariantStats = namedtuple('VariantStats', 
-                          ['depth', 'alt_depth', 'variant_allele_frequency'])
+VariantStats = namedtuple("VariantStats", 
+                          ["depth", "alt_depth", "variant_allele_frequency"])
 
 
-SomaticVariantStats = namedtuple('SomaticVariantStats', 
-                          ['tumor_stats', 'normal_stats'])
+SomaticVariantStats = namedtuple("SomaticVariantStats", 
+                          ["tumor_stats", "normal_stats"])
 
 
 def strelka_somatic_variant_stats(variant, variant_metadata):
@@ -24,16 +24,16 @@ def strelka_somatic_variant_stats(variant, variant_metadata):
     SomaticVariantStats
     """
 
-    sample_info = variant_metadata['sample_info']
+    sample_info = variant_metadata["sample_info"]
     # Ensure there are exactly two samples in the VCF, a tumor and normal
     assert len(sample_info) == 2, "More than two samples found in the somatic VCF"
 
-    tumor_stats = _strelka_variant_stats(variant, sample_info['TUMOR'])
-    normal_stats = _strelka_variant_stats(variant, sample_info['NORMAL'])
+    tumor_stats = _strelka_variant_stats(variant, sample_info["TUMOR"])
+    normal_stats = _strelka_variant_stats(variant, sample_info["NORMAL"])
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
 
 def _strelka_variant_stats(variant, sample_info):
-    """Parse a single sample's variant calling statistics based on Strelka VCF output
+    """Parse a single sample"s variant calling statistics based on Strelka VCF output
 
     Parameters
     ----------
@@ -47,8 +47,8 @@ def _strelka_variant_stats(variant, sample_info):
     """
 
     # Retrieve the Tier 1 counts from Strelka
-    ref_depth = int(sample_info[variant.ref+'U'][0])
-    alt_depth = int(sample_info[variant.alt+'U'][0])
+    ref_depth = int(sample_info[variant.ref+"U"][0])
+    alt_depth = int(sample_info[variant.alt+"U"][0])
     depth = alt_depth + ref_depth
     vaf = float(alt_depth) / depth
 
@@ -69,25 +69,25 @@ def mutect_somatic_variant_stats(variant, variant_metadata):
     SomaticVariantStats
     """
 
-    sample_info = variant_metadata['sample_info']
+    sample_info = variant_metadata["sample_info"]
     # Ensure there are exactly two samples in the VCF, a tumor and normal
     assert len(sample_info) == 2, "More than two samples found in the somatic VCF"
 
     # Find the sample with the genotype field set to variant in the VCF
-    tumor_sample_infos = [info for info in sample_info.values() if info['GT'] == '0/1']
+    tumor_sample_infos = [info for info in sample_info.values() if info["GT"] == "0/1"]
 
     # Ensure there is only one such sample
     assert len(tumor_sample_infos) == 1, "More than one tumor sample found in the VCF file"
 
     tumor_sample_info = tumor_sample_infos[0]
-    normal_sample_info = [info for info in sample_info.values() if info['GT'] != '0/1'][0]
+    normal_sample_info = [info for info in sample_info.values() if info["GT"] != "0/1"][0]
 
     tumor_stats = _mutect_variant_stats(variant, tumor_sample_info)
     normal_stats = _mutect_variant_stats(variant, normal_sample_info)
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
 
 def _mutect_variant_stats(variant, sample_info):
-    """Parse a single sample's variant calling statistics based on Mutect's (v1) VCF output
+    """Parse a single sample"s variant calling statistics based on Mutect"s (v1) VCF output
 
     Parameters
     ----------
@@ -101,7 +101,7 @@ def _mutect_variant_stats(variant, sample_info):
     """
 
     # Parse out the AD (or allele depth field), which is an array of [REF_DEPTH, ALT_DEPTH]
-    ref_depth, alt_depth = sample_info['AD']
+    ref_depth, alt_depth = sample_info["AD"]
     depth = int(ref_depth) + int(alt_depth)
     vaf = float(alt_depth) / depth
 
@@ -132,9 +132,9 @@ def variant_stats_from_variant(variant,
 
     all_stats = []
     for (vcf, variant_metadata) in metadata.items():
-        if 'strelka' in vcf.lower():
+        if "strelka" in vcf.lower():
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
-        elif 'mutect' in vcf.lower():
+        elif "mutect" in vcf.lower():
             stats = mutect_somatic_variant_stats(variant, variant_metadata)
         else:
             raise ValueError("Cannot parse sample fields, VCF file {} is from an unsupported caller.".format(vcf))
