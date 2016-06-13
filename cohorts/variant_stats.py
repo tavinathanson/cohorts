@@ -77,7 +77,7 @@ def mutect_somatic_variant_stats(variant, variant_metadata):
     tumor_sample_infos = [info for info in sample_info.values() if info['GT'] == '0/1']
 
     # Ensure there is only one such sample
-    assert len(tumor_sample_infos) == 1, "{}, {}".format(vcf, variant)
+    assert len(tumor_sample_infos) == 1, "More than one tumor sample found in the VCF file"
 
     tumor_sample_info = tumor_sample_infos[0]
     normal_sample_info = [info for info in sample_info.values() if info['GT'] != '0/1'][0]
