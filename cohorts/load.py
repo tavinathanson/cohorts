@@ -40,7 +40,7 @@ from pysam import AlignmentFile
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
-from .varcode_utils import filter_variants_with_metadata
+from .varcode_utils import filter_variants_with_metadata, filter_effects_with_metadata
 
 class InvalidDataError(ValueError):
     pass
@@ -601,7 +601,7 @@ class Cohort(Collection):
         self.save_to_cache(df, cache_name, patient.id, cached_file_name)
         return df
 
-    def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union"):
+    def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union", filter_fn=None):
         """Load a dictionary of patient_id to varcode.EffectCollection
         Parameters
         ----------
@@ -613,6 +613,8 @@ class Cohort(Collection):
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
+        filter_fn: function
+            Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved.
 
         Returns
         -------
@@ -622,22 +624,22 @@ class Cohort(Collection):
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, variant_type, merge_type)
+                patient, only_nonsynonymous, variant_type, merge_type, filter_fn)
             patient_effects[patient.id] = effects
         return patient_effects
 
     def _load_single_patient_effects(self, patient, only_nonsynonymous,
-                                     variant_type, merge_type):
+                                     variant_type, merge_type, filter_fn):
         cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
+        variants = self._load_single_patient_variants(
+            patient, variant_type, merge_type)
         if only_nonsynonymous:
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
             cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            return cached
+            return filter_effects_with_metadata(cached, variants.metadata, filter_fn)
 
-        variants = self._load_single_patient_variants(
-            patient, variant_type, merge_type)
         effects = variants.effects()
         nonsynonymous_effects = EffectCollection(
             effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
@@ -646,8 +648,8 @@ class Cohort(Collection):
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
 
         if only_nonsynonymous:
-            return nonsynonymous_effects
-        return effects
+            return filter_effects_with_metadata(nonsynonymous_effects, variants.metadata, filter_fn)
+        return filter_effects_with_metadata(effects, variants.metadata, filter_fn)
 
     def load_cufflinks(self, filter_ok=True):
         """

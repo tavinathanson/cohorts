@@ -14,13 +14,12 @@
 
 from __future__ import print_function
 
-from . import data_path, generated_data_path, DATA_DIR
+from varcode import ExonicSpliceSite, Substitution
+
 from .data_generate import generate_vcfs
 
-from cohorts import Cohort
 from cohorts.functions import *
 
-import pandas as pd
 from nose.tools import raises, eq_
 from os import path
 from shutil import rmtree
@@ -141,9 +140,32 @@ def test_filter_variants():
         cohort_variants = cohort.load_variants(merge_type="union", filter_fn=filter_g_variants)
 
         for (sample, variants) in cohort_variants.items():
-            print(sample, variants)
-            print(sample, g_variants[sample])
             eq_(len(variants), g_variants[sample])
+
+    finally:
+        if vcf_dir is not None and path.exists(vcf_dir):
+            rmtree(vcf_dir)
+        if cohort is not None:
+            cohort.clear_caches()
+
+def test_filter_effects():
+    vcf_dir, cohort = None, None
+    try:
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
+
+        def filter_substitution_effects(effect, metadata): return type(effect) == Substitution
+        missense_counts = {'1': 2, '4': 2, '5': 4}
+
+        cohort_effects = cohort.load_effects(only_nonsynonymous=True, merge_type="union", filter_fn=filter_substitution_effects)
+        for (sample, effects) in cohort_effects.items():
+            eq_(len(effects), missense_counts[sample])
+
+        def filter_exonic_splice_site_effects(effect, metadata): return type(effect) == ExonicSpliceSite
+        splice_site_counts = {'1': 1, '4': 1, '5': 2}
+
+        cohort_effects = cohort.load_effects(only_nonsynonymous=True, merge_type="union", filter_fn=filter_exonic_splice_site_effects)
+        for (sample, effects) in cohort_effects.items():
+            eq_(len(effects), splice_site_counts[sample])
 
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):

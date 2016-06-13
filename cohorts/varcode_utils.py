@@ -1,7 +1,7 @@
-from varcode import VariantCollection
+from varcode import EffectCollection, VariantCollection
 
 def filter_variants_with_metadata(variant_collection, filter_fn):
-    """Filter variants from the Variant Collections
+    """Filter variants from the Variant Collection
 
     Parameters
     ----------
@@ -21,3 +21,25 @@ def filter_variants_with_metadata(variant_collection, filter_fn):
                                   ])
     else:
         return variant_collection
+
+def filter_effects_with_metadata(effect_collection, variant_collection_metadata, filter_fn):
+    """Filter variants from the Effect Collection
+
+    Parameters
+    ----------
+    effect_collection : varcode.EffectCollection
+    filter_fn: function
+        Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved.
+
+    Returns
+    -------
+    varcode.EffectCollection
+        Filtered effect collection, with only the variants passing the filter
+    """
+    if filter_fn:
+        return EffectCollection([effect
+                                  for effect in effect_collection
+                                  if filter_fn(effect, variant_collection_metadata[effect.variant])
+                                  ])
+    else:
+        return effect_collection
