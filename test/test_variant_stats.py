@@ -13,6 +13,8 @@
 # limitations under the License.
 
 from __future__ import print_function
+
+#pylint: disable=no-name-in-module
 from nose.tools import assert_almost_equals, eq_, ok_, raises
 from shutil import rmtree
 from os import path
