@@ -136,6 +136,8 @@ def variant_stats_from_variant(variant,
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
         elif 'mutect' in vcf.lower():
             stats = mutect_somatic_variant_stats(variant, variant_metadata)
+        else:
+            raise ValueError("Cannot parse sample fields, VCF file {} is from an unsupported caller.".format(vcf))
         all_stats.append(stats)
 
     return merge_fn(all_stats)

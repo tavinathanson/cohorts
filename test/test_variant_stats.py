@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from __future__ import print_function
-from nose.tools import ok_
+from nose.tools import ok_, raises
 from shutil import rmtree
 from os import path
 
@@ -25,6 +25,7 @@ from cohorts.variant_stats import (strelka_somatic_variant_stats,
 
 FILE_FORMAT_1 = "patient_format1_%s.mutect.vcf"
 FILE_FORMAT_2 = "patient_format2_%s.strelka.vcf"
+FILE_FORMAT_3 = "patient_format3_%s.vcf"
 
 def make_cohort(file_formats):
     cohort = make_simple_cohort()
@@ -34,6 +35,10 @@ def make_cohort(file_formats):
                             template_name="vcf_template_1.vcf")
     _ = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [5, 2, 3])),
                       file_format=FILE_FORMAT_2,
+                      template_name="vcf_template_2.vcf")
+
+    _ = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [5, 2, 3])),
+                      file_format=FILE_FORMAT_3,
                       template_name="vcf_template_2.vcf")
     for patient in cohort:
         vcf_paths = []
@@ -59,6 +64,19 @@ def extraction(cohort, extractor):
 
             ok_(somatic_stats.normal_stats.variant_allele_frequency == 0)
 
+@raises(ValueError)
+def test_extract_unsupported_stats():
+    vcf_dir, cohort = None, None
+    try:
+        # Use Strelka and unsupported VCF format
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_2, FILE_FORMAT_3])
+        extraction(cohort, extractor=variant_stats_from_variant)
+
+    finally:
+        if vcf_dir is not None and path.exists(vcf_dir):
+            rmtree(vcf_dir)
+        if cohort is not None:
+            cohort.clear_caches()
 
 def test_extract_strelka_stats():
     vcf_dir, cohort = None, None
@@ -89,7 +107,7 @@ def test_extract_mutect_stats():
 def test_extract_strelka_mutect_stats():
     vcf_dir, cohort = None, None
     try:
-        # Use Mutect VCF format
+        # Use Mutect and Strelka VCF format
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2])
         extraction(cohort, extractor=variant_stats_from_variant)
 
