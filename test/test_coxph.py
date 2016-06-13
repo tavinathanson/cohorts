@@ -75,6 +75,6 @@ def test_coxph_model_alt_missing():
 ## test bootstrap code
 def test_coxph_bootstrap():
     d = prep_alt_coxph_data()
-    models = {'first_model': '~ age + sex + ecog + karno', 'second_model': '~ age + sex + ecog'}
+    models = {'first_model': '~ age + sex', 'second_model': '~ age + sex + ecog'}
     results = bootstrap_coxph(data = d, models = models, time_col = 'time', event_col = 'status')
     return(results) 
