@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-from os import path, makedirs, listdir
+from os import path, makedirs
 from shutil import rmtree
 import pandas as pd
 import seaborn as sb
@@ -25,10 +25,8 @@ import warnings
 # pylint: disable=no-name-in-module
 import six.moves.cPickle as pickle
 from types import FunctionType
-from collections import defaultdict
 
 import vap  ## vcf-annotate-polyphen
-import sqlalchemy
 from sqlalchemy import create_engine
 
 import varcode
@@ -42,6 +40,7 @@ from pysam import AlignmentFile
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
+from .varcode_utils import filter_variants_with_metadata
 
 class InvalidDataError(ValueError):
     pass
@@ -475,6 +474,8 @@ class Cohort(Collection):
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
+        filter_fn: function
+            Takes a variant and it's metadata and returns a boolean. Only variants returning True are preserved.
 
         Returns
         -------
@@ -495,12 +496,7 @@ class Cohort(Collection):
             cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
-                if filter_fn:
-                    filtered = [variant for variant in cached if filter_fn(variant, cached.metadata[variant])]
-                    return filtered
-                else:
-                    return cached
-
+                return filter_variants_with_metadata(cached, filter_fn)
             vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
                 (vcf_path, varcode.load_vcf_fast(vcf_path)) 
@@ -522,11 +518,7 @@ class Cohort(Collection):
 
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
 
-        if filter_fn:
-            filtered = [variant for variant in merged_variants if filter_fn(variant, merged_variants.metadata[variant])]
-            return filtered
-        else:
-            return merged_variants
+        return filter_variants_with_metadata(merged_variants, filter_fn)
 
     def _merge_variant_collections(self, vcf_to_variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
