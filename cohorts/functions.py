@@ -15,9 +15,6 @@
 from __future__ import print_function
 
 import numpy as np
-import pandas as pd
-
-from varcode import EffectCollection
 from varcode.effects import Substitution
 
 def snv_count(row, cohort, **kwargs):
