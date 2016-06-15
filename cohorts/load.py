@@ -350,6 +350,13 @@ class Cohort(Collection):
 
         if type(on) == FunctionType:
             return apply_func(on, col, df)
+
+        # For multiple functions, don't allow kwargs since we won't know which functions
+        # they apply to.
+        if len(kwargs) > 0:
+            raise ValueError("kwargs are not supported when collecting multiple functions "
+                             "as we don't know which function they apply to.")
+
         if type(on) == dict:
             cols = []
             for key, value in on.iteritems():
