@@ -329,21 +329,19 @@ class Cohort(Collection):
         def apply_func(on, col, df):
             """
             Sometimes we have functions that, by necessity, have more parameters
-            than just `row`. For a function like that, we assume that it has two
-            parameters: `row` and `cohort`. We use it to construct another function
-            that has only the `row` parameter so it can be sent to `DataFrame.apply`.
+            than just `row`. We construct a function with just the `row` parameter
+            so it can be sent to `DataFrame.apply`. We hackishly pass `cohort`
+            (as `self`) along if the function accepts a `cohort` argument.
             """
             if col is None:
                 # Use the function name, or "column" for lambdas, if no
                 # name is provided for the newly created column.
                 col = on.__name__ if not is_lambda(on) else "column"
-            on_argcount = on.__code__.co_argcount
-            if on_argcount == 1:
-                func = lambda row: on(row, **kwargs)
-            elif on_argcount == 2:
-                func = lambda row: on(row, self, **kwargs)
+            on_argnames = on.__code__.co_varnames
+            if "cohort" not in on_argnames:
+                func = lambda row: on(row=row, **kwargs)
             else:
-                raise ValueError("Function %s has too many arguments" % on)
+                func = lambda row: on(row=row, cohort=self, **kwargs)
             df[col] = df.apply(func, axis=1)
             return (col, df)
 
