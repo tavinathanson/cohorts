@@ -743,7 +743,7 @@ class Cohort(Collection):
         if variants is None:
             return None
 
-        if hla_alleles in None:
+        if patient.hla_alleles is None:
             print("HLA alleles did not exist for patient %s" % patient.id)
             return None
 

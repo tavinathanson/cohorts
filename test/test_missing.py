@@ -134,6 +134,8 @@ def generate_empty_neoantigens(cohort,
                 makedirs(path.dirname(neoantigen_path))
                 with open(neoantigen_path, "w") as f:
                     df_neoantigens = pd.read_csv(data_path("empty-neoantigens.csv"))
+                    # pylint: disable=no-member
+                    # pylint gets confused by to_csv
                     df_neoantigens.to_csv(neoantigen_path)
         else:
             raise ValueError("Patient ID needs to be empty or zero")
