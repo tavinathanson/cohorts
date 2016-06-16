@@ -22,14 +22,15 @@ import numpy as np
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.utils import resample
 
-def stripboxplot(x, y, data, **kwargs):
+def stripboxplot(x, y, data, ax=None, **kwargs):
     """
     Overlay a stripplot on top of a boxplot.
     """
     ax = sb.boxplot(
         x=x,
         y=y,
-        data=data
+        data=data,
+        ax=ax
     )
 
     return sb.stripplot(
@@ -69,7 +70,7 @@ def fishers_exact_plot(data, condition1, condition2):
     print("Fisher's Exact Test: OR: {}, p-value={}".format(oddsratio, pvalue))
     return (oddsratio, pvalue, plot)
 
-def mann_whitney_plot(data, condition, distribution,
+def mann_whitney_plot(data, condition, distribution, ax=None,
                       condition_value=None, alternative="two-sided",
                       skip_plot=False):
     """
@@ -102,7 +103,8 @@ def mann_whitney_plot(data, condition, distribution,
         plot = stripboxplot(
             x=condition,
             y=distribution,
-            data=data
+            data=data,
+            ax=ax
         )
 
     if condition_value:
