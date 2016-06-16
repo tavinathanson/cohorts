@@ -20,6 +20,7 @@ from .data_generate import generate_vcfs
 from cohorts.functions import *
 from cohorts.load import filter_not_null
 
+import pandas as pd
 from nose.tools import raises, eq_, ok_
 from os import path, makedirs
 from shutil import rmtree
@@ -86,11 +87,6 @@ def test_missing_vcf_path():
         count_col, df = cohort.as_dataframe(missense_snv_count)
         eq_(len(df), 3)
         ok_(np.isnan(list(df[count_col])[0]))
-
-        generate_empty_neoantigens(cohort)
-
-        count_col, df = cohort.as_dataframe(neoantigen_count)
-        eq_(len(df), 3)
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
@@ -128,7 +124,7 @@ def generate_empty_neoantigens(cohort,
                                patient_ids_with_zero_neoantigens,
                                patient_ids_with_empty_neoantigens):
     for patient in cohort:
-        if patient.id in patient_ids_with_empty_patient_ids:
+        if patient.id in patient_ids_with_empty_neoantigens:
             continue
         elif patient.id in patient_ids_with_zero_neoantigens:
             neoantigen_path = generated_data_path(
