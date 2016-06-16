@@ -65,7 +65,7 @@ def neoantigen_count(row, cohort, qc_filter=False, **kwargs):
             variants = cohort.load_variants(patients = [patient])[patient.id]
             filter_mask = patient_neoantigens_df.apply(lambda row: neoantigen_qc_filter(row, variants.metadata), axis=1)
             patient_neoantigens_df = patient_neoantigens_df[filter_mask]
-        return len(patient_neoantigens)
+        return len(patient_neoantigens_df)
     return np.nan
 
 def expressed_neoantigen_count(row, cohort, **kwargs):
