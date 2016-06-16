@@ -492,7 +492,8 @@ class Cohort(Collection):
 
         for patient in self.iter_patients(patients):
             variants = self._load_single_patient_variants(patient, variant_type, merge_type, filter_fn)
-            patient_variants[patient.id] = variants
+            if variants is not None:
+                patient_variants[patient.id] = variants
         return patient_variants
 
     def _load_single_patient_variants(self, patient, variant_type, merge_type, filter_fn=None):
@@ -504,15 +505,18 @@ class Cohort(Collection):
                 return filter_variants_with_metadata(cached, filter_fn)
             vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
-                (vcf_path, varcode.load_vcf_fast(vcf_path)) 
+                (vcf_path, varcode.load_vcf_fast(vcf_path))
                 for vcf_path in vcf_paths
             ]
-        except IOError: 
+        except IOError:
             failed_io = True
 
+        # Note that this is the number of variant collections and not the number of
+        # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
+        # collections will lead to NaN variants and neoantigens.
         if failed_io or len(variant_collections) == 0:
             print("Variants did not exist for patient %s" % patient.id)
-            return VariantCollection([])
+            return None
 
         if len(variant_collections) == 1:
             # There is nothing to merge
@@ -535,8 +539,8 @@ class Cohort(Collection):
 
         for variant in merged_variants:
             metadata = [
-                (vcf_path, vc.metadata[variant]) 
-                for (vcf_path, vc) in vcf_to_variant_collections.items() 
+                (vcf_path, vc.metadata[variant])
+                for (vcf_path, vc) in vcf_to_variant_collections.items()
                 if variant in vc.metadata
             ]
 
@@ -630,7 +634,8 @@ class Cohort(Collection):
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
                 patient, only_nonsynonymous, variant_type, merge_type, filter_fn)
-            patient_effects[patient.id] = effects
+            if effects is not None:
+                patient_effects[patient.id] = effects
         return patient_effects
 
     def _load_single_patient_effects(self, patient, only_nonsynonymous,
@@ -638,6 +643,9 @@ class Cohort(Collection):
         cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
         variants = self._load_single_patient_variants(
             patient, variant_type, merge_type)
+        if variants is None:
+            return None
+
         if only_nonsynonymous:
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
@@ -704,7 +712,7 @@ class Cohort(Collection):
     def load_neoantigens(self, patients=None, variant_type="snv", merge_type="union",
                          only_expressed=False, epitope_lengths=[8, 9, 10, 11],
                          ic50_cutoff=500, process_limit=10, max_file_records=None):
-        dfs = []
+        dfs = {}
         for patient in self.iter_patients(patients):
             df_epitopes = self._load_single_patient_neoantigens(
                 patient=patient,
@@ -715,8 +723,9 @@ class Cohort(Collection):
                 ic50_cutoff=ic50_cutoff,
                 process_limit=process_limit,
                 max_file_records=max_file_records)
-            dfs.append(df_epitopes)
-        return pd.concat(dfs)
+            if df_epitopes is not None:
+                dfs[patient.id] = df_epitopes
+        return dfs
 
     def _load_single_patient_neoantigens(self, patient, variant_type,
                                          merge_type, only_expressed, epitope_lengths,
@@ -731,6 +740,13 @@ class Cohort(Collection):
 
         variants = self._load_single_patient_variants(
             patient, variant_type, merge_type)
+        if variants is None:
+            return None
+
+        if hla_alleles in None:
+            print("HLA alleles did not exist for patient %s" % patient.id)
+            return None
+
         mhc_model = NetMHCcons(
             alleles=patient.hla_alleles,
             epitope_lengths=epitope_lengths,
@@ -930,6 +946,7 @@ class Cohort(Collection):
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
         plot_col, df = self.as_dataframe(on, col, **kwargs)
+        df = filter_not_null(df, plot_col)
         if df[plot_col].dtype == "bool":
             default_threshold = None
         else:
@@ -958,6 +975,8 @@ class Cohort(Collection):
         if on_two is not None:
             on = [on, on_two]
         plot_cols, df = self.as_dataframe(on, **kwargs)
+        for plot_col in plot_cols:
+            df = filter_not_null(df, plot_col)
         p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
         return p
 

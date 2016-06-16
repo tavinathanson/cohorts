@@ -47,7 +47,9 @@ def missense_snv_count(row, cohort, **kwargs):
 def neoantigen_count(row, cohort, **kwargs):
     patient_id = row["patient_id"]
     patient_neoantigens = cohort.load_neoantigens(patients=[cohort.patient_from_id(patient_id)], **kwargs)
-    return len(patient_neoantigens[patient_neoantigens["patient_id"] == patient_id])
+    if patient_id in patient_neoantigens:
+        return len(patient_neoantigens[patient_id])
+    return np.nan
 
 def expressed_neoantigen_count(row, cohort, **kwargs):
     return neoantigen_count(row, cohort, only_expressed=True)
