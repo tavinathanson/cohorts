@@ -128,7 +128,7 @@ def mann_whitney_plot(data, condition, distribution, ax=None,
     print("Mann-Whitney test: U={}, p-value={} ({})".format(U, pvalue, sided_str))
     return (U, pvalue, plot)
 
-def roc_curve_plot(data, value_column, outcome_column, bootstrap_samples=100):
+def roc_curve_plot(data, value_column, outcome_column, bootstrap_samples=100, ax=None):
     """Create a ROC curve and compute the bootstrap AUC for the given variable and outcome
  
     Parameters
@@ -141,6 +141,8 @@ def roc_curve_plot(data, value_column, outcome_column, bootstrap_samples=100):
         Column to use as the outcome variable
     bootstrap_samples : int, optional
         Number of bootstrap samples to use to compute the AUC
+    ax : Axes, default None
+        Axes to plot on 
 
     Returns
     -------
@@ -157,12 +159,17 @@ def roc_curve_plot(data, value_column, outcome_column, bootstrap_samples=100):
     print("{}, Bootstrap (samples = {}) AUC:{}, std={}".format(value_column, bootstrap_samples, mean_bootstrap_auc, scores.std()))
 
     fpr, tpr, thresholds = roc_curve(outcome, values)
-    plt.xlim([-0.05, 1.05])
-    plt.ylim([-0.05, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    roc_plot = plt.plot(fpr, tpr, lw=1, label=value_column)
-    plt.legend(loc=2, borderaxespad=0.)
-    plt.title('{} ROC Curve (n={})'.format(value_column, len(values)))
+
+    if ax is None:
+        ax = plt.gca()
+
+    roc_plot = ax.plot(fpr, tpr, lw=1, label=value_column)
+
+    ax.set_xlim([-0.05, 1.05])
+    ax.set_ylim([-0.05, 1.05])
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.legend(loc=2, borderaxespad=0.)
+    ax.set_title('{} ROC Curve (n={})'.format(value_column, len(values)))
 
     return (mean_bootstrap_auc, roc_plot)
