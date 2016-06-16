@@ -14,41 +14,57 @@
 
 from __future__ import print_function
 
+from .variant_filters import variant_qc_filter, effect_qc_filter, neoantigen_qc_filter
+
 import numpy as np
 from varcode.effects import Substitution
 
-def snv_count(row, cohort, **kwargs):
+def snv_count(row, cohort, qc_filter=False, **kwargs):
     patient_id = row["patient_id"]
     patient_variants = cohort.load_variants(
-        patients=[cohort.patient_from_id(patient_id)], **kwargs)
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=variant_qc_filter if qc_filter else None,
+        **kwargs)
     if patient_id in patient_variants:
         return len(patient_variants[patient_id])
     return np.nan
 
-def nonsynonymous_snv_count(row, cohort, **kwargs):
+def nonsynonymous_snv_count(row, cohort, qc_filter=False, **kwargs):
     patient_id = row["patient_id"]
     patient_nonsynonymous_effects = cohort.load_effects(
-        only_nonsynonymous=True, patients=[cohort.patient_from_id(patient_id)], **kwargs)
+        only_nonsynonymous=True,
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=effect_qc_filter if qc_filter else None,
+        **kwargs)
     if patient_id in patient_nonsynonymous_effects:
         return len(patient_nonsynonymous_effects[patient_id])
     return np.nan
 
-def missense_snv_count(row, cohort, **kwargs):
+def missense_snv_count(row, cohort, qc_filter=False, **kwargs):
     patient_id = row["patient_id"]
+    def filter_fn(effect, variant_metadata):
+        if qc_filter:
+            return type(effect) == Substitution and effect_qc_filter(effect, variant_metadata)
+        return type(effect) == Substitution
     patient_missense_effects = cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=lambda effect, variant_metadata: type(effect) == Substitution,
+        filter_fn=filter_fn,
         **kwargs)
     if patient_id in patient_missense_effects:
         return len(patient_missense_effects[patient_id])
     return np.nan
 
-def neoantigen_count(row, cohort, **kwargs):
+def neoantigen_count(row, cohort, qc_filter=False, **kwargs):
     patient_id = row["patient_id"]
-    patient_neoantigens = cohort.load_neoantigens(patients=[cohort.patient_from_id(patient_id)], **kwargs)
+    patient = cohort.patient_from_id(row["patient_id"])
+    patient_neoantigens = cohort.load_neoantigens(patients=[patient], **kwargs)
     if patient_id in patient_neoantigens:
-        return len(patient_neoantigens[patient_id])
+        patient_neoantigens_df = patient_neoantigens[patient_id]
+        if qc_filter:
+            filter_mask = patient_neoantigens_df.apply(lambda row: neoantigen_qc_filter(row, variants.metadata), axis=1)
+            patient_neoantigens_df = patient_neoantigens_df[filter_mask]
+        return len(patient_neoantigens)
     return np.nan
 
 def expressed_neoantigen_count(row, cohort, **kwargs):
