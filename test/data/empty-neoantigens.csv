@@ -1,0 +1,1 @@
+allele,peptide,length,ic50,percentile_rank,gene,gene_id,transcript,transcript_id,variant,effect,effect_type,prediction_method,protein_length,protein_mutation_start,protein_mutation_end,peptide_start_in_protein,novel_epitope,contains_mutant_residues,occurs_in_self_ligandome,mutation_start_in_peptide,mutation_end_in_peptide,patient_id
