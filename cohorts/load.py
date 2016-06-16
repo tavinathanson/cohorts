@@ -855,7 +855,7 @@ class Cohort(Collection):
         df.benefit = df.benefit.astype(bool)
         return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples)
 
-    def plot_benefit(self, on, col=None, benefit_col="benefit",
+    def plot_benefit(self, on, col=None, benefit_col="benefit", ax=None,
                      mw_alternative="two-sided", **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
         """
@@ -863,9 +863,10 @@ class Cohort(Collection):
                                  boolean_col=benefit_col,
                                  col=col,
                                  mw_alternative=mw_alternative,
+                                 ax=ax,
                                  **kwargs)
 
-    def plot_boolean(self, on, boolean_col, col=None,
+    def plot_boolean(self, on, boolean_col, col=None, ax=None,
                      mw_alternative="two-sided", **kwargs):
         """Plot a comparison of `boolean_col` in the cohort on a given variable via
         `on` or `col`.
@@ -904,10 +905,11 @@ class Cohort(Collection):
                 data=df,
                 condition=boolean_col,
                 distribution=plot_col,
-                alternative=mw_alternative)
+                alternative=mw_alternative,
+                ax=ax)
         return results
 
-    def plot_survival(self, on, col=None, how="os",
+    def plot_survival(self, on, col=None, how="os", ax=None,
                       threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
         Parameters
@@ -933,8 +935,10 @@ class Cohort(Collection):
             xlabel="Overall Survival" if how == "os" else "Progression-Free Survival",
             censor_col="deceased" if how == "os" else "progressed_or_deceased",
             survival_col=how,
-            threshold=threshold if threshold is not None else default_threshold)
-        print(results)
+            threshold=threshold if threshold is not None else default_threshold,
+            ax=ax)
+
+        return results
 
     def plot_joint(self, on, on_two=None, **kwargs):
         """Plot a jointplot.
@@ -949,7 +953,8 @@ class Cohort(Collection):
         if on_two is not None:
             on = [on, on_two]
         plot_cols, df = self.as_dataframe(on, **kwargs)
-        sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
+        p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
+        return p
 
 def first_not_none_param(params, default):
     """
