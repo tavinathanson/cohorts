@@ -550,7 +550,9 @@ class Cohort(Collection):
 
             merged_variants.metadata[variant] = dict(metadata)
 
-        return merged_variants
+        # TODO: REMOVE THIS!
+        return VariantCollection(merged_variants[:10],
+                                 metadata=merged_variants.metadata)
 
     def load_polyphen_annotations(self, as_dataframe=False):
         """Load a dataframe containing polyphen2 annotations for all variants
@@ -803,6 +805,15 @@ class Cohort(Collection):
             # not overlap a variant.
             df_epitopes = self.get_filtered_isovar_epitopes(
                 epitopes, ic50_cutoff=ic50_cutoff).dataframe()
+            # Store chr/pos/ref/alt in the cached DataFrame so we can filter based on
+            # the variant later.
+            for variant_column in ["chr", "pos", "ref", "alt"]:
+                # Be consistent with Topiary's output of "start" rather than "pos".
+                # Isovar, on the other hand, outputs "pos".
+                # See https://github.com/hammerlab/topiary/blob/5c12bab3d47bd86d396b079294aff141265f8b41/topiary/converters.py#L50
+                df_column = "start" if variant_column == "pos" else variant_column
+                df_epitopes[df_column] = df_epitopes.source_sequence_key.apply(
+                    lambda key: dict(key)[variant_column])
             df_epitopes["patient_id"] = patient.id
 
             self.save_to_cache(df_epitopes, self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
