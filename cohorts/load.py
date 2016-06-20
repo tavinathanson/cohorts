@@ -854,7 +854,7 @@ class Cohort(Collection):
         column_types = [cohort_dataframe[col].dtype for col in cohort_dataframe.columns]
         return dict(zip(list(cohort_dataframe.columns), column_types))
 
-    def plot_roc_curve(self, on, bootstrap_samples=100, **kwargs):
+    def plot_roc_curve(self, on, bootstrap_samples=100, col=None, ax=None, **kwargs):
         """Plot an ROC curve for benefit and a given variable
 
         Parameters
@@ -863,6 +863,8 @@ class Cohort(Collection):
             See `cohort.load.as_dataframe`
         bootstrap_samples : int, optional
             Number of boostrap samples to use to compute the AUC
+        ax : Axes, default None
+            Axes to plot on
 
         Returns
         -------
@@ -870,11 +872,11 @@ class Cohort(Collection):
             Returns the average AUC for the given predictor over `bootstrap_samples`
             and the associated ROC curve
         """
-        plot_col, df = self.as_dataframe(on, col=None, **kwargs)
+        plot_col, df = self.as_dataframe(on, col=col, **kwargs)
         df = filter_not_null(df, "benefit")
         df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
-        return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples)
+        return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples, ax=ax)
 
     def plot_benefit(self, on, col=None, benefit_col="benefit", ax=None,
                      mw_alternative="two-sided", **kwargs):
