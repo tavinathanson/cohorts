@@ -79,6 +79,8 @@ def load_ensembl_coverage(cohort, coverage_path, min_depth=30):
         patient_ensembl_loci_df = pd.read_csv(
             path.join(coverage_path, patient.id, "cdf.csv"),
             names=columns)
+        # pylint: disable=no-member
+	    # pylint gets confused by read_csvpylint
         patient_ensembl_loci_df = patient_ensembl_loci_df[(
             (patient_ensembl_loci_df.NormalDepth == min_depth) &
             (patient_ensembl_loci_df.TumorDepth == min_depth))]
