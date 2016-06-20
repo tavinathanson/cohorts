@@ -16,6 +16,7 @@ from __future__ import print_function
 
 from . import data_path, generated_data_path, DATA_DIR
 from .data_generate import generate_vcfs
+from .functions import *
 
 from cohorts import Cohort, Patient
 from cohorts.load import InvalidDataError

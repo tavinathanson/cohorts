@@ -16,11 +16,12 @@ from __future__ import print_function
 
 from . import data_path, generated_data_path
 from .data_generate import generate_vcfs
+from .functions import *
 
-from cohorts.functions import *
 from cohorts.load import filter_not_null
 
 import pandas as pd
+import numpy as np
 from nose.tools import raises, eq_, ok_
 from os import path, makedirs
 from shutil import rmtree

@@ -17,8 +17,7 @@ from __future__ import print_function
 from varcode import ExonicSpliceSite, Substitution
 
 from .data_generate import generate_vcfs
-
-from cohorts.functions import *
+from .functions import *
 
 from nose.tools import raises, eq_
 from os import path
