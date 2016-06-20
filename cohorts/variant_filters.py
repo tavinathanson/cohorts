@@ -57,6 +57,9 @@ def variant_string_to_variant(variant_str, reference="grch37"):
 def load_ensembl_coverage(cohort, coverage_path, min_depth=30):
     """
     Load in Pageant CoverageDepth results with Ensembl loci.
+
+    coverage_path is a path to Pageant CoverageDepth output directory, with
+    one subdirectory per patient and a `cdf.csv` file inside each patient subdir.
     """
     columns = [
         "NormalDepth",
@@ -80,7 +83,7 @@ def load_ensembl_coverage(cohort, coverage_path, min_depth=30):
             path.join(coverage_path, patient.id, "cdf.csv"),
             names=columns)
         # pylint: disable=no-member
-	    # pylint gets confused by read_csvpylint
+        # pylint gets confused by read_csv
         patient_ensembl_loci_df = patient_ensembl_loci_df[(
             (patient_ensembl_loci_df.NormalDepth == min_depth) &
             (patient_ensembl_loci_df.TumorDepth == min_depth))]
