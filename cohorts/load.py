@@ -41,6 +41,7 @@ from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
 from .varcode_utils import filter_variants_with_metadata, filter_effects_with_metadata
+import variant_filters
 
 class InvalidDataError(ValueError):
     pass
@@ -210,7 +211,8 @@ class Cohort(Collection):
                  join_with=None,
                  join_how="inner",
                  check_provenance=False,
-                 polyphen_dump_path=None):
+                 polyphen_dump_path=None,
+                 pageant_coverage_path=None):
         Collection.__init__(
             self,
             elements=patients)
@@ -218,13 +220,15 @@ class Cohort(Collection):
         self.cache_results = cache_results
 
         df_loaders = [
-            DataFrameLoader("cufflinks", self.load_cufflinks)]
+            DataFrameLoader("cufflinks", self.load_cufflinks),
+            DataFrameLoader("ensembl_coverage", self.load_ensembl_coverage)]
         df_loaders.extend(extra_df_loaders)
         self.df_loaders = df_loaders
         self.join_with = join_with
         self.join_how = join_how
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
+        self.pageant_coverage_path = pageant_coverage_path
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -839,6 +843,13 @@ class Cohort(Collection):
             if is_mutant and binding_prediction.value <= ic50_cutoff:
                 mutant_binding_predictions.append(binding_prediction)
         return EpitopeCollection(mutant_binding_predictions)
+
+    def load_ensembl_coverage(self, min_depth=30):
+        if self.pageant_coverage_path is None:
+            raise ValueError("Need a Pageant CoverageDepth path to load ensembl coverage values")
+        return variant_filters.load_ensembl_coverage(cohort=self,
+                                                     coverage_path=self.pageant_coverage_path,
+                                                     min_depth=min_depth)
 
     def clear_caches(self):
         for cache in self.cache_names.keys():

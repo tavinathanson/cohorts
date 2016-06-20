@@ -17,6 +17,8 @@ from .variant_stats import variant_stats_from_variant
 import numpy as np
 from varcode import Substitution, Variant
 import re
+import pandas as pd
+from os import path
 
 def variant_qc_filter(variant, variant_metadata):
     somatic_stats = variant_stats_from_variant(variant, variant_metadata)
@@ -51,3 +53,40 @@ def variant_string_to_variant(variant_str, reference="grch37"):
     alt = m.group(3)
     variant = Variant(contig=chrom, start=start, ref=ref, alt=alt, ensembl=reference)
     return variant
+
+def load_ensembl_coverage(cohort, coverage_path, min_depth=30):
+    """
+    Load in Pageant CoverageDepth results with Ensembl loci.
+    """
+    columns = [
+        "NormalDepth",
+        "TumorDepth",
+        "Normal BP",
+        "Tumor BP",
+        "Num Loci",
+        "% Normal BP",
+        "% Tumor BP",
+        "% Loci",
+        "Off-target Normal BP",
+        "Off-target Tumor BP",
+        "Off-target Num Loci",
+        "Off-target % Normal BP",
+        "Off-target % Tumor BP",
+        "Off-target % Loci",
+    ]
+    ensembl_loci_dfs = []
+    for patient in cohort:
+        patient_ensembl_loci_df = pd.read_csv(
+            path.join(coverage_path, patient.id, "cdf.csv"),
+            names=columns)
+        patient_ensembl_loci_df = patient_ensembl_loci_df[(
+            (patient_ensembl_loci_df.NormalDepth == min_depth) &
+            (patient_ensembl_loci_df.TumorDepth == min_depth))]
+        assert len(patient_ensembl_loci_df) == 1, (
+            "Incorrect number of %d depth loci results: %d" % (
+                min_depth, len(patient_ensembl_loci_df)))
+        patient_ensembl_loci_df["patient_id"] = patient.id
+        ensembl_loci_dfs.append(patient_ensembl_loci_df)
+    ensembl_loci_df = pd.concat(ensembl_loci_dfs)
+    ensembl_loci_df["MB"] = ensembl_loci_df["Num Loci"] / 1000000.0
+    return ensembl_loci_df[["patient_id", "Num Loci", "MB"]]
