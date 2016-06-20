@@ -61,7 +61,7 @@ if __name__ == "__main__":
             "pandas>=0.15",
             "seaborn>=0.7.0",
             "scipy>=0.17.0",
-            "topiary>=0.0.16",
+            "topiary>=0.0.20",
             "mhctools>=0.2.3",
             "varcode>=0.4.12",
             "pyensembl>=0.8.12",
