@@ -41,7 +41,7 @@ from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
 from .varcode_utils import filter_variants_with_metadata, filter_effects_with_metadata
-import variant_filters
+from . import variant_filters
 
 class InvalidDataError(ValueError):
     pass
