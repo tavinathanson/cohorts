@@ -43,3 +43,19 @@ def filter_effects_with_metadata(effect_collection, variant_collection_metadata,
                                   ])
     else:
         return effect_collection
+
+def filter_neoantigens_with_metadata(neoantigens_df, variants, filter_fn):
+    if filter_fn:
+        filter_mask = neoantigens_df.apply(
+            lambda row: filter_fn(row, variants), axis=1)
+        return neoantigens_df[filter_mask]
+    else:
+        return neoantigens_df
+
+def filter_polyphen_with_metadata(annotations_df, variants, filter_fn):
+    if filter_fn:
+        filter_mask = annotations_df.apply(
+            lambda row: filter_fn(row, variants), axis=1)
+        return annotations_df[filter_mask]
+    else:
+        return annotations_df

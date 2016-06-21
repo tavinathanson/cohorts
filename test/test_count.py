@@ -17,8 +17,7 @@ from __future__ import print_function
 from varcode import ExonicSpliceSite, Substitution
 
 from .data_generate import generate_vcfs
-
-from cohorts.functions import *
+from .functions import *
 
 from nose.tools import raises, eq_
 from os import path
@@ -117,7 +116,7 @@ def test_merge_two():
         eq_(len(df), 3)
         eq_(list(df[count_col]), [3, 1, 5])
 
-        cohort_variants = cohort.load_variants(merge_type="intersection")
+        cohort_variants = cohort.load_variants(merge_type="intersection", filter_fn=None)
         for (sample, variants) in cohort_variants.items():
             for variant in variants:
                 metadata = variants.metadata[variant]
