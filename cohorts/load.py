@@ -552,9 +552,7 @@ class Cohort(Collection):
 
             merged_variants.metadata[variant] = dict(metadata)
 
-        # TODO: REMOVE THIS!
-        return VariantCollection(merged_variants[:10],
-                                 metadata=merged_variants.metadata)
+        return merged_variants
 
     def load_polyphen_annotations(self, as_dataframe=False):
         """Load a dataframe containing polyphen2 annotations for all variants
