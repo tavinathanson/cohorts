@@ -1,11 +1,11 @@
 from collections import namedtuple
 
 
-VariantStats = namedtuple("VariantStats", 
+VariantStats = namedtuple("VariantStats",
                           ["depth", "alt_depth", "variant_allele_frequency"])
 
 
-SomaticVariantStats = namedtuple("SomaticVariantStats", 
+SomaticVariantStats = namedtuple("SomaticVariantStats",
                           ["tumor_stats", "normal_stats"])
 
 
@@ -108,11 +108,11 @@ def _mutect_variant_stats(variant, sample_info):
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
 
 
-def variant_stats_from_variant(variant, 
+def variant_stats_from_variant(variant,
                                metadata,
                                merge_fn=(lambda all_stats: \
                                 max(all_stats, key=(lambda stats: stats.tumor_stats.depth)))):
-    """Parse the variant calling stats from a variant called from multiple VCFs. The stats are merged 
+    """Parse the variant calling stats from a variant called from multiple VCFs. The stats are merged
     based on `merge_fn`
 
     Parameters
@@ -123,7 +123,7 @@ def variant_stats_from_variant(variant,
     merge_fn : function
         Function from list of SomaticVariantStats to single SomaticVariantStats.
         This is used if a variant is called by multiple callers or appears in multiple VCFs.
-        By default, this uses the data from the caller that had a higher tumor depth. 
+        By default, this uses the data from the caller that had a higher tumor depth.
 
     Returns
     -------
