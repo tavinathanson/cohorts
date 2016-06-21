@@ -485,7 +485,7 @@ class Cohort(Collection):
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
-        filter_fn: function
+        filter_fn : function
             Takes a variant and it's metadata and returns a boolean. Only variants returning True are preserved. Defaults to `variant_qc_filter`.
 
         Returns
@@ -554,7 +554,8 @@ class Cohort(Collection):
 
         return merged_variants
 
-    def load_polyphen_annotations(self, as_dataframe=False):
+    def load_polyphen_annotations(self, as_dataframe=False,
+                                  variant_filter_fn=variant_qc_filter):
         """Load a dataframe containing polyphen2 annotations for all variants
 
         Parameters
@@ -562,6 +563,8 @@ class Cohort(Collection):
         database_file : string, sqlite
             Path to the WHESS/Polyphen2 SQLite database.
             Can be downloaded and bunzip2'ed from http://bit.ly/208mlIU
+        variant_filter_fn : function
+            filter_fn that gets applied to the variants (vs. the annotations).
 
         Returns
         -------
@@ -570,14 +573,16 @@ class Cohort(Collection):
         """
         patient_annotations = {}
         for patient in self:
-            annotations = self._load_single_patient_polyphen(patient)
+            annotations = self._load_single_patient_polyphen(
+                patient,
+                variant_filter_fn=variant_filter_fn)
             annotations["patient_id"] = patient.id
             patient_annotations[patient.id] = annotations
         if as_dataframe:
             return pd.concat(patient_annotations.values())
         return patient_annotations
 
-    def _load_single_patient_polyphen(self, patient):
+    def _load_single_patient_polyphen(self, patient, variant_filter_fn):
         cache_name = self.cache_names["polyphen"]
         cached_file_name = "polyphen-annotations.csv"
         cached = self.load_from_cache(cache_name, patient.id, cached_file_name)
@@ -589,7 +594,8 @@ class Cohort(Collection):
 
         variants = self._load_single_patient_variants(patient,
                                                       variant_type="snv",
-                                                      merge_type="union")
+                                                      merge_type="union",
+                                                      filter_fn=variant_filter_fn)
         df = pd.DataFrame(columns=["chrom", "pos", "ref", "alt",
                                    "annotation_found", "gene", "protein",
                                    "aa_change", "hvar_pred", "hvar_prob",
@@ -628,7 +634,7 @@ class Cohort(Collection):
             Load variants of a specific type, default 'snv'
         merge_type : {'union', 'intersection'}, optional
             Use this method to merge multiple variant sets for a single patient, default 'union'
-        filter_fn: function
+        filter_fn : function
             Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved. Defaults to `effect_qc_filter`.
 
         Returns
