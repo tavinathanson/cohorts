@@ -51,6 +51,15 @@ def neoantigen_qc_filter(row, variants):
                       ensembl=genome)
     return variant_qc_filter(variant, variants.metadata[variant])
 
+def polyphen_qc_filter(row, variants):
+    genome = variants[0].ensembl
+    variant = Variant(contig=row["chrom"],
+                      ref=row["ref"],
+                      alt=row["alt"],
+                      start=row["pos"],
+                      ensembl=genome)
+    return variant_qc_filter(variant, variants.metadata[variant])
+
 def load_ensembl_coverage(cohort, coverage_path, min_depth=30):
     """
     Load in Pageant CoverageDepth results with Ensembl loci.

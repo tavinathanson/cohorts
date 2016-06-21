@@ -41,8 +41,9 @@ from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
 from .varcode_utils import (filter_variants_with_metadata, filter_effects_with_metadata,
-                            filter_neoantigens_with_metadata)
-from .variant_filters import variant_qc_filter, effect_qc_filter, neoantigen_qc_filter
+                            filter_neoantigens_with_metadata, filter_polyphen_with_metadata)
+from .variant_filters import (variant_qc_filter, effect_qc_filter,
+                              neoantigen_qc_filter, polyphen_qc_filter)
 from . import variant_filters
 
 class InvalidDataError(ValueError):
@@ -555,7 +556,7 @@ class Cohort(Collection):
         return merged_variants
 
     def load_polyphen_annotations(self, as_dataframe=False,
-                                  variant_filter_fn=variant_qc_filter):
+                                  filter_fn=polyphen_qc_filter):
         """Load a dataframe containing polyphen2 annotations for all variants
 
         Parameters
@@ -563,8 +564,10 @@ class Cohort(Collection):
         database_file : string, sqlite
             Path to the WHESS/Polyphen2 SQLite database.
             Can be downloaded and bunzip2'ed from http://bit.ly/208mlIU
-        variant_filter_fn : function
-            filter_fn that gets applied to the variants (vs. the annotations).
+        filter_fn : function
+            Takes an annotation row and variants and returns a boolean.
+            Only annotations returning True are preserved. Defaults to
+            `polyphen_qc_filter`.
 
         Returns
         -------
@@ -575,27 +578,31 @@ class Cohort(Collection):
         for patient in self:
             annotations = self._load_single_patient_polyphen(
                 patient,
-                variant_filter_fn=variant_filter_fn)
-            annotations["patient_id"] = patient.id
-            patient_annotations[patient.id] = annotations
+                filter_fn=filter_fn)
+            if annotations is not None:
+                annotations["patient_id"] = patient.id
+                patient_annotations[patient.id] = annotations
         if as_dataframe:
             return pd.concat(patient_annotations.values())
         return patient_annotations
 
-    def _load_single_patient_polyphen(self, patient, variant_filter_fn):
+    def _load_single_patient_polyphen(self, patient, filter_fn):
         cache_name = self.cache_names["polyphen"]
         cached_file_name = "polyphen-annotations.csv"
+        variants = self._load_single_patient_variants(patient,
+                                                      variant_type="snv",
+                                                      merge_type="union",
+                                                      filter_fn=None)
+        if variants is None:
+            return None
+
         cached = self.load_from_cache(cache_name, patient.id, cached_file_name)
         if cached is not None:
-            return cached
+            return filter_polyphen_with_metadata(cached, variants, filter_fn)
 
         engine = create_engine("sqlite:///{}".format(self.polyphen_dump_path))
         conn = engine.connect()
 
-        variants = self._load_single_patient_variants(patient,
-                                                      variant_type="snv",
-                                                      merge_type="union",
-                                                      filter_fn=variant_filter_fn)
         df = pd.DataFrame(columns=["chrom", "pos", "ref", "alt",
                                    "annotation_found", "gene", "protein",
                                    "aa_change", "hvar_pred", "hvar_prob",
@@ -620,7 +627,7 @@ class Cohort(Collection):
         df["pos"] = df["pos"].astype("int")
         df["annotation_found"] = df["annotation_found"].astype("bool")
         self.save_to_cache(df, cache_name, patient.id, cached_file_name)
-        return df
+        return filter_polyphen_with_metadata(df, variants, filter_fn)
 
     def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union", filter_fn=effect_qc_filter):
         """Load a dictionary of patient_id to varcode.EffectCollection
