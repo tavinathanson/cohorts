@@ -24,17 +24,17 @@ from cohorts.functions import (
 # TODO: Tests should simply work with these options set to True.
 
 def snv_count(row, cohort, **kwargs):
-    return cohorts_snv_count(row, cohort, qc_filter=False,
+    return cohorts_snv_count(row, cohort, filter_fn=None,
                              normalized_per_mb=False, **kwargs)
 
 def missense_snv_count(row, cohort, **kwargs):
-    return cohorts_missense_snv_count(row, cohort, qc_filter=False,
+    return cohorts_missense_snv_count(row, cohort, filter_fn=None,
                                       normalized_per_mb=False, **kwargs)
 
 def neoantigen_count(row, cohort, **kwargs):
-    return cohorts_neoantigen_count(row, cohort, qc_filter=False,
+    return cohorts_neoantigen_count(row, cohort, filter_fn=None,
                                     normalized_per_mb=False, **kwargs)
 
 def expressed_neoantigen_count(row, cohort, **kwargs):
-    return cohorts_expressed_neoantigen_count(row, cohort, qc_filter=False,
+    return cohorts_expressed_neoantigen_count(row, cohort, filter_fn=None,
                                               normalized_per_mb=False, **kwargs)

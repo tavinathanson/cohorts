@@ -44,6 +44,7 @@ def make_missing_vcf_cohort(patient_ids_with_missing_paths, missing_paths):
             patient.snv_vcf_paths = missing_paths
         else:
             patient.snv_vcf_paths = vcf_paths
+        patient.hla_alleles = ["HLA-A02:01"]
     return vcf_dir, cohort
 
 def test_broken_vcf_path():

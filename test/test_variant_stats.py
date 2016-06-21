@@ -65,7 +65,7 @@ def make_cohort(file_formats):
     return vcf_dir, cohort
 
 def extraction(cohort, extractor):
-    variants = cohort.load_variants()
+    variants = cohort.load_variants(filter_fn=None)
     for (sample, sample_variants) in variants.items():
         ok_(len(sample_variants) > 0)
         for variant in sample_variants:
@@ -137,7 +137,7 @@ def test_extract_and_merge_strelka_mutect_stats():
     try:
         # Use Mutect and Strelka VCF format with overlapping variants
         vcf_dir, cohort = make_cohort([FILE_FORMAT_2, FILE_FORMAT_4])
-        variants = cohort.load_variants()
+        variants = cohort.load_variants(filter_fn=None)
         patient_1_variants = variants['1']
 
         def test_stats(variant_index, expected_tumor_depth, expected_tumor_vaf):

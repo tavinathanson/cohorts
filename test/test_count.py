@@ -116,7 +116,7 @@ def test_merge_two():
         eq_(len(df), 3)
         eq_(list(df[count_col]), [3, 1, 5])
 
-        cohort_variants = cohort.load_variants(merge_type="intersection")
+        cohort_variants = cohort.load_variants(merge_type="intersection", filter_fn=None)
         for (sample, variants) in cohort_variants.items():
             for variant in variants:
                 metadata = variants.metadata[variant]
