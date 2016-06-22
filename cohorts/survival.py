@@ -54,7 +54,7 @@ def plot_kmf(df,
         if threshold == 'median':
             threshold = df[condition_col].median()
         condition = df[condition_col] > threshold
-        label = '{} > {}'.format(condition_col, threshold)
+        label = '{} > {0:.2f}'.format(condition_col, threshold)
     else:
         condition = df[condition_col]
         label = '{}'.format(condition_col)
