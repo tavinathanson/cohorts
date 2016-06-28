@@ -777,7 +777,7 @@ class Cohort(Collection):
 
     def load_neoantigens(self, patients=None, variant_type="snv", merge_type="union",
                          only_expressed=False, epitope_lengths=[8, 9, 10, 11],
-                         ic50_cutoff=500, process_limit=30, max_file_records=None,
+                         ic50_cutoff=500, process_limit=10, max_file_records=None,
                          filter_fn=neoantigen_qc_filter):
         dfs = {}
         for patient in self.iter_patients(patients):

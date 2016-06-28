@@ -28,7 +28,7 @@ def variant_qc_filter(variant, variant_metadata, depth=DEFAULT_DEPTH,
                       normal_vaf=DEFAULT_NORMAL_VAF, alt_depth=DEFAULT_ALT_DEPTH):
     somatic_stats = variant_stats_from_variant(variant, variant_metadata)
 
-    # Filter variant with depth < 30
+    # Filter variant with depth < depth
     if (somatic_stats.tumor_stats.depth < depth or
         somatic_stats.normal_stats.depth < depth):
         return False
