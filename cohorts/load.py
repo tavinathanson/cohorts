@@ -554,8 +554,11 @@ class Cohort(Collection):
         # TODO: we're currently using the same isovar cache that we use for expressed
         # neoantigen prediction; so we pass in the same epitope lengths.
         # This is hacky and should be addressed.
-        df_isovar = self._load_single_patient_isovar(patient, variant_type, merge_type,
-                                                     epitope_lengths=[8, 9, 10, 11])
+        df_isovar = self._load_single_patient_isovar(patient=patient,
+                                                     variants=variants,
+                                                     epitope_lengths=[8, 9, 10, 11],
+                                                     variant_type=variant_type,
+                                                     merge_type=merge_type)
         for i, row in df_isovar.iterrows():
             genome = variants[0].ensembl
             variant = Variant(contig=row["chr"],
@@ -795,7 +798,8 @@ class Cohort(Collection):
                 dfs[patient.id] = df_epitopes
         return dfs
 
-    def _load_single_patient_isovar(self, patient, variant_type, merge_type, epitope_lengths):
+    def _load_single_patient_isovar(self, patient, variants, epitope_lengths,
+                                    variant_type, merge_type):
         # TODO: different epitope lengths, and other parameters, should result in
         # different caches
         isovar_cached_file_name = "%s-%s-isovar.csv" % (variant_type, merge_type)
@@ -862,9 +866,11 @@ class Cohort(Collection):
             process_limit=process_limit)
         if only_expressed:
             df_isovar = self._load_single_patient_isovar(patient=patient,
+                                                         variants=variants,
+                                                         epitope_lengths=epitope_lengths,
                                                          variant_type=variant_type,
-                                                         merge_type=merge_type,
-                                                         epitope_lengths=epitope_lengths)
+                                                         merge_type=merge_type)
+
             # Map from isovar rows to protein sequences
             isovar_rows_to_protein_sequences = dict([
                 (frozenset(row.to_dict().items()), row["amino_acids"]) for (i, row) in df_isovar.iterrows()])
