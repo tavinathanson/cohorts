@@ -20,26 +20,32 @@ import re
 import pandas as pd
 from os import path
 
-def variant_qc_filter(variant, variant_metadata):
+DEFAULT_DEPTH = 30
+DEFAULT_NORMAL_VAF = 0.02
+DEFAULT_ALT_DEPTH = 5
+
+def variant_qc_filter(variant, variant_metadata, depth=DEFAULT_DEPTH,
+                      normal_vaf=DEFAULT_NORMAL_VAF, alt_depth=DEFAULT_ALT_DEPTH):
     somatic_stats = variant_stats_from_variant(variant, variant_metadata)
 
     # Filter variant with depth < 30
-    if somatic_stats.tumor_stats.depth < 30 or somatic_stats.normal_stats.depth < 30:
+    if (somatic_stats.tumor_stats.depth < depth or
+        somatic_stats.normal_stats.depth < depth):
         return False
 
     # Filter based on normal evidence
-    if somatic_stats.normal_stats.variant_allele_frequency > .02:
+    if somatic_stats.normal_stats.variant_allele_frequency > normal_vaf:
         return False
 
-    if somatic_stats.tumor_stats.alt_depth < 5:
+    if somatic_stats.tumor_stats.alt_depth < alt_depth:
         return False
 
     return True
 
-def effect_qc_filter(effect, variant_metadata):
-    return variant_qc_filter(effect.variant, variant_metadata)
+def effect_qc_filter(effect, variant_metadata, **kwargs):
+    return variant_qc_filter(effect.variant, variant_metadata, **kwargs)
 
-def neoantigen_qc_filter(row, variants):
+def neoantigen_qc_filter(row, variants, **kwargs):
     # We need to re-create the Variant object from the neoeantigen DataFrame.
     # TODO: Just pickle the Neoantigen collection rather than dealing with
     # DataFrames.
@@ -49,16 +55,16 @@ def neoantigen_qc_filter(row, variants):
                       alt=row["alt"],
                       start=row["start"],
                       ensembl=genome)
-    return variant_qc_filter(variant, variants.metadata[variant])
+    return variant_qc_filter(variant, variants.metadata[variant], **kwargs)
 
-def polyphen_qc_filter(row, variants):
+def polyphen_qc_filter(row, variants, **kwargs):
     genome = variants[0].ensembl
     variant = Variant(contig=row["chrom"],
                       ref=row["ref"],
                       alt=row["alt"],
                       start=row["pos"],
                       ensembl=genome)
-    return variant_qc_filter(variant, variants.metadata[variant])
+    return variant_qc_filter(variant, variants.metadata[variant], **kwargs)
 
 def load_ensembl_coverage(cohort, coverage_path, min_depth=30):
     """
