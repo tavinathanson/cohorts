@@ -235,6 +235,7 @@ class Cohort(Collection):
 
         self.verify_id_uniqueness()
         self.verify_survival()
+        self.dataframe_hash = None
 
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
@@ -298,6 +299,7 @@ class Cohort(Collection):
                 df_loader.name,
                 old_len_df,
                 len(df)))
+        self.dataframe_hash = hash(str(df.sort_values('patient_id')))
         return df
 
     def as_dataframe(self, on=None, col=None, join_with=None, join_how=None, **kwargs):
@@ -1007,37 +1009,34 @@ class Cohort(Collection):
         p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
         return p
 
-    def summarize_provenance(self):
-        """ Utility function to summarize provenance of Cohort data for each existing cache_dir
+    def summarize_provenance_per_cache(self):
+        """ Utility function to summarize provenance files for cached items used by a Cohort, for each cache_dir that exists.
+            Only existing cache_dirs are summarized. 
+
+            This is a summary of provenance files because the function checks to see whether all patients data have 
+            the same provenance within the cache dir. The function assumes that it will be desireable to have all patients
+            data generated using the same environment, for each cache type.
+
+            At the moment, most PROVENANCE files contain details about packages used to generate the cached data file. However, this 
+            function is generic & so it summarizes the contents of those files irrespective of their contents.
             
             == Returns == 
 
-            Dict containing summarized provenance for each existing cache_dir, among all patients in the data frame. Contains
-            None for a cache_dir if provenance is not equivalent among all patients in that cache dir.
+            Dict containing summarized provenance for each existing cache_dir, after checking to see that 
+            provenance files are identical among all patients in the data frame for that cache_dir.
 
-            Dict also contains an item 'dfhash' representing unique hash of default dataframe for cohort, given options.
-            
-            == Behavior == 
+            If conflicting PROVENANCE files are discovered within a cache-dir:
+                - a warning is generated, describing the conflict
+                - and, a value of `None` is returned in the dictionary for that cache-dir
 
-            Checks for non-equivalent provenance among patients in each cache dir that exists. Cache dirs that
-            do not exist are not populated in the dictionary.
-
-            If non-equivalence is found:
-               - prints a warning
-               - returns None for that cache dir in the resulting dict
-
-            Otherwise:
-               - returns provenance for that cache dir, equivalent among all patients in data frame
-            
             == See also ==
             
-            `?cohorts.Cohort.summarize_unique_provenance` which optionally prints a single provenance dict if provenance is equivalent among all
-            cache_dirs.
+            * `?cohorts.Cohort.summarize_provenance` which summarizes provenance files among cache_dirs.
+            * `?cohorts.Cohort.summarize_dataframe` which hashes/summarizes contents of the data frame for this cohort
 
         """
         provenance_summary = {}
         df = self.as_dataframe()
-        df_hash = hash(str(df.sort_values('patient_id')))
         for cache in self.cache_names:
             cache_name = self.cache_names[cache]
             cache_provenance = None
@@ -1056,49 +1055,75 @@ class Cohort(Collection):
                     provenance_summary[cache_name] = cache_provenance
                 else:
                     provenance_summary[cache_name] = None
-        provenance_summary[u'dfhash'] = df_hash
         return(provenance_summary)
+    
+    def summarize_dataframe(self):
+        """ Summarize default dataframe for this cohort using a hash function. 
+            Useful for confirming the version of data used in various reports, e.g. ipynbs
+        """
+        if self.dataframe_hash:
+            return(self.dataframe_hash)
+        else:
+            df = self._as_dataframe_unmodified()
+            return(self.dataframe_hash)
+    
+    def summarize_provenance(self):
+        """ Utility function to summarize provenance files for cached items used by a Cohort. 
 
-    def summarize_unique_provenance(self):
-        """ Utility function to summarize provenance of Cohort data among existing cache_dirs
+            At the moment, most PROVENANCE files contain details about packages used to generate files. However, this 
+            function is generic & so it summarizes the contents of those files irrespective of their contents.
             
-            Calls `cohort.summarize_provenance()` & then checks for equivalence among cache-dir-specific
-            provenances. See that `summarize_provenance` function for details.
-
             == Returns == 
             
-            Dict summarizing uniqueness of provenance for this Cohort among all cache dirs.
+            Dict containing summary of provenance items, among all cache dirs used by the Cohort. 
 
-            if identical across all cache dirs: returns single summary of provenance among all cache_dir
-            if not: returns provenance for each cache_dir
+            IE if all provenances are identical across all cache dirs, then a single set of provenances is returned. 
+            Otherwise, if all provenances are not identical, the provenance items per cache_dir are returned.
 
             == See also ==
             
             `?cohorts.Cohort.summarize_provenance` which is used to summarize provenance for each existing cache_dir.
 
         """
-        provenance_summary = self.summarize_provenance()
-        df_hash = provenance_summary[u'dfhash']
-        first_provenance = None
+        provenance_per_cache = self.summarize_provenance_per_cache()
+        summary_provenance = None
         num_discordant = 0
-        for cache in provenance_summary:
-            if cache != u'dfhash':
-                if not(first_provenance):
-                    first_provenance = provenance_summary[cache]
-                    first_provenance_name = cache
-                num_discordant += _compare_provenance(
-                    provenance_summary[cache],
-                    first_provenance,
-                    left_outer_diff = "In %s but not in %s" % (cache, first_provenance_name),
-                    right_outer_diff = "In %s but not in %s" % (first_provenance_name, cache)
-                    )
+        for cache in provenance_per_cache:
+            if not(first_provenance):
+                ## pick arbitrary provenance & call this the "summary" (for now)
+                summary_provenance = provenance_per_cache[cache]
+                summary_provenance_name = cache
+            ## for each cache, check equivalence with summary_provenance
+            num_discordant += _compare_provenance(
+                provenance_per_cache[cache],
+                summary_provenance,
+                left_outer_diff = "In %s but not in %s" % (cache, summary_provenance_name),
+                right_outer_diff = "In %s but not in %s" % (summary_provenance_name, cache)
+                )
         ## compare provenance across cached items
         if num_discordant == 0:
-            prov = first_provenance
+            prov = summary_provenance_name ## report summary provenance if exists
         else:
-            prov = provenance_summary
-        prov[u'dfhash'] = df_hash
+            prov = provenance_per_cache ## otherwise, return provenance per cache
         return(prov)
+    
+    def summarize_data_sources(self):
+        """ Utility function to summarize data source status for this Cohort, useful for confirming
+            the state of data used for an analysis
+
+            Current items:
+              dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
+              provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
+        """
+        provenance_file_summary = self.summarize_provenance()
+        dataframe_hash = self.summarize_dataframe()
+        results = dict(
+            'provenance_file_summary' = provenance_file_summary,
+            'dataframe_hash' = dataframe_hash
+            )
+        return(results)
+        
+
 
 def first_not_none_param(params, default):
     """
