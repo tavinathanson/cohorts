@@ -1096,15 +1096,16 @@ class Cohort(Collection):
         provenance_summary = self.summarize_provenance()
         df_hash = provenance_summary[u'dfhash']
         first_provenance = None
+        cache_diff = ""
         for cache in provenance_summary:
             if cache == u'dfhash':
                 next
             if not(first_provenance):
                 first_provenance = provenance_summary[cache]
-            cache_diff += _compare_provenance(provenance_summary[cache], last_provenance)
+            cache_diff += _compare_provenance(provenance_summary[cache], first_provenance)
         ## compare provenance across cached items
         if len(cache_diff) == 0:
-            prov = last_provenance
+            prov = first_provenance
         else:
             prov = provenance_summary
         prov[u'dfhash'] = df_hash
