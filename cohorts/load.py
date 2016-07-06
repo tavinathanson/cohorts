@@ -1082,7 +1082,7 @@ class Cohort(Collection):
 
             == See also ==
             
-            `?cohorts.Cohort.summarize_provenance` which is used to summarize provenance for each existing cache_dir.
+            `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance for each existing cache_dir.
 
         """
         provenance_per_cache = self.summarize_provenance_per_cache()
@@ -1102,7 +1102,7 @@ class Cohort(Collection):
                 )
         ## compare provenance across cached items
         if num_discordant == 0:
-            prov = summary_provenance_name ## report summary provenance if exists
+            prov = summary_provenance ## report summary provenance if exists
         else:
             prov = provenance_per_cache ## otherwise, return provenance per cache
         return(prov)
@@ -1117,10 +1117,10 @@ class Cohort(Collection):
         """
         provenance_file_summary = self.summarize_provenance()
         dataframe_hash = self.summarize_dataframe()
-        results = dict(
-            'provenance_file_summary' = provenance_file_summary,
-            'dataframe_hash' = dataframe_hash
-            )
+        results = {
+            'provenance_file_summary': provenance_file_summary,
+            'dataframe_hash': dataframe_hash
+            }
         return(results)
         
 
