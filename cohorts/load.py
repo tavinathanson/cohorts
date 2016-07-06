@@ -1089,7 +1089,7 @@ class Cohort(Collection):
         summary_provenance = None
         num_discordant = 0
         for cache in provenance_per_cache:
-            if not(first_provenance):
+            if not(summary_provenance):
                 ## pick arbitrary provenance & call this the "summary" (for now)
                 summary_provenance = provenance_per_cache[cache]
                 summary_provenance_name = cache
