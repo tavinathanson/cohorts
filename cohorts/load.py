@@ -418,25 +418,12 @@ class Cohort(Collection):
             return None
 
         if self.check_provenance:
-            provenance = set(self.generate_provenance().items())
-            provenance_previous = set(self.load_provenance(patient_cache_dir).items())
-
-            def provenance_str(provenance):
-                return ["%s==%s" % (key, value) for (key, value) in provenance]
-
-            # Two-way diff: are any modules introduced, and are any modules lost?
-            new_diff = provenance.difference(provenance_previous)
-            old_diff = provenance_previous.difference(provenance)
-            warn_str = ""
-            if len(new_diff) > 0:
-                warn_str += "In current environment but not cached for patient %s: %s" % (
-                    patient_id, provenance_str(new_diff))
-            if len(old_diff) > 0:
-                warn_str += "In cached environment for patient %s but not current: %s" % (
-                    patient_id, provenance_str(old_diff))
-
-            if len(warn_str) > 0:
-                warnings.warn(warn_str, Warning)
+            warn_str = _compare_provenance(
+                this_provenance = self.generate_provenance(), 
+                other_provenance = self.load_provenance(patient_cache_dir),
+                left_outer_diff = "In current environment but not cached for patient %s" % (patient_id),
+                right_outer_diff = "In cached environment for patient %s but not current" % (patient_id)
+                )
 
         if path.splitext(cache_file)[1] == ".csv":
             return pd.read_csv(cache_file, dtype={"patient_id": object})
@@ -1097,8 +1084,15 @@ class Cohort(Collection):
         cache_diff = ""
         for cache in provenance_summary:
             if cache != u'dfhash':
-                first_provenance = provenance_summary[cache]
-                cache_diff += _compare_provenance(provenance_summary[cache], first_provenance)
+                if not(first_provenance):
+                    first_provenance = provenance_summary[cache]
+                    first_provenance_name = cache
+                cache_diff += _compare_provenance(
+                    provenance_summary[cache],
+                    first_provenance,
+                    left_outer_diff = "In %s but not in %s" % (cache, first_provenance_name),
+                    right_outer_diff = "In %s but not in %s" % (first_provenance_cache, cache)
+                    )
         ## compare provenance across cached items
         if len(cache_diff) == 0:
             prov = first_provenance
@@ -1131,7 +1125,11 @@ def _provenance_str(provenance):
     return ["%s==%s" % (key, value) for (key, value) in provenance]
 
 
-def _compare_provenance(this_provenance, other_provenance):
+def _compare_provenance(
+        this_provenance, other_provenance,
+        left_outer_diff = "In current but not comparison",
+        right_outer_diff = "In comparison but not current"
+        ):
     """ utility function to compare two abritrary provenance dicts
         returns a character string of warnings.
     """
@@ -1143,10 +1141,12 @@ def _compare_provenance(this_provenance, other_provenance):
     old_diff = other_items.difference(this_items)
     warn_str = ""
     if len(new_diff) > 0:
-        warn_str += "In current but not comparison: %s" % (
+        warn_str += "%s: %s" % (
+            left_outer_diff,
             _provenance_str(new_diff))
     if len(old_diff) > 0:
-        warn_str += "In comparison but not current: %s" % (
+        warn_str += "%s: %s" % (
+            right_outer_diff,
             _provenance_str(old_diff))
 
     if len(warn_str) > 0:
