@@ -1096,6 +1096,7 @@ class Cohort(Collection):
         provenance_summary = self.summarize_provenance()
         df_hash = provenance_summary[u'dfhash']
         first_provenance = None
+        cache_diff = ""
         for cache in provenance_summary:
             if cache == u'dfhash':
                 next
@@ -1134,16 +1135,16 @@ def _provenance_str(provenance):
     return ["%s==%s" % (key, value) for (key, value) in provenance]
 
 
-def _compare_provenance(provenance, comparison):
+def _compare_provenance(this_provenance, other_provenance):
     """ utility function to compare two abritrary provenance dicts
         returns a character string of warnings.
     """
-    this_provenance = set(provenance.items())
-    provenance_previous = set(comparison.items())
+    this_items = set(this_provenance.items())
+    other_items = set(other_provenance.items())
 
     # Two-way diff: are any modules introduced, and are any modules lost?
-    new_diff = this_provenance.difference(provenance_previous)
-    old_diff = provenance_previous.difference(this_provenance)
+    new_diff = this_items.difference(other_items)
+    old_diff = other_items.difference(this_items)
     warn_str = ""
     if len(new_diff) > 0:
         warn_str += "In current but not comparison: %s" % (
