@@ -1012,8 +1012,8 @@ class Cohort(Collection):
             
             == Returns == 
 
-            Dict containing unique provenance among all patients in each existing cache dir, or 
-            None if provenance is not unique among all patients.
+            Dict containing summarized provenance for each existing cache_dir, among all patients in the data frame. Contains
+            None for a cache_dir if provenance is not equivalent among all patients in that cache dir.
 
             Dict also contains an item 'dfhash' representing unique hash of default dataframe for cohort, given options.
             
@@ -1027,11 +1027,11 @@ class Cohort(Collection):
                - returns None for that cache dir in the resulting dict
 
             Otherwise:
-               - returns unique provenance for that cache dir, equivalent among all patients in data frame
+               - returns provenance for that cache dir, equivalent among all patients in data frame
             
             == See also ==
             
-            `?cohorts.summarize_unique_provenance` which optionally prints a single provenance dict if provenance is identical across all
+            `?cohorts.Cohort.summarize_unique_provenance` which optionally prints a single provenance dict if provenance is equivalent among all
             cache_dirs.
 
         """
@@ -1063,7 +1063,7 @@ class Cohort(Collection):
         """ Utility function to summarize provenance of Cohort data among existing cache_dirs
             
             Calls `cohort.summarize_provenance()` & then checks for equivalence among cache-dir-specific
-            provenances. See that ?cohorts.summarize_provenance for details.
+            provenances. See that `summarize_provenance` function for details.
 
             == Returns == 
             
@@ -1074,8 +1074,7 @@ class Cohort(Collection):
 
             == See also ==
             
-            `?cohorts.summarize_provenance` which optionally prints a single provenance dict if provenance is identical across all
-            cache_dirs.
+            `?cohorts.Cohort.summarize_provenance` which is used to summarize provenance for each existing cache_dir.
 
         """
         provenance_summary = self.summarize_provenance()
@@ -1132,6 +1131,14 @@ def _compare_provenance(
         ):
     """ utility function to compare two abritrary provenance dicts
         returns number of discrepancies.
+
+        == params == 
+        this_provenance: provenance dict which should be compared to "other_provenance"
+        other_provenance: comparison provenance dict
+
+        (optional)
+        left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
+        right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
     """
     this_items = set(this_provenance.items())
     other_items = set(other_provenance.items())
