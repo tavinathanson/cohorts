@@ -1131,7 +1131,7 @@ def _compare_provenance(
         right_outer_diff = "In comparison but not current"
         ):
     """ utility function to compare two abritrary provenance dicts
-        returns a character string of warnings.
+        returns number of discrepancies.
     """
     this_items = set(this_provenance.items())
     other_items = set(other_provenance.items())
@@ -1152,5 +1152,5 @@ def _compare_provenance(
     if len(warn_str) > 0:
         warnings.warn(warn_str, Warning)
     
-    return(len(warn_str))
+    return(len(new_diff)+len(old_diff))
 
