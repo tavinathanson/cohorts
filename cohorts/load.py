@@ -1056,9 +1056,7 @@ class Cohort(Collection):
             cache_provenance = None
             cache_warnings = ""
             this_cache_dir = path.join(self.cache_dir, cache_name)
-            if (not(path.exists(this_cache_dir))):
-                next
-            else:
+            if path.exists(this_cache_dir):
                 for i, row in df.iterrows():
                     patient_id = row["patient_id"]
                     patient_cache_dir = path.join(this_cache_dir, patient_id)
@@ -1098,14 +1096,12 @@ class Cohort(Collection):
         first_provenance = None
         cache_diff = ""
         for cache in provenance_summary:
-            if cache == u'dfhash':
-                next
-            if not(first_provenance):
+            if cache != u'dfhash':
                 first_provenance = provenance_summary[cache]
-            cache_diff += _compare_provenance(provenance_summary[cache], last_provenance)
+                cache_diff += _compare_provenance(provenance_summary[cache], first_provenance)
         ## compare provenance across cached items
         if len(cache_diff) == 0:
-            prov = last_provenance
+            prov = first_provenance
         else:
             prov = provenance_summary
         prov[u'dfhash'] = df_hash
