@@ -1144,10 +1144,10 @@ def _compare_provenance(this_provenance, other_provenance):
     warn_str = ""
     if len(new_diff) > 0:
         warn_str += "In current but not comparison: %s" % (
-            provenance_str(new_diff))
+            _provenance_str(new_diff))
     if len(old_diff) > 0:
         warn_str += "In comparison but not current: %s" % (
-            provenance_str(old_diff))
+            _provenance_str(old_diff))
 
     if len(warn_str) > 0:
         warnings.warn(warn_str, Warning)
