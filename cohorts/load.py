@@ -1091,7 +1091,7 @@ class Cohort(Collection):
                     provenance_summary[cache],
                     first_provenance,
                     left_outer_diff = "In %s but not in %s" % (cache, first_provenance_name),
-                    right_outer_diff = "In %s but not in %s" % (first_provenance_cache, cache)
+                    right_outer_diff = "In %s but not in %s" % (first_provenance_name, cache)
                     )
         ## compare provenance across cached items
         if len(cache_diff) == 0:
