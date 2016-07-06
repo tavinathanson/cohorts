@@ -1020,6 +1020,96 @@ class Cohort(Collection):
         p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
         return p
 
+    def summarize_provenance(self):
+        """ Utility function to summarize provenance of Cohort data for each existing cache_dir
+            
+            == Returns == 
+
+            Dict containing unique provenance among all patients in each existing cache dir, or 
+            None if provenance is not unique among all patients.
+
+            Dict also contains an item 'dfhash' representing unique hash of default dataframe for cohort, given options.
+            
+            == Behavior == 
+
+            Checks for non-equivalent provenance among patients in each cache dir that exists. Cache dirs that
+            do not exist are not populated in the dictionary.
+
+            If non-equivalence is found:
+               - prints a warning
+               - returns None for that cache dir in the resulting dict
+
+            Otherwise:
+               - returns unique provenance for that cache dir, equivalent among all patients in data frame
+            
+            == See also ==
+            
+            `?cohorts.summarize_unique_provenance` which optionally prints a single provenance dict if provenance is identical across all
+            cache_dirs.
+
+        """
+        provenance_summary = {}
+        df = self.as_dataframe()
+        df_hash = hash(str(df.sort_values('patient_id')))
+        for cache in self.cache_names:
+            cache_name = self.cache_names[cache]
+            cache_provenance = None
+            cache_warnings = ""
+            this_cache_dir = path.join(self.cache_dir, cache_name)
+            if (not(path.exists(this_cache_dir))):
+                next
+            else:
+                for i, row in df.iterrows():
+                    patient_id = row["patient_id"]
+                    patient_cache_dir = path.join(this_cache_dir, patient_id)
+                    this_provenance = self.load_provenance(patient_cache_dir = patient_cache_dir)
+                    if not(cache_provenance):
+                        cache_provenance = this_provenance
+                    else:
+                        cache_warnings += _compare_provenance(this_provenance, cache_provenance)
+                if len(cache_warnings) == 0:
+                    provenance_summary[cache_name] = cache_provenance
+                else:
+                    provenance_summary[cache_name] = None
+        provenance_summary[u'dfhash'] = df_hash
+        return(provenance_summary)
+
+    def summarize_unique_provenance(self):
+        """ Utility function to summarize provenance of Cohort data among existing cache_dirs
+            
+            Calls `cohort.summarize_provenance()` & then checks for equivalence among cache-dir-specific
+            provenances. See that ?cohorts.summarize_provenance for details.
+
+            == Returns == 
+            
+            Dict summarizing uniqueness of provenance for this Cohort among all cache dirs.
+
+            if identical across all cache dirs: returns single summary of provenance among all cache_dir
+            if not: returns provenance for each cache_dir
+
+            == See also ==
+            
+            `?cohorts.summarize_provenance` which optionally prints a single provenance dict if provenance is identical across all
+            cache_dirs.
+
+        """
+        provenance_summary = self.summarize_provenance()
+        df_hash = provenance_summary[u'dfhash']
+        first_provenance = None
+        for cache in provenance_summary:
+            if cache == u'dfhash':
+                next
+            if not(first_provenance):
+                first_provenance = provenance_summary[cache]
+            cache_diff += _compare_provenance(provenance_summary[cache], last_provenance)
+        ## compare provenance across cached items
+        if len(cache_diff) == 0:
+            prov = last_provenance
+        else:
+            prov = provenance_summary
+        prov[u'dfhash'] = df_hash
+        return(prov)
+
 def first_not_none_param(params, default):
     """
     Given a list of `params`, use the first param in the list that is
@@ -1037,3 +1127,33 @@ def filter_not_null(df, col):
     if updated_len < original_len:
         print("Missing %s for %d patients: from %d to %d" % (col, original_len - updated_len, original_len, updated_len))
     return df
+
+def _provenance_str(provenance):
+    """ utility function used by _compare_provenance to print diff
+    """
+    return ["%s==%s" % (key, value) for (key, value) in provenance]
+
+
+def _compare_provenance(provenance, comparison):
+    """ utility function to compare two abritrary provenance dicts
+        returns a character string of warnings.
+    """
+    this_provenance = set(provenance.items())
+    provenance_previous = set(comparison.items())
+
+    # Two-way diff: are any modules introduced, and are any modules lost?
+    new_diff = this_provenance.difference(provenance_previous)
+    old_diff = provenance_previous.difference(this_provenance)
+    warn_str = ""
+    if len(new_diff) > 0:
+        warn_str += "In current but not comparison: %s" % (
+            provenance_str(new_diff))
+    if len(old_diff) > 0:
+        warn_str += "In comparison but not current: %s" % (
+            provenance_str(old_diff))
+
+    if len(warn_str) > 0:
+        warnings.warn(warn_str, Warning)
+    
+    return(warn_str)
+
