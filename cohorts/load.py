@@ -418,11 +418,11 @@ class Cohort(Collection):
             return None
 
         if self.check_provenance:
-            warn_str = _compare_provenance(
+            num_discrepant = _compare_provenance(
                 this_provenance = self.generate_provenance(), 
                 other_provenance = self.load_provenance(patient_cache_dir),
-                left_outer_diff = "In current environment but not cached for patient %s" % (patient_id),
-                right_outer_diff = "In cached environment for patient %s but not current" % (patient_id)
+                left_outer_diff = "In current environment but not cached in %s for patient %s" % (cache_name, patient_id),
+                right_outer_diff = "In cached %s for patient %s but not current" % (cache_name, patient_id)
                 )
 
         if path.splitext(cache_file)[1] == ".csv":
