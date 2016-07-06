@@ -1041,7 +1041,7 @@ class Cohort(Collection):
         for cache in self.cache_names:
             cache_name = self.cache_names[cache]
             cache_provenance = None
-            cache_warnings = ""
+            num_discordant = 0
             this_cache_dir = path.join(self.cache_dir, cache_name)
             if path.exists(this_cache_dir):
                 for i, row in df.iterrows():
@@ -1051,8 +1051,8 @@ class Cohort(Collection):
                     if not(cache_provenance):
                         cache_provenance = this_provenance
                     else:
-                        cache_warnings += _compare_provenance(this_provenance, cache_provenance)
-                if len(cache_warnings) == 0:
+                        num_discordant += _compare_provenance(this_provenance, cache_provenance)
+                if num_discordant == 0:
                     provenance_summary[cache_name] = cache_provenance
                 else:
                     provenance_summary[cache_name] = None
@@ -1081,20 +1081,20 @@ class Cohort(Collection):
         provenance_summary = self.summarize_provenance()
         df_hash = provenance_summary[u'dfhash']
         first_provenance = None
-        cache_diff = ""
+        num_discordant = 0
         for cache in provenance_summary:
             if cache != u'dfhash':
                 if not(first_provenance):
                     first_provenance = provenance_summary[cache]
                     first_provenance_name = cache
-                cache_diff += _compare_provenance(
+                num_discordant += _compare_provenance(
                     provenance_summary[cache],
                     first_provenance,
                     left_outer_diff = "In %s but not in %s" % (cache, first_provenance_name),
                     right_outer_diff = "In %s but not in %s" % (first_provenance_name, cache)
                     )
         ## compare provenance across cached items
-        if len(cache_diff) == 0:
+        if num_discordant == 0:
             prov = first_provenance
         else:
             prov = provenance_summary
@@ -1152,5 +1152,5 @@ def _compare_provenance(
     if len(warn_str) > 0:
         warnings.warn(warn_str, Warning)
     
-    return(warn_str)
+    return(len(warn_str))
 
