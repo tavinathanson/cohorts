@@ -1009,7 +1009,7 @@ class Cohort(Collection):
         p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
         return p
 
-    def summarize_provenance_per_cache(self):
+    def _provenance_per_cache(self):
         """ Utility function to summarize provenance files for cached items used by a Cohort, for each cache_dir that exists.
             Only existing cache_dirs are summarized. 
 
@@ -1085,7 +1085,7 @@ class Cohort(Collection):
             `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance for each existing cache_dir.
 
         """
-        provenance_per_cache = self.summarize_provenance_per_cache()
+        provenance_per_cache = self._summarize_provenance_per_cache()
         summary_provenance = None
         num_discordant = 0
         for cache in provenance_per_cache:
