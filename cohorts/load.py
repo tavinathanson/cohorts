@@ -1040,7 +1040,7 @@ class Cohort(Collection):
         for cache in self.cache_names:
             cache_name = self.cache_names[cache]
             cache_provenance = None
-            num_discordant = 0
+            num_discrepant = 0
             this_cache_dir = path.join(self.cache_dir, cache_name)
             if path.exists(this_cache_dir):
                 for i, row in df.iterrows():
@@ -1050,8 +1050,8 @@ class Cohort(Collection):
                     if not(cache_provenance):
                         cache_provenance = this_provenance
                     else:
-                        num_discordant += _compare_provenance(this_provenance, cache_provenance)
-                if num_discordant == 0:
+                        num_discrepant += _compare_provenance(this_provenance, cache_provenance)
+                if num_discrepant == 0:
                     provenance_summary[cache_name] = cache_provenance
                 else:
                     provenance_summary[cache_name] = None
@@ -1087,21 +1087,21 @@ class Cohort(Collection):
         """
         provenance_per_cache = self.summarize_provenance_per_cache()
         summary_provenance = None
-        num_discordant = 0
+        num_discrepant = 0
         for cache in provenance_per_cache:
             if not(summary_provenance):
                 ## pick arbitrary provenance & call this the "summary" (for now)
                 summary_provenance = provenance_per_cache[cache]
                 summary_provenance_name = cache
             ## for each cache, check equivalence with summary_provenance
-            num_discordant += _compare_provenance(
+            num_discrepant += _compare_provenance(
                 provenance_per_cache[cache],
                 summary_provenance,
                 left_outer_diff = "In %s but not in %s" % (cache, summary_provenance_name),
                 right_outer_diff = "In %s but not in %s" % (summary_provenance_name, cache)
                 )
         ## compare provenance across cached items
-        if num_discordant == 0:
+        if num_discrepant == 0:
             prov = summary_provenance ## report summary provenance if exists
         else:
             prov = provenance_per_cache ## otherwise, return provenance per cache
