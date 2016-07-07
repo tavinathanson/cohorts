@@ -1020,7 +1020,8 @@ class Cohort(Collection):
             At the moment, most PROVENANCE files contain details about packages used to generate the cached data file. However, this 
             function is generic & so it summarizes the contents of those files irrespective of their contents.
             
-            == Returns == 
+            Returns
+            ----------
 
             Dict containing summarized provenance for each existing cache_dir, after checking to see that 
             provenance files are identical among all patients in the data frame for that cache_dir.
@@ -1029,7 +1030,8 @@ class Cohort(Collection):
                 - a warning is generated, describing the conflict
                 - and, a value of `None` is returned in the dictionary for that cache-dir
 
-            == See also ==
+            See also
+            -----------
             
             * `?cohorts.Cohort.summarize_provenance` which summarizes provenance files among cache_dirs.
             * `?cohorts.Cohort.summarize_dataframe` which hashes/summarizes contents of the data frame for this cohort
@@ -1073,14 +1075,16 @@ class Cohort(Collection):
             At the moment, most PROVENANCE files contain details about packages used to generate files. However, this 
             function is generic & so it summarizes the contents of those files irrespective of their contents.
             
-            == Returns == 
+            Returns
+            ----------
             
             Dict containing summary of provenance items, among all cache dirs used by the Cohort. 
 
             IE if all provenances are identical across all cache dirs, then a single set of provenances is returned. 
             Otherwise, if all provenances are not identical, the provenance items per cache_dir are returned.
 
-            == See also ==
+            See also
+            ----------
             
             `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance for each existing cache_dir.
 
@@ -1111,9 +1115,14 @@ class Cohort(Collection):
         """ Utility function to summarize data source status for this Cohort, useful for confirming
             the state of data used for an analysis
 
-            Current items:
-              dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
-              provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
+            Returns
+            ----------
+            Dictionary with summary of data sources
+
+            Currently contains
+
+            - dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
+            - provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
         """
         provenance_file_summary = self.summarize_provenance()
         dataframe_hash = self.summarize_dataframe()
@@ -1157,13 +1166,21 @@ def _compare_provenance(
     """ utility function to compare two abritrary provenance dicts
         returns number of discrepancies.
 
-        == params == 
-        this_provenance: provenance dict which should be compared to "other_provenance"
+        Parameters
+        ----------
+
+        this_provenance: provenance dict (to be compared to "other_provenance")
         other_provenance: comparison provenance dict
 
         (optional)
         left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
         right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
+
+        Returns
+        -----------
+
+        Number of discrepancies (0: None)
+
     """
     this_items = set(this_provenance.items())
     other_items = set(other_provenance.items())
