@@ -1048,11 +1048,15 @@ class Cohort(Collection):
                 for i, row in df.iterrows():
                     patient_id = row["patient_id"]
                     patient_cache_dir = path.join(this_cache_dir, patient_id)
-                    this_provenance = self.load_provenance(patient_cache_dir = patient_cache_dir)
-                    if not(cache_provenance):
-                        cache_provenance = this_provenance
-                    else:
-                        num_discrepant += _compare_provenance(this_provenance, cache_provenance)
+                    try:
+                        this_provenance = self.load_provenance(patient_cache_dir = patient_cache_dir)
+                    except:
+                        this_provenance = None
+                    if this_provenance:
+                        if not(cache_provenance):
+                            cache_provenance = this_provenance
+                        else:
+                            num_discrepant += _compare_provenance(this_provenance, cache_provenance)
                 if num_discrepant == 0:
                     provenance_summary[cache_name] = cache_provenance
                 else:
