@@ -1013,7 +1013,7 @@ class Cohort(Collection):
         """ Utility function to return a list of patient ids in the Cohort
         """
         results = []
-        for (patient in self.):
+        for (patient in self.patients):
             results.append(patient.id)
         return(results)
 
