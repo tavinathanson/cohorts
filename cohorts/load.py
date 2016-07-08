@@ -264,7 +264,7 @@ class Cohort(Collection):
                         "Full row: %s" % row)
         cohort_dataframe.apply(func, axis=1)
 
-    def _as_dataframe_unmodified(self, join_with, join_how):
+    def _as_dataframe_unmodified(self, join_with = None, join_how = None):
         # Use join_with if specified, otherwise fall back to what is defined in the class
         join_with = first_not_none_param([join_with, self.join_with], default=[])
         if type(join_with) == str:
