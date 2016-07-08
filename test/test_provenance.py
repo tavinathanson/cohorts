@@ -112,11 +112,11 @@ def test_summarize_provenance():
         
         ## should see a warning when loading provenance
         ## & provenance value should be None
-        print(cohort.summarize_provenance_per_cache())
-        ok_(not cohort.summarize_provenance_per_cache()[cache_name])
-
-
-
+        # But, when check_provenance is off, we shouldn't get a warning.
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ok_(not cohort.summarize_provenance_per_cache()[cache_name])
+            ok_(len(w)>0)
 
     finally:
         if cohort is not None:
