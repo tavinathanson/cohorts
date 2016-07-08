@@ -4,4 +4,5 @@ venv
 .ipynb_checkpoints
 cache
 ENV.sh
+.coverage
 generated/
