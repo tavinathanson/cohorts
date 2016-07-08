@@ -17,6 +17,7 @@ from __future__ import print_function
 from nose.tools import eq_, ok_
 import pandas as pd
 from os import path
+import cohorts
 import warnings
 
 from .test_basic import make_simple_cohort
@@ -100,11 +101,19 @@ def test_summarize_provenance():
         # Now let's mess with the second provenance file.
         df_empty = cohort.load_from_cache(cache_name, patient_id, "cached_file.csv")
         provenance = cohort.load_provenance(patient_cache_dir)
-        provenance["hello"] = "1.0.1"
+        provenance["pandas"] = "1.0.1"
+        print(provenance)
+        print("\n")
         cohort.save_provenance(patient_cache_dir, provenance)
+        ## confirm provenance was updated
+        new_provenance = cohort.load_provenance(patient_cache_dir)
+        ok_(cohorts._compare_provenance(provenance, new_provenance) == 0)
+        print(new_provenance) 
+        
         ## should see a warning when loading provenance
         ## & provenance value should be None
-        ok_(not cohort.summarize_provenance()[cache_name])
+        print(cohort.summarize_provenance_per_cache())
+        ok_(not cohort.summarize_provenance_per_cache()[cache_name])
 
 
 
