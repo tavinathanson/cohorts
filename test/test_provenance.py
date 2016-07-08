@@ -107,7 +107,7 @@ def test_summarize_provenance():
         cohort.save_provenance(patient_cache_dir, provenance)
         ## confirm provenance was updated
         new_provenance = cohort.load_provenance(patient_cache_dir)
-        ok_(cohorts._compare_provenance(provenance, new_provenance) == 0)
+        ok_(cohorts.compare_provenance(provenance, new_provenance) == 0)
         print(new_provenance) 
         
         ## should see a warning when loading provenance

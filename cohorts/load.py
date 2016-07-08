@@ -420,7 +420,7 @@ class Cohort(Collection):
             return None
 
         if self.check_provenance:
-            num_discrepant = _compare_provenance(
+            num_discrepant = compare_provenance(
                 this_provenance = self.generate_provenance(), 
                 other_provenance = self.load_provenance(patient_cache_dir),
                 left_outer_diff = "In current environment but not cached in %s for patient %s" % (cache_name, patient_id),
@@ -1009,6 +1009,14 @@ class Cohort(Collection):
         p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
         return p
 
+    def _list_patient_ids(self):
+        """ Utility function to return a list of patient ids in the Cohort
+        """
+        results = []
+        for (patient in self.):
+            results.append(patient.id)
+        return(results)
+
     def summarize_provenance_per_cache(self):
         """ Utility function to summarize provenance files for cached items used by a Cohort, for each cache_dir that exists.
             Only existing cache_dirs are summarized. 
@@ -1045,8 +1053,7 @@ class Cohort(Collection):
             num_discrepant = 0
             this_cache_dir = path.join(self.cache_dir, cache_name)
             if path.exists(this_cache_dir):
-                for i, row in df.iterrows():
-                    patient_id = row["patient_id"]
+                for patient_id in self._list_patient_ids():
                     patient_cache_dir = path.join(this_cache_dir, patient_id)
                     try:
                         this_provenance = self.load_provenance(patient_cache_dir = patient_cache_dir)
@@ -1056,7 +1063,7 @@ class Cohort(Collection):
                         if not(cache_provenance):
                             cache_provenance = this_provenance
                         else:
-                            num_discrepant += _compare_provenance(this_provenance, cache_provenance)
+                            num_discrepant += compare_provenance(this_provenance, cache_provenance)
                 if num_discrepant == 0:
                     provenance_summary[cache_name] = cache_provenance
                 else:
@@ -1102,7 +1109,7 @@ class Cohort(Collection):
                 summary_provenance = provenance_per_cache[cache]
                 summary_provenance_name = cache
             ## for each cache, check equivalence with summary_provenance
-            num_discrepant += _compare_provenance(
+            num_discrepant += compare_provenance(
                 provenance_per_cache[cache],
                 summary_provenance,
                 left_outer_diff = "In %s but not in %s" % (cache, summary_provenance_name),
@@ -1157,12 +1164,12 @@ def filter_not_null(df, col):
     return df
 
 def _provenance_str(provenance):
-    """ utility function used by _compare_provenance to print diff
+    """ utility function used by compare_provenance to print diff
     """
     return ["%s==%s" % (key, value) for (key, value) in provenance]
 
 
-def _compare_provenance(
+def compare_provenance(
         this_provenance, other_provenance,
         left_outer_diff = "In current but not comparison",
         right_outer_diff = "In comparison but not current"
