@@ -235,6 +235,7 @@ class Cohort(Collection):
 
         self.verify_id_uniqueness()
         self.verify_survival()
+        self.dataframe_hash = None
 
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
@@ -263,7 +264,7 @@ class Cohort(Collection):
                         "Full row: %s" % row)
         cohort_dataframe.apply(func, axis=1)
 
-    def _as_dataframe_unmodified(self, join_with, join_how):
+    def _as_dataframe_unmodified(self, join_with = None, join_how = None):
         # Use join_with if specified, otherwise fall back to what is defined in the class
         join_with = first_not_none_param([join_with, self.join_with], default=[])
         if type(join_with) == str:
@@ -298,6 +299,7 @@ class Cohort(Collection):
                 df_loader.name,
                 old_len_df,
                 len(df)))
+        self.dataframe_hash = hash(str(df.sort_values('patient_id')))
         return df
 
     def as_dataframe(self, on=None, col=None, join_with=None, join_how=None, **kwargs):
@@ -418,25 +420,12 @@ class Cohort(Collection):
             return None
 
         if self.check_provenance:
-            provenance = set(self.generate_provenance().items())
-            provenance_previous = set(self.load_provenance(patient_cache_dir).items())
-
-            def provenance_str(provenance):
-                return ["%s==%s" % (key, value) for (key, value) in provenance]
-
-            # Two-way diff: are any modules introduced, and are any modules lost?
-            new_diff = provenance.difference(provenance_previous)
-            old_diff = provenance_previous.difference(provenance)
-            warn_str = ""
-            if len(new_diff) > 0:
-                warn_str += "In current environment but not cached for patient %s: %s" % (
-                    patient_id, provenance_str(new_diff))
-            if len(old_diff) > 0:
-                warn_str += "In cached environment for patient %s but not current: %s" % (
-                    patient_id, provenance_str(old_diff))
-
-            if len(warn_str) > 0:
-                warnings.warn(warn_str, Warning)
+            num_discrepant = compare_provenance(
+                this_provenance = self.generate_provenance(), 
+                other_provenance = self.load_provenance(patient_cache_dir),
+                left_outer_diff = "In current environment but not cached in %s for patient %s" % (cache_name, patient_id),
+                right_outer_diff = "In cached %s for patient %s but not current" % (cache_name, patient_id)
+                )
 
         if path.splitext(cache_file)[1] == ".csv":
             return pd.read_csv(cache_file, dtype={"patient_id": object})
@@ -1020,6 +1009,142 @@ class Cohort(Collection):
         p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
         return p
 
+    def _list_patient_ids(self):
+        """ Utility function to return a list of patient ids in the Cohort
+        """
+        results = []
+        for patient in self:
+            results.append(patient.id)
+        return(results)
+
+    def summarize_provenance_per_cache(self):
+        """ Utility function to summarize provenance files for cached items used by a Cohort, for each cache_dir that exists.
+            Only existing cache_dirs are summarized. 
+
+            This is a summary of provenance files because the function checks to see whether all patients data have 
+            the same provenance within the cache dir. The function assumes that it will be desireable to have all patients
+            data generated using the same environment, for each cache type.
+
+            At the moment, most PROVENANCE files contain details about packages used to generate the cached data file. However, this 
+            function is generic & so it summarizes the contents of those files irrespective of their contents.
+            
+            Returns
+            ----------
+
+            Dict containing summarized provenance for each existing cache_dir, after checking to see that 
+            provenance files are identical among all patients in the data frame for that cache_dir.
+
+            If conflicting PROVENANCE files are discovered within a cache-dir:
+                - a warning is generated, describing the conflict
+                - and, a value of `None` is returned in the dictionary for that cache-dir
+
+            See also
+            -----------
+            
+            * `?cohorts.Cohort.summarize_provenance` which summarizes provenance files among cache_dirs.
+            * `?cohorts.Cohort.summarize_dataframe` which hashes/summarizes contents of the data frame for this cohort
+
+        """
+        provenance_summary = {}
+        df = self.as_dataframe()
+        for cache in self.cache_names:
+            cache_name = self.cache_names[cache]
+            cache_provenance = None
+            num_discrepant = 0
+            this_cache_dir = path.join(self.cache_dir, cache_name)
+            if path.exists(this_cache_dir):
+                for patient_id in self._list_patient_ids():
+                    patient_cache_dir = path.join(this_cache_dir, patient_id)
+                    try:
+                        this_provenance = self.load_provenance(patient_cache_dir = patient_cache_dir)
+                    except:
+                        this_provenance = None
+                    if this_provenance:
+                        if not(cache_provenance):
+                            cache_provenance = this_provenance
+                        else:
+                            num_discrepant += compare_provenance(this_provenance, cache_provenance)
+                if num_discrepant == 0:
+                    provenance_summary[cache_name] = cache_provenance
+                else:
+                    provenance_summary[cache_name] = None
+        return(provenance_summary)
+    
+    def summarize_dataframe(self):
+        """ Summarize default dataframe for this cohort using a hash function. 
+            Useful for confirming the version of data used in various reports, e.g. ipynbs
+        """
+        if self.dataframe_hash:
+            return(self.dataframe_hash)
+        else:
+            df = self._as_dataframe_unmodified()
+            return(self.dataframe_hash)
+    
+    def summarize_provenance(self):
+        """ Utility function to summarize provenance files for cached items used by a Cohort. 
+
+            At the moment, most PROVENANCE files contain details about packages used to generate files. However, this 
+            function is generic & so it summarizes the contents of those files irrespective of their contents.
+            
+            Returns
+            ----------
+            
+            Dict containing summary of provenance items, among all cache dirs used by the Cohort. 
+
+            IE if all provenances are identical across all cache dirs, then a single set of provenances is returned. 
+            Otherwise, if all provenances are not identical, the provenance items per cache_dir are returned.
+
+            See also
+            ----------
+            
+            `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance for each existing cache_dir.
+
+        """
+        provenance_per_cache = self.summarize_provenance_per_cache()
+        summary_provenance = None
+        num_discrepant = 0
+        for cache in provenance_per_cache:
+            if not(summary_provenance):
+                ## pick arbitrary provenance & call this the "summary" (for now)
+                summary_provenance = provenance_per_cache[cache]
+                summary_provenance_name = cache
+            ## for each cache, check equivalence with summary_provenance
+            num_discrepant += compare_provenance(
+                provenance_per_cache[cache],
+                summary_provenance,
+                left_outer_diff = "In %s but not in %s" % (cache, summary_provenance_name),
+                right_outer_diff = "In %s but not in %s" % (summary_provenance_name, cache)
+                )
+        ## compare provenance across cached items
+        if num_discrepant == 0:
+            prov = summary_provenance ## report summary provenance if exists
+        else:
+            prov = provenance_per_cache ## otherwise, return provenance per cache
+        return(prov)
+    
+    def summarize_data_sources(self):
+        """ Utility function to summarize data source status for this Cohort, useful for confirming
+            the state of data used for an analysis
+
+            Returns
+            ----------
+            Dictionary with summary of data sources
+
+            Currently contains
+
+            - dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
+            - provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
+        """
+        provenance_file_summary = self.summarize_provenance()
+        dataframe_hash = self.summarize_dataframe()
+        results = {
+            'provenance_file_summary': provenance_file_summary,
+            'dataframe_hash': dataframe_hash
+            }
+        return(results)
+        
+
+
 def first_not_none_param(params, default):
     """
     Given a list of `params`, use the first param in the list that is
@@ -1037,3 +1162,55 @@ def filter_not_null(df, col):
     if updated_len < original_len:
         print("Missing %s for %d patients: from %d to %d" % (col, original_len - updated_len, original_len, updated_len))
     return df
+
+def _provenance_str(provenance):
+    """ utility function used by compare_provenance to print diff
+    """
+    return ["%s==%s" % (key, value) for (key, value) in provenance]
+
+
+def compare_provenance(
+        this_provenance, other_provenance,
+        left_outer_diff = "In current but not comparison",
+        right_outer_diff = "In comparison but not current"
+        ):
+    """ utility function to compare two abritrary provenance dicts
+        returns number of discrepancies.
+
+        Parameters
+        ----------
+
+        this_provenance: provenance dict (to be compared to "other_provenance")
+        other_provenance: comparison provenance dict
+
+        (optional)
+        left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
+        right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
+
+        Returns
+        -----------
+
+        Number of discrepancies (0: None)
+
+    """
+    this_items = set(this_provenance.items())
+    other_items = set(other_provenance.items())
+
+    # Two-way diff: are any modules introduced, and are any modules lost?
+    new_diff = this_items.difference(other_items)
+    old_diff = other_items.difference(this_items)
+    warn_str = ""
+    if len(new_diff) > 0:
+        warn_str += "%s: %s" % (
+            left_outer_diff,
+            _provenance_str(new_diff))
+    if len(old_diff) > 0:
+        warn_str += "%s: %s" % (
+            right_outer_diff,
+            _provenance_str(old_diff))
+
+    if len(warn_str) > 0:
+        warnings.warn(warn_str, Warning)
+    
+    return(len(new_diff)+len(old_diff))
+
