@@ -62,3 +62,29 @@ def test_provenance():
     finally:
         if cohort is not None:
             cohort.clear_caches()
+
+def test_summarize_provenance():
+    cohort = None
+    try:
+        # First, let's just make a cohort and cache a file. Before we do this,
+        # we have no provenance.
+        cohort = make_simple_cohort()
+        cohort.check_provenance = True
+        df_empty = pd.DataFrame({"a": [1]})
+        patient_id = "1"
+        cache_name = cohort.cache_names["variant"]
+        cache_dir = path.join(cohort.cache_dir, cache_name)
+        patient_cache_dir = path.join(cache_dir, str(patient_id))
+        provenance_path = path.join(patient_cache_dir, "PROVENANCE")
+        ok_(not path.exists(provenance_path))
+        ## should not have any provenance summary (but shouldn't fail) if no provenance 
+        summary = cohort.summarize_provenance()
+
+        # After we cache the file, we should have provenance.
+        cohort.save_to_cache(df_empty, cache_name, patient_id, "cached_file.csv")
+        ## and, we should be able to summarize provenance
+        summary = cohort.summarize_provenance()
+
+    finally:
+        if cohort is not None:
+            cohort.clear_caches()
