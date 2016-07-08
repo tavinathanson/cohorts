@@ -85,6 +85,30 @@ def test_summarize_provenance():
         ## and, we should be able to summarize provenance
         summary = cohort.summarize_provenance()
 
+        ## add second patient id
+        patient_id = "2"
+        patient_cache_dir = path.join(cache_dir, str(patient_id))
+        provenance_path = path.join(patient_cache_dir, "PROVENANCE")
+        ok_(not path.exists(provenance_path))
+        ## shouldn't fail (some patients have provenance & some don't)
+        summary = cohort.summarize_provenance()
+        ## save to file 
+        cohort.save_to_cache(df_empty, cache_name, patient_id, "cached_file.csv")
+        ## shouldn't fail (both patients have provenance & should be equivalent)
+        summary = cohort.summarize_provenance()
+
+        # Now let's mess with the second provenance file.
+        df_empty = cohort.load_from_cache(cache_name, patient_id, "cached_file.csv")
+        provenance = cohort.load_provenance(patient_cache_dir)
+        provenance["hello"] = "1.0.1"
+        cohort.save_provenance(patient_cache_dir, provenance)
+        ## should see a warning when loading provenance
+        ## & provenance value should be None
+        ok_(not cohort.summarize_provenance()[cache_name])
+
+
+
+
     finally:
         if cohort is not None:
             cohort.clear_caches()
