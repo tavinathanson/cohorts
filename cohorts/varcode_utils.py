@@ -18,7 +18,8 @@ def filter_variants_with_metadata(variant_collection, filter_fn):
         return VariantCollection([variant
                                   for variant in variant_collection
                                   if filter_fn(variant, variant_collection.metadata[variant])
-                                  ])
+                                  ],
+                                 metadata=variant_collection.metadata)
     else:
         return variant_collection
 
