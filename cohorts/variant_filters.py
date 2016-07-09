@@ -20,24 +20,33 @@ import re
 import pandas as pd
 from os import path
 
-DEFAULT_DEPTH = 30
-DEFAULT_NORMAL_VAF = 0.02
-DEFAULT_ALT_DEPTH = 5
+DEFAULT_MIN_TUMOR_DEPTH = 30
+DEFAULT_MIN_NORMAL_DEPTH = 30
+DEFAULT_MIN_TUMOR_VAF = 0
+DEFAULT_MAX_NORMAL_VAF = 0.02
+DEFAULT_MIN_TUMOR_ALT_DEPTH = 5
 
-def variant_qc_filter(variant, variant_metadata, depth=DEFAULT_DEPTH,
-                      normal_vaf=DEFAULT_NORMAL_VAF, alt_depth=DEFAULT_ALT_DEPTH):
+def variant_qc_filter(variant, variant_metadata,
+                      min_tumor_depth=DEFAULT_MIN_TUMOR_DEPTH,
+                      min_normal_depth=DEFAULT_MIN_NORMAL_DEPTH,
+                      min_tumor_vaf=DEFAULT_MIN_TUMOR_VAF,
+                      max_normal_vaf=DEFAULT_MAX_NORMAL_VAF,
+                      min_tumor_alt_depth=DEFAULT_MIN_TUMOR_ALT_DEPTH):
     somatic_stats = variant_stats_from_variant(variant, variant_metadata)
 
     # Filter variant with depth < depth
-    if (somatic_stats.tumor_stats.depth < depth or
-        somatic_stats.normal_stats.depth < depth):
+    if (somatic_stats.tumor_stats.depth < min_tumor_depth or
+        somatic_stats.normal_stats.depth < min_normal_depth):
         return False
 
     # Filter based on normal evidence
-    if somatic_stats.normal_stats.variant_allele_frequency > normal_vaf:
+    if somatic_stats.normal_stats.variant_allele_frequency > max_normal_vaf:
         return False
 
-    if somatic_stats.tumor_stats.alt_depth < alt_depth:
+    if somatic_stats.tumor_stats.variant_allele_frequency < min_tumor_vaf:
+        return False
+
+    if somatic_stats.tumor_stats.alt_depth < min_tumor_alt_depth:
         return False
 
     return True
