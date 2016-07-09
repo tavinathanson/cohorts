@@ -42,8 +42,7 @@ from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
 from .varcode_utils import (filter_variants, filter_effects,
                             filter_neoantigens, filter_polyphen)
-from .variant_filters import (variant_qc_filter, effect_qc_filter,
-                              neoantigen_qc_filter, polyphen_qc_filter)
+from .variant_filters import variant_qc_filter
 from . import variant_filters
 
 class InvalidDataError(ValueError):
@@ -492,7 +491,7 @@ class Cohort(Collection):
         patients : str, optional
             Filter to a subset of patients
         filter_fn : function
-            Takes a variant and it's metadata and returns a boolean. Only variants returning True are preserved. Defaults to `variant_qc_filter`.
+            Takes a FilterableVariant and returns a boolean. Only variants returning True are preserved. Defaults to `variant_qc_filter`.
 
         Returns
         -------
@@ -564,7 +563,7 @@ class Cohort(Collection):
         return merged_variants
 
     def load_polyphen_annotations(self, as_dataframe=False,
-                                  filter_fn=polyphen_qc_filter):
+                                  filter_fn=variant_qc_filter):
         """Load a dataframe containing polyphen2 annotations for all variants
 
         Parameters
@@ -573,9 +572,9 @@ class Cohort(Collection):
             Path to the WHESS/Polyphen2 SQLite database.
             Can be downloaded and bunzip2'ed from http://bit.ly/208mlIU
         filter_fn : function
-            Takes an annotation row and variants and returns a boolean.
+            Takes a FilterablePolyphen and returns a boolean.
             Only annotations returning True are preserved. Defaults to
-            `polyphen_qc_filter`.
+            `variant_qc_filter`.
 
         Returns
         -------
@@ -644,7 +643,7 @@ class Cohort(Collection):
                                filter_fn=filter_fn)
 
     def load_effects(self, patients=None, only_nonsynonymous=False,
-                     filter_fn=effect_qc_filter):
+                     filter_fn=variant_qc_filter):
         """Load a dictionary of patient_id to varcode.EffectCollection
         Parameters
         ----------
@@ -653,7 +652,7 @@ class Cohort(Collection):
         only_nonsynonymous : bool, optional
             If true, load only nonsynonymous effects, default False
         filter_fn : function
-            Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved. Defaults to `effect_qc_filter`.
+            Takes a FilterableEffect and returns a boolean. Only effects returning True are preserved. Defaults to `variant_qc_filter`.
 
         Returns
         -------
@@ -745,7 +744,7 @@ class Cohort(Collection):
     def load_neoantigens(self, patients=None, only_expressed=False,
                          epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
                          process_limit=10, max_file_records=None,
-                         filter_fn=neoantigen_qc_filter):
+                         filter_fn=variant_qc_filter):
         dfs = {}
         for patient in self.iter_patients(patients):
             df_epitopes = self._load_single_patient_neoantigens(
