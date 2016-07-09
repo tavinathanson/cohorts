@@ -40,8 +40,8 @@ from pysam import AlignmentFile
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
-from .varcode_utils import (filter_variants_with_metadata, filter_effects_with_metadata,
-                            filter_neoantigens_with_metadata, filter_polyphen_with_metadata)
+from .varcode_utils import (filter_variants, filter_effects,
+                            filter_neoantigens, filter_polyphen)
 from .variant_filters import (variant_qc_filter, effect_qc_filter,
                               neoantigen_qc_filter, polyphen_qc_filter)
 from . import variant_filters
@@ -126,7 +126,8 @@ class Patient(object):
                  normal_sample=None,
                  tumor_sample=None,
                  hla_alleles=None,
-                 additional_data=None):
+                 additional_data=None,
+                 cohort=None):
         require_id_str(id)
         self.id = id
         self.os = os
@@ -141,6 +142,7 @@ class Patient(object):
         self.tumor_sample = tumor_sample
         self.hla_alleles = hla_alleles
         self.additional_data = additional_data
+        self.cohort = cohort
 
         self.add_progressed_or_deceased()
 
@@ -208,6 +210,10 @@ class Cohort(Collection):
     responder_pfs_equals_os : bool
         Ensure that the PFS values for responders (not progressed) are equal to
         OS values.
+    variant_type : {'snv', 'indel'}, optional
+        Load variants of a specific type, default 'snv'
+    merge_type : {'union', 'intersection'}, optional
+        Use this method to merge multiple variant sets for a single patient, default 'union'
     """
     def __init__(self,
                  patients,
@@ -219,10 +225,16 @@ class Cohort(Collection):
                  responder_pfs_equals_os=False,
                  check_provenance=False,
                  polyphen_dump_path=None,
-                 pageant_coverage_path=None,):
+                 pageant_coverage_path=None,
+                 variant_type="snv",
+                 merge_type="union"):
         Collection.__init__(
             self,
             elements=patients)
+        # TODO: Patients shouldn't actually need to reference their cohorts; remove
+        # this when possible.
+        for patient in patients:
+            patient.cohort = self
         self.cache_dir = cache_dir
         self.cache_results = cache_results
 
@@ -237,6 +249,8 @@ class Cohort(Collection):
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
+        self.variant_type = variant_type
+        self.merge_type = merge_type
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -470,21 +484,13 @@ class Cohort(Collection):
                 return patient
         raise ValueError("No patient with ID %s found" % id)
 
-    def load_variants(self, patients=None,
-                      variant_type="snv", merge_type="union",
-                      only_expressed=False, filter_fn=variant_qc_filter):
+    def load_variants(self, patients=None, filter_fn=variant_qc_filter):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
         Parameters
         ----------
         patients : str, optional
             Filter to a subset of patients
-        variant_type : {'snv', 'indel'}, optional
-            Load variants of a specific type, default 'snv'
-        merge_type : {'union', 'intersection'}, optional
-            Use this method to merge multiple variant sets for a single patient, default 'union'
-        only_expressed : boolean, optional
-            Only return expressed variants via isovar
         filter_fn : function
             Takes a variant and it's metadata and returns a boolean. Only variants returning True are preserved. Defaults to `variant_qc_filter`.
 
@@ -497,28 +503,20 @@ class Cohort(Collection):
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
-            variants = self._load_single_patient_variants(patient, variant_type, merge_type,
-                                                          only_expressed, filter_fn)
+            variants = self._load_single_patient_variants(patient, filter_fn)
             if variants is not None:
                 patient_variants[patient.id] = variants
         return patient_variants
 
-    def _load_single_patient_variants(self, patient, variant_type, merge_type,
-                                      only_expressed, filter_fn):
-        def on_return(variants):
-            if only_expressed:
-                variants = self._filter_variants_to_expressed(variants,
-                                                              patient=patient,
-                                                              variant_type=variant_type,
-                                                              merge_type=merge_type)
-            return filter_variants_with_metadata(variants, filter_fn)
-
+    def _load_single_patient_variants(self, patient, filter_fn):
         failed_io = False
         try:
-            cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
+            cached_file_name = "%s-%s-variants.pkl" % (self.variant_type, self.merge_type)
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
-                return on_return(cached)
+                return filter_variants(variant_collection=cached,
+                                       patient=patient,
+                                       filter_fn=filter_fn)
             vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
                 (vcf_path, varcode.load_vcf_fast(vcf_path))
@@ -539,37 +537,12 @@ class Cohort(Collection):
             vcf_path, variants = variant_collections[0]
             merged_variants = variants
         else:
-            merged_variants = self._merge_variant_collections(dict(variant_collections), merge_type)
+            merged_variants = self._merge_variant_collections(dict(variant_collections), self.merge_type)
 
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
-        return on_return(merged_variants)
-
-    def _filter_variants_to_expressed(self, variants, patient, variant_type, merge_type):
-        """Given a VariantCollection, filters that collection to only expressed variants."""
-        if len(variants) == 0:
-            return variants
-
-        expressed_variants = []
-        expressed_metadata = {}
-        # TODO: we're currently using the same isovar cache that we use for expressed
-        # neoantigen prediction; so we pass in the same epitope lengths.
-        # This is hacky and should be addressed.
-        df_isovar = self._load_single_patient_isovar(patient=patient,
-                                                     variants=variants,
-                                                     epitope_lengths=[8, 9, 10, 11],
-                                                     variant_type=variant_type,
-                                                     merge_type=merge_type)
-        for i, row in df_isovar.iterrows():
-            genome = variants[0].ensembl
-            variant = Variant(contig=row["chr"],
-                              start=row["pos"],
-                              ref=row["ref"],
-                              alt=row["alt"],
-                              ensembl=genome)
-            if variant in variants:
-                expressed_variants.append(variant)
-                expressed_metadata[variant] = variants.metadata[variant]
-        return VariantCollection(expressed_variants, metadata=expressed_metadata)
+        return filter_variants(variant_collection=merged_variants,
+                               patient=patient,
+                               filter_fn=filter_fn)
 
     def _merge_variant_collections(self, vcf_to_variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
@@ -625,16 +598,18 @@ class Cohort(Collection):
         cache_name = self.cache_names["polyphen"]
         cached_file_name = "polyphen-annotations.csv"
         variants = self._load_single_patient_variants(patient,
-                                                      variant_type="snv",
-                                                      merge_type="union",
-                                                      only_expressed=False,
+                                                      variant_type=self.variant_type,
+                                                      merge_type=self.merge_type,
                                                       filter_fn=None)
         if variants is None:
             return None
 
         cached = self.load_from_cache(cache_name, patient.id, cached_file_name)
         if cached is not None:
-            return filter_polyphen_with_metadata(cached, variants, filter_fn)
+            return filter_polyphen(polyphen_df=cached,
+                                   variant_collection=variants,
+                                   patient=patient,
+                                   filter_fn=filter_fn)
 
         engine = create_engine("sqlite:///{}".format(self.polyphen_dump_path))
         conn = engine.connect()
@@ -663,11 +638,13 @@ class Cohort(Collection):
         df["pos"] = df["pos"].astype("int")
         df["annotation_found"] = df["annotation_found"].astype("bool")
         self.save_to_cache(df, cache_name, patient.id, cached_file_name)
-        return filter_polyphen_with_metadata(df, variants, filter_fn)
+        return filter_polyphen(polyphen_df=df,
+                               variant_collection=variants,
+                               patient=patient,
+                               filter_fn=filter_fn)
 
     def load_effects(self, patients=None, only_nonsynonymous=False,
-                     variant_type="snv", merge_type="union",
-                     only_expressed=False, filter_fn=effect_qc_filter):
+                     filter_fn=effect_qc_filter):
         """Load a dictionary of patient_id to varcode.EffectCollection
         Parameters
         ----------
@@ -675,12 +652,6 @@ class Cohort(Collection):
             Filter to a subset of patients
         only_nonsynonymous : bool, optional
             If true, load only nonsynonymous effects, default False
-        variant_type : {'snv', 'indel'}, optional
-            Load variants of a specific type, default 'snv'
-        merge_type : {'union', 'intersection'}, optional
-            Use this method to merge multiple variant sets for a single patient, default 'union'
-        only_expressed : boolean, optional
-            Only return expressed variants via isovar
         filter_fn : function
             Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved. Defaults to `effect_qc_filter`.
 
@@ -692,26 +663,14 @@ class Cohort(Collection):
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, variant_type, merge_type, only_expressed, filter_fn)
+                patient, only_nonsynonymous, filter_fn)
             if effects is not None:
                 patient_effects[patient.id] = effects
         return patient_effects
 
-    def _load_single_patient_effects(self, patient, only_nonsynonymous,
-                                     variant_type, merge_type,
-                                     only_expressed, filter_fn):
-        def on_return(variants, effects):
-            if only_expressed:
-                variants = self._filter_variants_to_expressed(variants,
-                                                              patient=patient,
-                                                              variant_type=variant_type,
-                                                              merge_type=merge_type)
-                effects = [effect for effect in effects if effect.variant in variants]
-            return filter_effects_with_metadata(effects, variants.metadata, filter_fn)
-
-        cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
-        variants = self._load_single_patient_variants(
-            patient, variant_type, merge_type, only_expressed=False, filter_fn=None)
+    def _load_single_patient_effects(self, patient, only_nonsynonymous, filter_fn):
+        cached_file_name = "%s-%s-effects.pkl" % (self.variant_type, self.merge_type)
+        variants = self._load_single_patient_variants(patient, filter_fn=None)
         if variants is None:
             return None
 
@@ -720,7 +679,10 @@ class Cohort(Collection):
         else:
             cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            return on_return(variants=variants, effects=cached)
+            return filter_effects(effect_collection=cached,
+                                  variant_collection=variants,
+                                  patient=patient,
+                                  filter_fn=filter_fn)
 
         effects = variants.effects()
         nonsynonymous_effects = EffectCollection(
@@ -728,10 +690,12 @@ class Cohort(Collection):
 
         self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
-
-        if only_nonsynonymous:
-            return on_return(variants=variants, effects=nonsynonymous_effects)
-        return on_return(variants=variants, effects=effects)
+        return filter_effects(
+            effect_collection=(
+                nonsynonymous_effects if only_nonsynonymous else effects),
+            variant_collection=variants,
+            patient=patient,
+            filter_fn=filter_fn)
 
     def load_cufflinks(self, filter_ok=True):
         """
@@ -778,16 +742,14 @@ class Cohort(Collection):
             data = data[data["FPKM_status"] == "OK"]
         return data
 
-    def load_neoantigens(self, patients=None, variant_type="snv", merge_type="union",
-                         only_expressed=False, epitope_lengths=[8, 9, 10, 11],
-                         ic50_cutoff=500, process_limit=10, max_file_records=None,
+    def load_neoantigens(self, patients=None, only_expressed=False,
+                         epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
+                         process_limit=10, max_file_records=None,
                          filter_fn=neoantigen_qc_filter):
         dfs = {}
         for patient in self.iter_patients(patients):
             df_epitopes = self._load_single_patient_neoantigens(
                 patient=patient,
-                variant_type=variant_type,
-                merge_type=merge_type,
                 only_expressed=only_expressed,
                 epitope_lengths=epitope_lengths,
                 ic50_cutoff=ic50_cutoff,
@@ -798,11 +760,10 @@ class Cohort(Collection):
                 dfs[patient.id] = df_epitopes
         return dfs
 
-    def _load_single_patient_isovar(self, patient, variants, epitope_lengths,
-                                    variant_type, merge_type):
+    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
         # TODO: different epitope lengths, and other parameters, should result in
         # different caches
-        isovar_cached_file_name = "%s-%s-isovar.csv" % (variant_type, merge_type)
+        isovar_cached_file_name = "%s-%s-isovar.csv" % (self.variant_type, self.merge_type)
         df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         if df_isovar is not None:
             return df_isovar
@@ -838,13 +799,12 @@ class Cohort(Collection):
         self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         return df_isovar
 
-    def _load_single_patient_neoantigens(self, patient, variant_type,
-                                         merge_type, only_expressed, epitope_lengths,
+    def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
-        cached_file_name = "%s-%s-neoantigens.csv" % (variant_type, merge_type)
+        cached_file_name = "%s-%s-neoantigens.csv" % (self.variant_type, self.merge_type)
         variants = self._load_single_patient_variants(
-            patient, variant_type, merge_type, only_expressed=False, filter_fn=None)
+            patient, only_expressed=False, filter_fn=None)
         if variants is None:
             return None
 
@@ -857,7 +817,10 @@ class Cohort(Collection):
         else:
             cached = self.load_from_cache(self.cache_names["neoantigen"], patient.id, cached_file_name)
         if cached is not None:
-            return filter_neoantigens_with_metadata(cached, variants, filter_fn)
+            return filter_neoantigens(neoantigens_df=cached,
+                                      variant_collection=variants,
+                                      patient=patient,
+                                      filter_fn=filter_fn)
 
         mhc_model = NetMHCcons(
             alleles=patient.hla_alleles,
@@ -865,11 +828,9 @@ class Cohort(Collection):
             max_file_records=max_file_records,
             process_limit=process_limit)
         if only_expressed:
-            df_isovar = self._load_single_patient_isovar(patient=patient,
+            df_isovar = self.load_single_patient_isovar(patient=patient,
                                                          variants=variants,
-                                                         epitope_lengths=epitope_lengths,
-                                                         variant_type=variant_type,
-                                                         merge_type=merge_type)
+                                                         epitope_lengths=epitope_lengths)
 
             # Map from isovar rows to protein sequences
             isovar_rows_to_protein_sequences = dict([
@@ -908,7 +869,10 @@ class Cohort(Collection):
 
             self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], patient.id, cached_file_name)
 
-        return filter_neoantigens_with_metadata(df_epitopes, variants, filter_fn)
+        return filter_neoantigens(neoantigens_df=df_epitopes,
+                                  variant_collection=variants,
+                                  patient=patient,
+                                  filter_fn=filter_fn)
 
     def get_filtered_isovar_epitopes(self, epitopes, ic50_cutoff):
         """
