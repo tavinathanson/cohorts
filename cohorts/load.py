@@ -385,7 +385,7 @@ class Cohort(Collection):
         # they apply to.
         if len(kwargs) > 0:
             raise ValueError("kwargs are not supported when collecting multiple functions "
-                             "as we don"t know which function they apply to.")
+                             "as we don't know which function they apply to.")
 
         if type(on) == dict:
             cols = []
@@ -598,8 +598,6 @@ class Cohort(Collection):
         cache_name = self.cache_names["polyphen"]
         cached_file_name = "polyphen-annotations.csv"
         variants = self._load_single_patient_variants(patient,
-                                                      variant_type=self.variant_type,
-                                                      merge_type=self.merge_type,
                                                       filter_fn=None)
         if variants is None:
             return None

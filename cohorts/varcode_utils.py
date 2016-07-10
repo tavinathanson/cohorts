@@ -1,4 +1,4 @@
-from varcode import EffectCollection, VariantCollection
+from varcode import EffectCollection, VariantCollection, Variant
 
 class FilterableVariant(object):
     def __init__(self, variant, variant_collection, patient):
@@ -38,7 +38,7 @@ class FilterableNeoantigen(FilterableVariant):
                                    variant_collection=variant_collection,
                                    patient=patient)
 
-class FilterablePolyphenVariant(FilterableVariant):
+class FilterablePolyphen(FilterableVariant):
     def __init__(self, polyphen_row, variant_collection, patient):
         self.polyphen_row = polyphen_row
         def build_variant(row, genome):
