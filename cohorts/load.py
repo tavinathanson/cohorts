@@ -21,7 +21,7 @@ import seaborn as sb
 import json
 import warnings
 
-# pylint doesn't like this line
+# pylint doesn"t like this line
 # pylint: disable=no-name-in-module
 import six.moves.cPickle as pickle
 from types import FunctionType
@@ -104,11 +104,11 @@ class Patient(object):
     indel_vcf_paths : list
         List of paths to indel VCFs for this patient; multple VCFs get merged.
     normal_sample : Sample
-        This patient's normal `Sample`.
+        This patient"s normal `Sample`.
     tumor_sample: Sample
-        This patient's tumor `Sample`.
+        This patient"s tumor `Sample`.
     hla_alleles : list
-        A list of this patient's HLA class I alleles.
+        A list of this patient"s HLA class I alleles.
     additional_data : dict
         A dictionary of additional data: name of datum mapping to value.
     """
@@ -151,7 +151,7 @@ class Patient(object):
         if self.progressed_or_deceased is None:
             self.progressed_or_deceased = self.progressed or self.deceased
 
-        # If we have both of these, ensure that they're in sync
+        # If we have both of these, ensure that they"re in sync
         if self.progressed_or_deceased is not None and self.progressed is not None:
             assert self.progressed_or_deceased == self.progressed or self.deceased, (
                     "progressed_or_deceased should equal progressed || deceased")
@@ -209,10 +209,10 @@ class Cohort(Collection):
     responder_pfs_equals_os : bool
         Ensure that the PFS values for responders (not progressed) are equal to
         OS values.
-    variant_type : {'snv', 'indel'}, optional
-        Load variants of a specific type, default 'snv'
-    merge_type : {'union', 'intersection'}, optional
-        Use this method to merge multiple variant sets for a single patient, default 'union'
+    variant_type : {"snv", "indel"}, optional
+        Load variants of a specific type, default "snv"
+    merge_type : {"union", "intersection"}, optional
+        Use this method to merge multiple variant sets for a single patient, default "union"
     """
     def __init__(self,
                  patients,
@@ -230,7 +230,7 @@ class Cohort(Collection):
         Collection.__init__(
             self,
             elements=patients)
-        # TODO: Patients shouldn't actually need to reference their cohorts; remove
+        # TODO: Patients shouldn"t actually need to reference their cohorts; remove
         # this when possible.
         for patient in patients:
             patient.cohort = self
@@ -300,7 +300,7 @@ class Cohort(Collection):
         patient_rows = []
         for patient in self:
             row = {} if patient.additional_data is None else patient.additional_data.copy()
-            row['patient_id'] = patient.id
+            row["patient_id"] = patient.id
             for clinical_col in ["benefit", "os", "pfs", "deceased",
                                 "progressed", "progressed_or_deceased"]:
                 row[clinical_col] = getattr(patient, clinical_col)
@@ -320,7 +320,7 @@ class Cohort(Collection):
                 df_loader.name,
                 old_len_df,
                 len(df)))
-        self.dataframe_hash = hash(str(df.sort_values('patient_id')))
+        self.dataframe_hash = hash(str(df.sort_values("patient_id")))
         return df
 
     def as_dataframe(self, on=None, col=None, join_with=None, join_how=None, **kwargs):
@@ -381,11 +381,11 @@ class Cohort(Collection):
         if type(on) == FunctionType:
             return apply_func(on, col, df)
 
-        # For multiple functions, don't allow kwargs since we won't know which functions
+        # For multiple functions, don"t allow kwargs since we won"t know which functions
         # they apply to.
         if len(kwargs) > 0:
             raise ValueError("kwargs are not supported when collecting multiple functions "
-                             "as we don't know which function they apply to.")
+                             "as we don"t know which function they apply to.")
 
         if type(on) == dict:
             cols = []
@@ -571,7 +571,7 @@ class Cohort(Collection):
         ----------
         database_file : string, sqlite
             Path to the WHESS/Polyphen2 SQLite database.
-            Can be downloaded and bunzip2'ed from http://bit.ly/208mlIU
+            Can be downloaded and bunzip2"ed from http://bit.ly/208mlIU
         filter_fn : function
             Takes a FilterablePolyphen and returns a boolean.
             Only annotations returning True are preserved. Defaults to
@@ -704,7 +704,7 @@ class Cohort(Collection):
         Parameters
         ----------
         filter_ok : bool, optional
-            If true, filter Cufflinks data to row with FPKM_status == 'OK'
+            If true, filter Cufflinks data to row with FPKM_status == "OK"
 
         Returns
         -------
@@ -726,12 +726,12 @@ class Cohort(Collection):
         ----------
         patient : Patient
         filter_ok : bool, optional
-            If true, filter Cufflinks data to row with FPKM_status == 'OK'
+            If true, filter Cufflinks data to row with FPKM_status == "OK"
 
         Returns
         -------
         cufflinks_data: Pandas dataframe
-            Pandas dataframe of sample's Cufflinks data
+            Pandas dataframe of sample"s Cufflinks data
             columns include patient_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
         """
         data = pd.read_csv(patient.tumor_sample.cufflinks_path, sep="\t")
@@ -791,7 +791,7 @@ class Cohort(Collection):
             variants=variants,
             samfile=rna_bam_file,
             protein_sequence_length=protein_sequence_length,
-            min_reads_supporting_rna_sequence=3, # Per Alex R.'s suggestion
+            min_reads_supporting_rna_sequence=3, # Per Alex R."s suggestion
             min_transcript_prefix_length=MIN_TRANSCRIPT_PREFIX_LENGTH,
             max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
             max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
@@ -847,7 +847,7 @@ class Cohort(Collection):
             # Store chr/pos/ref/alt in the cached DataFrame so we can filter based on
             # the variant later.
             for variant_column in ["chr", "pos", "ref", "alt"]:
-                # Be consistent with Topiary's output of "start" rather than "pos".
+                # Be consistent with Topiary"s output of "start" rather than "pos".
                 # Isovar, on the other hand, outputs "pos".
                 # See https://github.com/hammerlab/topiary/blob/5c12bab3d47bd86d396b079294aff141265f8b41/topiary/converters.py#L50
                 df_column = "start" if variant_column == "pos" else variant_column
@@ -878,8 +878,8 @@ class Cohort(Collection):
         Mostly replicates topiary.build_epitope_collection_from_binding_predictions
 
         Note: topiary needs to do fancy stuff like subsequence_protein_offset + binding_prediction.offset
-        in order to figure out whether a variant is in the peptide because it only has the variant's
-        offset into the full protein; but isovar gives us the variant's offset into the protein subsequence
+        in order to figure out whether a variant is in the peptide because it only has the variant"s
+        offset into the full protein; but isovar gives us the variant"s offset into the protein subsequence
         (dictated by protein_sequence_length); so all we need to do is map that onto the smaller 8-11mer
         peptides generated by mhctools.
         """
@@ -940,7 +940,7 @@ class Cohort(Collection):
         df = filter_not_null(df, "benefit")
         df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
-        return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples, ax=ax)
+        return roc_curve_plot(df, plot_col, "benefit", bootstrap_samples, ax=ax)
 
     def plot_benefit(self, on, col=None, benefit_col="benefit", ax=None,
                      mw_alternative="two-sided", **kwargs):
@@ -959,7 +959,7 @@ class Cohort(Collection):
         `on` or `col`.
 
         If the variable (through `on` or `col` is binary) this will compare
-        odds-ratios and perform a Fisher's exact test.
+        odds-ratios and perform a Fisher"s exact test.
 
         If the variable is numeric, this will compare the distributions through
         a Mann-Whitney test and plot the distributions with box-strip plot
@@ -1005,9 +1005,9 @@ class Cohort(Collection):
             See `cohort.load.as_dataframe`
         col : str, optional
             If specified, store the result of `on`. See `cohort.load.as_dataframe`
-        how : {'os', 'pfs'}, optional
+        how : {"os", "pfs"}, optional
             Whether to plot OS (overall survival) or PFS (progression free survival)
-        threshold : int or 'median', optional
+        threshold : int or "median", optional
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
@@ -1025,7 +1025,6 @@ class Cohort(Collection):
             survival_col=how,
             threshold=threshold if threshold is not None else default_threshold,
             ax=ax)
-
         return results
 
     def plot_joint(self, on, on_two=None, **kwargs):
@@ -1055,32 +1054,34 @@ class Cohort(Collection):
         return(results)
 
     def summarize_provenance_per_cache(self):
-        """ Utility function to summarize provenance files for cached items used by a Cohort, for each cache_dir that exists.
-            Only existing cache_dirs are summarized. 
+        """Utility function to summarize provenance files for cached items used by a Cohort,
+        for each cache_dir that exists. Only existing cache_dirs are summarized.
 
-            This is a summary of provenance files because the function checks to see whether all patients data have 
-            the same provenance within the cache dir. The function assumes that it will be desireable to have all patients
-            data generated using the same environment, for each cache type.
+        This is a summary of provenance files because the function checks to see whether all
+        patients data have the same provenance within the cache dir. The function assumes
+        that it will be desireable to have all patients data generated using the same
+        environment, for each cache type.
 
-            At the moment, most PROVENANCE files contain details about packages used to generate the cached data file. However, this 
-            function is generic & so it summarizes the contents of those files irrespective of their contents.
-            
-            Returns
-            ----------
+        At the moment, most PROVENANCE files contain details about packages used to generat
+        e the cached data file. However, this function is generic & so it summarizes the
+        contents of those files irrespective of their contents.
 
-            Dict containing summarized provenance for each existing cache_dir, after checking to see that 
-            provenance files are identical among all patients in the data frame for that cache_dir.
+        Returns
+        ----------
+        Dict containing summarized provenance for each existing cache_dir, after checking
+        to see that provenance files are identical among all patients in the data frame for
+        that cache_dir.
 
-            If conflicting PROVENANCE files are discovered within a cache-dir:
-                - a warning is generated, describing the conflict
-                - and, a value of `None` is returned in the dictionary for that cache-dir
+        If conflicting PROVENANCE files are discovered within a cache-dir:
+         - a warning is generated, describing the conflict
+         - and, a value of `None` is returned in the dictionary for that cache-dir
 
-            See also
-            -----------
-            
-            * `?cohorts.Cohort.summarize_provenance` which summarizes provenance files among cache_dirs.
-            * `?cohorts.Cohort.summarize_dataframe` which hashes/summarizes contents of the data frame for this cohort
-
+        See also
+        -----------
+        * `?cohorts.Cohort.summarize_provenance` which summarizes provenance files among
+        cache_dirs.
+        * `?cohorts.Cohort.summarize_dataframe` which hashes/summarizes contents of the data
+        frame for this cohort.
         """
         provenance_summary = {}
         df = self.as_dataframe()
@@ -1106,36 +1107,36 @@ class Cohort(Collection):
                 else:
                     provenance_summary[cache_name] = None
         return(provenance_summary)
-    
+
     def summarize_dataframe(self):
-        """ Summarize default dataframe for this cohort using a hash function. 
-            Useful for confirming the version of data used in various reports, e.g. ipynbs
+        """Summarize default dataframe for this cohort using a hash function.
+        Useful for confirming the version of data used in various reports, e.g. ipynbs
         """
         if self.dataframe_hash:
             return(self.dataframe_hash)
         else:
             df = self._as_dataframe_unmodified()
             return(self.dataframe_hash)
-    
+
     def summarize_provenance(self):
-        """ Utility function to summarize provenance files for cached items used by a Cohort. 
+        """Utility function to summarize provenance files for cached items used by a Cohort.
 
-            At the moment, most PROVENANCE files contain details about packages used to generate files. However, this 
-            function is generic & so it summarizes the contents of those files irrespective of their contents.
-            
-            Returns
-            ----------
-            
-            Dict containing summary of provenance items, among all cache dirs used by the Cohort. 
+        At the moment, most PROVENANCE files contain details about packages used to
+        generate files. However, this function is generic & so it summarizes the contents
+        of those files irrespective of their contents.
 
-            IE if all provenances are identical across all cache dirs, then a single set of provenances is returned. 
-            Otherwise, if all provenances are not identical, the provenance items per cache_dir are returned.
+        Returns
+        ----------
+        Dict containing summary of provenance items, among all cache dirs used by the Cohort.
 
-            See also
-            ----------
-            
-            `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance for each existing cache_dir.
+        IE if all provenances are identical across all cache dirs, then a single set of
+        provenances is returned. Otherwise, if all provenances are not identical, the provenance
+        items per cache_dir are returned.
 
+        See also
+        ----------
+        `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance
+        for each existing cache_dir.
         """
         provenance_per_cache = self.summarize_provenance_per_cache()
         summary_provenance = None
@@ -1151,36 +1152,33 @@ class Cohort(Collection):
                 summary_provenance,
                 left_outer_diff = "In %s but not in %s" % (cache, summary_provenance_name),
                 right_outer_diff = "In %s but not in %s" % (summary_provenance_name, cache)
-                )
+            )
         ## compare provenance across cached items
         if num_discrepant == 0:
             prov = summary_provenance ## report summary provenance if exists
         else:
             prov = provenance_per_cache ## otherwise, return provenance per cache
         return(prov)
-    
+
     def summarize_data_sources(self):
-        """ Utility function to summarize data source status for this Cohort, useful for confirming
-            the state of data used for an analysis
+        """Utility function to summarize data source status for this Cohort, useful for confirming
+        the state of data used for an analysis
 
-            Returns
-            ----------
-            Dictionary with summary of data sources
+        Returns
+        ----------
+        Dictionary with summary of data sources
 
-            Currently contains
-
-            - dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
-            - provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
+        Currently contains
+        - dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
+        - provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
         """
         provenance_file_summary = self.summarize_provenance()
         dataframe_hash = self.summarize_dataframe()
         results = {
-            'provenance_file_summary': provenance_file_summary,
-            'dataframe_hash': dataframe_hash
-            }
+            "provenance_file_summary": provenance_file_summary,
+            "dataframe_hash": dataframe_hash
+        }
         return(results)
-        
-
 
 def first_not_none_param(params, default):
     """
@@ -1201,34 +1199,29 @@ def filter_not_null(df, col):
     return df
 
 def _provenance_str(provenance):
-    """ utility function used by compare_provenance to print diff
+    """Utility function used by compare_provenance to print diff
     """
     return ["%s==%s" % (key, value) for (key, value) in provenance]
-
 
 def compare_provenance(
         this_provenance, other_provenance,
         left_outer_diff = "In current but not comparison",
-        right_outer_diff = "In comparison but not current"
-        ):
-    """ utility function to compare two abritrary provenance dicts
-        returns number of discrepancies.
+        right_outer_diff = "In comparison but not current"):
+    """Utility function to compare two abritrary provenance dicts
+    returns number of discrepancies.
 
-        Parameters
-        ----------
+    Parameters
+    ----------
+    this_provenance: provenance dict (to be compared to "other_provenance")
+    other_provenance: comparison provenance dict
 
-        this_provenance: provenance dict (to be compared to "other_provenance")
-        other_provenance: comparison provenance dict
+    (optional)
+    left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
+    right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
 
-        (optional)
-        left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
-        right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
-
-        Returns
-        -----------
-
-        Number of discrepancies (0: None)
-
+    Returns
+    -----------
+    Number of discrepancies (0: None)
     """
     this_items = set(this_provenance.items())
     other_items = set(other_provenance.items())
@@ -1248,6 +1241,6 @@ def compare_provenance(
 
     if len(warn_str) > 0:
         warnings.warn(warn_str, Warning)
-    
+
     return(len(new_diff)+len(old_diff))
 
