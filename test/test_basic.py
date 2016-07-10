@@ -36,7 +36,7 @@ def make_simple_clinical_dataframe(
                          "deceased": [True, False, False] if deceased_list is None else deceased_list,
                          "progressed_or_deceased": [True, True, False] if progressed_or_deceased_list is None else progressed_or_deceased_list})
 
-def make_simple_cohort(**kwargs):
+def make_simple_cohort(merge_type="union", **kwargs):
     clinical_dataframe = make_simple_clinical_dataframe(**kwargs)
     patients = []
     for i, row in clinical_dataframe.iterrows():
@@ -52,6 +52,7 @@ def make_simple_cohort(**kwargs):
     return Cohort(
         patients=patients,
         responder_pfs_equals_os=True,
+        merge_type=merge_type,
         cache_dir=generated_data_path("cache"))
 
 def test_pfs_equal_to_os():

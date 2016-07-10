@@ -251,6 +251,8 @@ class Cohort(Collection):
         self.variant_type = variant_type
         self.merge_type = merge_type
 
+        assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
+
         self.verify_id_uniqueness()
         self.verify_survival()
         self.dataframe_hash = None
@@ -498,7 +500,6 @@ class Cohort(Collection):
         merged_variants
             Dictionary of patient_id to VariantCollection
         """
-        assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
@@ -516,7 +517,7 @@ class Cohort(Collection):
                 return filter_variants(variant_collection=cached,
                                        patient=patient,
                                        filter_fn=filter_fn)
-            vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
+            vcf_paths = patient.snv_vcf_paths if self.variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
                 (vcf_path, varcode.load_vcf_fast(vcf_path))
                 for vcf_path in vcf_paths
@@ -802,8 +803,7 @@ class Cohort(Collection):
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
         cached_file_name = "%s-%s-neoantigens.csv" % (self.variant_type, self.merge_type)
-        variants = self._load_single_patient_variants(
-            patient, only_expressed=False, filter_fn=None)
+        variants = self._load_single_patient_variants(patient, filter_fn=None)
         if variants is None:
             return None
 

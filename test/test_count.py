@@ -29,8 +29,8 @@ FILE_FORMAT_1 = "patient_format1_%s.vcf"
 FILE_FORMAT_2 = "patient_format2_%s.vcf"
 FILE_FORMAT_3 = "patient_format3_%s.vcf"
 
-def make_cohort(file_formats):
-    cohort = make_simple_cohort()
+def make_cohort(file_formats, merge_type="union"):
+    cohort = make_simple_cohort(merge_type=merge_type)
     patient_ids = [patient.id for patient in cohort]
     vcf_dir = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [3, 3, 6])),
                             file_format=FILE_FORMAT_1,
@@ -80,7 +80,8 @@ def test_merge_three():
     vcf_dir, cohort = None, None
     try:
         # Use all three VCF sources
-        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2, FILE_FORMAT_3])
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2, FILE_FORMAT_3],
+                                      merge_type="union")
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
         # [5, 2, 3] uses a separate template, resulting in a union of [4, 3, 6] + [5, 2, 3] = [9, 5, 9] unique variants
@@ -89,7 +90,9 @@ def test_merge_three():
         eq_(list(df[count_col]), [9, 5, 9])
 
         # For intersection, variants need to appear in *all*, here. None of them do.
-        count_col, df = cohort.as_dataframe(snv_count, merge_type="intersection")
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2, FILE_FORMAT_3],
+                                      merge_type="intersection")
+        count_col, df = cohort.as_dataframe(snv_count)
         eq_(list(df[count_col]), [0, 0, 0])
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
@@ -104,7 +107,8 @@ def test_merge_two():
     vcf_dir, cohort = None, None
     try:
         # Now, with only two VCF sources
-        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2])
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2],
+                                      merge_type="union")
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
         count_col, df = cohort.as_dataframe(snv_count)
@@ -112,11 +116,13 @@ def test_merge_two():
         eq_(list(df[count_col]), [4, 3, 6])
 
         # For intersection, some variants do appear in both.
-        count_col, df = cohort.as_dataframe(snv_count, merge_type="intersection")
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2],
+                                      merge_type="intersection")
+        count_col, df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
         eq_(list(df[count_col]), [3, 1, 5])
 
-        cohort_variants = cohort.load_variants(merge_type="intersection", filter_fn=None)
+        cohort_variants = cohort.load_variants(filter_fn=None)
         for (sample, variants) in cohort_variants.items():
             for variant in variants:
                 metadata = variants.metadata[variant]
@@ -133,10 +139,11 @@ def test_filter_variants():
     try:
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2])
 
-        def filter_g_variants(variant, metadata): return variant.ref == 'G'
+        def filter_g_variants(filterable_variant):
+            return filterable_variant.variant.ref == 'G'
         g_variants = {'1': 2, '4': 1, '5': 3}
 
-        cohort_variants = cohort.load_variants(merge_type="union", filter_fn=filter_g_variants)
+        cohort_variants = cohort.load_variants(filter_fn=filter_g_variants)
 
         for (sample, variants) in cohort_variants.items():
             eq_(len(variants), g_variants[sample])
@@ -152,17 +159,19 @@ def test_filter_effects():
     try:
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
 
-        def filter_substitution_effects(effect, metadata): return type(effect) == Substitution
+        def filter_substitution_effects(filterable_effect):
+            return type(filterable_effect.effect) == Substitution
         missense_counts = {'1': 2, '4': 2, '5': 4}
 
-        cohort_effects = cohort.load_effects(only_nonsynonymous=True, merge_type="union", filter_fn=filter_substitution_effects)
+        cohort_effects = cohort.load_effects(only_nonsynonymous=True, filter_fn=filter_substitution_effects)
         for (sample, effects) in cohort_effects.items():
             eq_(len(effects), missense_counts[sample])
 
-        def filter_exonic_splice_site_effects(effect, metadata): return type(effect) == ExonicSpliceSite
+        def filter_exonic_splice_site_effects(filterable_effect):
+            return type(filterable_effect.effect) == ExonicSpliceSite
         splice_site_counts = {'1': 1, '4': 1, '5': 2}
 
-        cohort_effects = cohort.load_effects(only_nonsynonymous=True, merge_type="union", filter_fn=filter_exonic_splice_site_effects)
+        cohort_effects = cohort.load_effects(only_nonsynonymous=True, filter_fn=filter_exonic_splice_site_effects)
         for (sample, effects) in cohort_effects.items():
             eq_(len(effects), splice_site_counts[sample])
 
