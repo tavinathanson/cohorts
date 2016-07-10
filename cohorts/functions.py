@@ -86,10 +86,10 @@ def neoantigen_count(row, cohort, filter_fn=neoantigen_qc_filter,
     return np.nan
 
 def expressed_missense_snv_count(row, cohort, filter_fn=effect_qc_filter, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
+    def expressed_filter_fn(filterable_effect):
         if filter_fn is not None:
             return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-        return filter_fn
+        return effect_expressed_filter(filterable_effect)
     return missense_snv_count(row, cohort, filter_fn=expressed_filter_fn, **kwargs)
 
 def expressed_neoantigen_count(row, cohort, **kwargs):
