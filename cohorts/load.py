@@ -205,6 +205,9 @@ class Cohort(Collection):
         The name of one or more `DataFrameLoader`s to join with by default.
     join_how : str
         What type of default join to use for joining `DataFrameLoader`s.
+    responder_pfs_equals_os : bool
+        Ensure that the PFS values for responders (not progressed) are equal to
+        OS values.
     """
     def __init__(self,
                  patients,
@@ -213,9 +216,10 @@ class Cohort(Collection):
                  extra_df_loaders=[],
                  join_with=None,
                  join_how="inner",
+                 responder_pfs_equals_os=True,
                  check_provenance=False,
                  polyphen_dump_path=None,
-                 pageant_coverage_path=None):
+                 pageant_coverage_path=None,):
         Collection.__init__(
             self,
             elements=patients)
@@ -229,6 +233,7 @@ class Cohort(Collection):
         self.df_loaders = df_loaders
         self.join_with = join_with
         self.join_how = join_how
+        self.responder_pfs_equals_os = responder_pfs_equals_os
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
@@ -262,7 +267,8 @@ class Cohort(Collection):
                     raise InvalidDataError(
                         "A patient did not progress despite PFS being less than OS. "
                         "Full row: %s" % row)
-        cohort_dataframe.apply(func, axis=1)
+        if self.responder_pfs_equals_os:
+            cohort_dataframe.apply(func, axis=1)
 
     def _as_dataframe_unmodified(self, join_with = None, join_how = None):
         # Use join_with if specified, otherwise fall back to what is defined in the class
