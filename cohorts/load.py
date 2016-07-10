@@ -21,7 +21,7 @@ import seaborn as sb
 import json
 import warnings
 
-# pylint doesn"t like this line
+# pylint doesn't like this line
 # pylint: disable=no-name-in-module
 import six.moves.cPickle as pickle
 from types import FunctionType
@@ -104,11 +104,11 @@ class Patient(object):
     indel_vcf_paths : list
         List of paths to indel VCFs for this patient; multple VCFs get merged.
     normal_sample : Sample
-        This patient"s normal `Sample`.
+        This patient's normal `Sample`.
     tumor_sample: Sample
-        This patient"s tumor `Sample`.
+        This patient's tumor `Sample`.
     hla_alleles : list
-        A list of this patient"s HLA class I alleles.
+        A list of this patient's HLA class I alleles.
     additional_data : dict
         A dictionary of additional data: name of datum mapping to value.
     """
@@ -141,6 +141,9 @@ class Patient(object):
         self.tumor_sample = tumor_sample
         self.hla_alleles = hla_alleles
         self.additional_data = additional_data
+
+        # TODO: This can be removed once all patient-specific functions are
+        # removed from Cohort.
         self.cohort = cohort
 
         self.add_progressed_or_deceased()
@@ -151,7 +154,7 @@ class Patient(object):
         if self.progressed_or_deceased is None:
             self.progressed_or_deceased = self.progressed or self.deceased
 
-        # If we have both of these, ensure that they"re in sync
+        # If we have both of these, ensure that they're in sync
         if self.progressed_or_deceased is not None and self.progressed is not None:
             assert self.progressed_or_deceased == self.progressed or self.deceased, (
                     "progressed_or_deceased should equal progressed || deceased")
@@ -230,8 +233,8 @@ class Cohort(Collection):
         Collection.__init__(
             self,
             elements=patients)
-        # TODO: Patients shouldn"t actually need to reference their cohorts; remove
-        # this when possible.
+        # TODO: Patients shouldn't actually need to reference their Cohort; remove
+        # this when patient-specific functions all live in Patient.
         for patient in patients:
             patient.cohort = self
         self.cache_dir = cache_dir
@@ -381,7 +384,7 @@ class Cohort(Collection):
         if type(on) == FunctionType:
             return apply_func(on, col, df)
 
-        # For multiple functions, don"t allow kwargs since we won"t know which functions
+        # For multiple functions, don't allow kwargs since we won"t know which functions
         # they apply to.
         if len(kwargs) > 0:
             raise ValueError("kwargs are not supported when collecting multiple functions "
@@ -729,7 +732,7 @@ class Cohort(Collection):
         Returns
         -------
         cufflinks_data: Pandas dataframe
-            Pandas dataframe of sample"s Cufflinks data
+            Pandas dataframe of sample's Cufflinks data
             columns include patient_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
         """
         data = pd.read_csv(patient.tumor_sample.cufflinks_path, sep="\t")
@@ -757,45 +760,6 @@ class Cohort(Collection):
             if df_epitopes is not None:
                 dfs[patient.id] = df_epitopes
         return dfs
-
-    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
-        # TODO: different epitope lengths, and other parameters, should result in
-        # different caches
-        isovar_cached_file_name = "%s-%s-isovar.csv" % (self.variant_type, self.merge_type)
-        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
-        if df_isovar is not None:
-            return df_isovar
-
-        import logging
-        logging.disable(logging.INFO)
-        if patient.tumor_sample is None:
-            raise ValueError("Patient %s has no tumor sample" % patient.id)
-        if patient.tumor_sample.bam_path_rna is None:
-            raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
-        rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
-        from isovar.default_parameters import (
-            MIN_TRANSCRIPT_PREFIX_LENGTH,
-            MAX_REFERENCE_TRANSCRIPT_MISMATCHES
-        )
-
-        # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
-        # sequence length: (max peptide length * 2) - 1
-        # Example:
-        # 123456789AB
-        #           123456789AB
-        # AAAAAAAAAAVAAAAAAAAAA
-        protein_sequence_length = (max(epitope_lengths) * 2) - 1
-        df_isovar = variants_to_protein_sequences_dataframe(
-            variants=variants,
-            samfile=rna_bam_file,
-            protein_sequence_length=protein_sequence_length,
-            min_reads_supporting_rna_sequence=3, # Per Alex R."s suggestion
-            min_transcript_prefix_length=MIN_TRANSCRIPT_PREFIX_LENGTH,
-            max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
-            max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
-            min_mapping_quality=1)
-        self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
-        return df_isovar
 
     def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
                                          ic50_cutoff, process_limit, max_file_records,
@@ -845,7 +809,7 @@ class Cohort(Collection):
             # Store chr/pos/ref/alt in the cached DataFrame so we can filter based on
             # the variant later.
             for variant_column in ["chr", "pos", "ref", "alt"]:
-                # Be consistent with Topiary"s output of "start" rather than "pos".
+                # Be consistent with Topiary's output of "start" rather than "pos".
                 # Isovar, on the other hand, outputs "pos".
                 # See https://github.com/hammerlab/topiary/blob/5c12bab3d47bd86d396b079294aff141265f8b41/topiary/converters.py#L50
                 df_column = "start" if variant_column == "pos" else variant_column
@@ -876,8 +840,8 @@ class Cohort(Collection):
         Mostly replicates topiary.build_epitope_collection_from_binding_predictions
 
         Note: topiary needs to do fancy stuff like subsequence_protein_offset + binding_prediction.offset
-        in order to figure out whether a variant is in the peptide because it only has the variant"s
-        offset into the full protein; but isovar gives us the variant"s offset into the protein subsequence
+        in order to figure out whether a variant is in the peptide because it only has the variant's
+        offset into the full protein; but isovar gives us the variant's offset into the protein subsequence
         (dictated by protein_sequence_length); so all we need to do is map that onto the smaller 8-11mer
         peptides generated by mhctools.
         """
@@ -894,6 +858,45 @@ class Cohort(Collection):
             if is_mutant and binding_prediction.value <= ic50_cutoff:
                 mutant_binding_predictions.append(binding_prediction)
         return EpitopeCollection(mutant_binding_predictions)
+
+    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        # TODO: different epitope lengths, and other parameters, should result in
+        # different caches
+        isovar_cached_file_name = "%s-%s-isovar.csv" % (self.variant_type, self.merge_type)
+        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+        if df_isovar is not None:
+            return df_isovar
+
+        import logging
+        logging.disable(logging.INFO)
+        if patient.tumor_sample is None:
+            raise ValueError("Patient %s has no tumor sample" % patient.id)
+        if patient.tumor_sample.bam_path_rna is None:
+            raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
+        rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
+        from isovar.default_parameters import (
+            MIN_TRANSCRIPT_PREFIX_LENGTH,
+            MAX_REFERENCE_TRANSCRIPT_MISMATCHES
+        )
+
+        # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
+        # sequence length: (max peptide length * 2) - 1
+        # Example:
+        # 123456789AB
+        #           123456789AB
+        # AAAAAAAAAAVAAAAAAAAAA
+        protein_sequence_length = (max(epitope_lengths) * 2) - 1
+        df_isovar = variants_to_protein_sequences_dataframe(
+            variants=variants,
+            samfile=rna_bam_file,
+            protein_sequence_length=protein_sequence_length,
+            min_reads_supporting_rna_sequence=3, # Per Alex R.'s suggestion
+            min_transcript_prefix_length=MIN_TRANSCRIPT_PREFIX_LENGTH,
+            max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
+            max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
+            min_mapping_quality=1)
+        self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+        return df_isovar
 
     def load_ensembl_coverage(self, min_depth=30):
         if self.pageant_coverage_path is None:
@@ -957,7 +960,7 @@ class Cohort(Collection):
         `on` or `col`.
 
         If the variable (through `on` or `col` is binary) this will compare
-        odds-ratios and perform a Fisher"s exact test.
+        odds-ratios and perform a Fisher's exact test.
 
         If the variable is numeric, this will compare the distributions through
         a Mann-Whitney test and plot the distributions with box-strip plot
