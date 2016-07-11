@@ -53,15 +53,6 @@ def variant_qc_filter(filterable_variant,
 
     return True
 
-def effect_qc_filter(filterable_effect, **kwargs):
-    return variant_qc_filter(filterable_effect, **kwargs)
-
-def neoantigen_qc_filter(filterable_neoantigen, **kwargs):
-    return variant_qc_filter(filterable_neoantigen, **kwargs)
-
-def polyphen_qc_filter(filterable_polyphen, **kwargs):
-    return variant_qc_filter(filterable_polyphen, **kwargs)
-
 @memoize
 def expressed_variant_set(patient, variant_collection):
     # TODO: we're currently using the same isovar cache that we use for expressed

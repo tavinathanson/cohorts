@@ -14,8 +14,7 @@
 
 from __future__ import print_function
 
-from .variant_filters import (variant_qc_filter, effect_qc_filter, neoantigen_qc_filter,
-                              effect_expressed_filter)
+from .variant_filters import variant_qc_filter,effect_expressed_filter
 
 import numpy as np
 from varcode.effects import Substitution
@@ -35,7 +34,7 @@ def snv_count(row, cohort, filter_fn=variant_qc_filter,
         return count
     return np.nan
 
-def nonsynonymous_snv_count(row, cohort, filter_fn=effect_qc_filter,
+def nonsynonymous_snv_count(row, cohort, filter_fn=variant_qc_filter,
                             normalized_per_mb=True, **kwargs):
     patient_id = row["patient_id"]
     patient_nonsynonymous_effects = cohort.load_effects(
@@ -50,7 +49,7 @@ def nonsynonymous_snv_count(row, cohort, filter_fn=effect_qc_filter,
         return count
     return np.nan
 
-def missense_snv_count(row, cohort, filter_fn=effect_qc_filter,
+def missense_snv_count(row, cohort, filter_fn=variant_qc_filter,
                        normalized_per_mb=True, **kwargs):
     patient_id = row["patient_id"]
     def missense_filter_fn(filterable_effect):
@@ -70,7 +69,7 @@ def missense_snv_count(row, cohort, filter_fn=effect_qc_filter,
         return count
     return np.nan
 
-def neoantigen_count(row, cohort, filter_fn=neoantigen_qc_filter,
+def neoantigen_count(row, cohort, filter_fn=variant_qc_filter,
                      normalized_per_mb=True, **kwargs):
     patient_id = row["patient_id"]
     patient = cohort.patient_from_id(row["patient_id"])
@@ -85,7 +84,7 @@ def neoantigen_count(row, cohort, filter_fn=neoantigen_qc_filter,
         return count
     return np.nan
 
-def expressed_missense_snv_count(row, cohort, filter_fn=effect_qc_filter, **kwargs):
+def expressed_missense_snv_count(row, cohort, filter_fn=variant_qc_filter, **kwargs):
     def expressed_filter_fn(filterable_effect):
         if filter_fn is not None:
             return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
