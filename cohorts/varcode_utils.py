@@ -1,5 +1,8 @@
 from varcode import EffectCollection, VariantCollection, Variant
 
+def genome(variant_collection):
+    return variant_collection[0].ensembl
+
 class FilterableVariant(object):
     def __init__(self, variant, variant_collection, patient):
         self.variant = variant
@@ -12,7 +15,7 @@ class FilterableVariant(object):
 
     @property
     def genome(self):
-        return self.variant_collection[0].ensembl
+        return genome(self.variant_collection)
 
 class FilterableEffect(FilterableVariant):
     def __init__(self, effect, variant_collection, patient):
@@ -32,7 +35,7 @@ class FilterableNeoantigen(FilterableVariant):
                 alt=row["alt"],
                 start=row["start"],
                 ensembl=genome)
-        variant = build_variant(neoantigen_row, self.genome)
+        variant = build_variant(neoantigen_row, genome(variant_collection))
         FilterableVariant.__init__(self,
                                    variant=variant,
                                    variant_collection=variant_collection,
@@ -48,7 +51,7 @@ class FilterablePolyphen(FilterableVariant):
                 alt=row["alt"],
                 start=row["pos"],
                 ensembl=genome)
-        variant = build_variant(polyphen_row, self.genome)
+        variant = build_variant(polyphen_row, genome(variant_collection))
         FilterableVariant.__init__(self,
                                    variant=variant,
                                    variant_collection=variant_collection,
