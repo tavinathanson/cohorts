@@ -51,6 +51,7 @@ def make_simple_cohort(**kwargs):
 
     return Cohort(
         patients=patients,
+        responder_pfs_equals_os=True,
         cache_dir=generated_data_path("cache"))
 
 def test_pfs_equal_to_os():
