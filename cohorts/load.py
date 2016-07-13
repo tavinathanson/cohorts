@@ -216,7 +216,7 @@ class Cohort(Collection):
                  extra_df_loaders=[],
                  join_with=None,
                  join_how="inner",
-                 responder_pfs_equals_os=True,
+                 responder_pfs_equals_os=False,
                  check_provenance=False,
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,):
