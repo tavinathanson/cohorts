@@ -488,7 +488,7 @@ class Cohort(Collection):
                 return patient
         raise ValueError("No patient with ID %s found" % id)
 
-    def load_variants(self, patients=None, filter_fn=variant_qc_filter):
+    def load_variants(self, patients=None, filter_fn=None):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
         Parameters
@@ -567,7 +567,7 @@ class Cohort(Collection):
         return merged_variants
 
     def load_polyphen_annotations(self, as_dataframe=False,
-                                  filter_fn=variant_qc_filter):
+                                  filter_fn=None):
         """Load a dataframe containing polyphen2 annotations for all variants
 
         Parameters
@@ -645,7 +645,7 @@ class Cohort(Collection):
                                filter_fn=filter_fn)
 
     def load_effects(self, patients=None, only_nonsynonymous=False,
-                     filter_fn=variant_qc_filter):
+                     filter_fn=None):
         """Load a dictionary of patient_id to varcode.EffectCollection
         Parameters
         ----------
@@ -746,7 +746,7 @@ class Cohort(Collection):
     def load_neoantigens(self, patients=None, only_expressed=False,
                          epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
                          process_limit=10, max_file_records=None,
-                         filter_fn=variant_qc_filter):
+                         filter_fn=None):
         dfs = {}
         for patient in self.iter_patients(patients):
             df_epitopes = self._load_single_patient_neoantigens(
