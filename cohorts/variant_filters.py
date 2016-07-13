@@ -16,49 +16,70 @@ from .variant_stats import variant_stats_from_variant
 
 import numpy as np
 from varcode import Substitution, Variant
+from varcode.common import memoize
 import re
 import pandas as pd
 from os import path
 
-def variant_qc_filter(variant, variant_metadata):
-    somatic_stats = variant_stats_from_variant(variant, variant_metadata)
+DEFAULT_MIN_TUMOR_DEPTH = 30
+DEFAULT_MIN_NORMAL_DEPTH = 30
+DEFAULT_MIN_TUMOR_VAF = 0
+DEFAULT_MAX_NORMAL_VAF = 0.02
+DEFAULT_MIN_TUMOR_ALT_DEPTH = 5
 
-    # Filter variant with depth < 30
-    if somatic_stats.tumor_stats.depth < 30 or somatic_stats.normal_stats.depth < 30:
+def variant_qc_filter(filterable_variant,
+                      min_tumor_depth=DEFAULT_MIN_TUMOR_DEPTH,
+                      min_normal_depth=DEFAULT_MIN_NORMAL_DEPTH,
+                      min_tumor_vaf=DEFAULT_MIN_TUMOR_VAF,
+                      max_normal_vaf=DEFAULT_MAX_NORMAL_VAF,
+                      min_tumor_alt_depth=DEFAULT_MIN_TUMOR_ALT_DEPTH):
+    somatic_stats = variant_stats_from_variant(filterable_variant.variant,
+                                               filterable_variant.variant_metadata)
+
+    # Filter variant with depth < depth
+    if (somatic_stats.tumor_stats.depth < min_tumor_depth or
+        somatic_stats.normal_stats.depth < min_normal_depth):
         return False
 
     # Filter based on normal evidence
-    if somatic_stats.normal_stats.variant_allele_frequency > .02:
+    if somatic_stats.normal_stats.variant_allele_frequency > max_normal_vaf:
         return False
 
-    if somatic_stats.tumor_stats.alt_depth < 5:
+    if somatic_stats.tumor_stats.variant_allele_frequency < min_tumor_vaf:
+        return False
+
+    if somatic_stats.tumor_stats.alt_depth < min_tumor_alt_depth:
         return False
 
     return True
 
-def effect_qc_filter(effect, variant_metadata):
-    return variant_qc_filter(effect.variant, variant_metadata)
+@memoize
+def expressed_variant_set(patient, variant_collection):
+    # TODO: we're currently using the same isovar cache that we use for expressed
+    # neoantigen prediction; so we pass in the same epitope lengths.
+    # This is hacky and should be addressed.
+    df_isovar = patient.cohort.load_single_patient_isovar(
+        patient=patient,
+        variants=variant_collection,
+        epitope_lengths=[8, 9, 10, 11])
+    expressed_variant_set = set()
+    for _, row in df_isovar.iterrows():
+        expressed_variant = Variant(contig=row["chr"],
+                          start=row["pos"],
+                          ref=row["ref"],
+                          alt=row["alt"],
+                          ensembl=variant_collection[0].ensembl)
+        expressed_variant_set.add(expressed_variant)
+    return expressed_variant_set
 
-def neoantigen_qc_filter(row, variants):
-    # We need to re-create the Variant object from the neoeantigen DataFrame.
-    # TODO: Just pickle the Neoantigen collection rather than dealing with
-    # DataFrames.
-    genome = variants[0].ensembl
-    variant = Variant(contig=row["chr"],
-                      ref=row["ref"],
-                      alt=row["alt"],
-                      start=row["start"],
-                      ensembl=genome)
-    return variant_qc_filter(variant, variants.metadata[variant])
+def variant_expressed_filter(filterable_variant, **kwargs):
+    expressed_variants = expressed_variant_set(
+        patient=filterable_variant.patient,
+        variant_collection=filterable_variant.variant_collection)
+    return filterable_variant.variant in expressed_variants
 
-def polyphen_qc_filter(row, variants):
-    genome = variants[0].ensembl
-    variant = Variant(contig=row["chrom"],
-                      ref=row["ref"],
-                      alt=row["alt"],
-                      start=row["pos"],
-                      ensembl=genome)
-    return variant_qc_filter(variant, variants.metadata[variant])
+def effect_expressed_filter(filterable_effect, **kwargs):
+    return variant_expressed_filter(filterable_effect, **kwargs)
 
 def load_ensembl_coverage(cohort, coverage_path, min_depth=30):
     """

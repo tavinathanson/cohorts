@@ -30,7 +30,7 @@ import vap  ## vcf-annotate-polyphen
 from sqlalchemy import create_engine
 
 import varcode
-from varcode import VariantCollection, EffectCollection
+from varcode import VariantCollection, EffectCollection, Variant
 from mhctools import NetMHCcons, EpitopeCollection
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
@@ -40,10 +40,9 @@ from pysam import AlignmentFile
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
-from .varcode_utils import (filter_variants_with_metadata, filter_effects_with_metadata,
-                            filter_neoantigens_with_metadata, filter_polyphen_with_metadata)
-from .variant_filters import (variant_qc_filter, effect_qc_filter,
-                              neoantigen_qc_filter, polyphen_qc_filter)
+from .varcode_utils import (filter_variants, filter_effects,
+                            filter_neoantigens, filter_polyphen)
+from .variant_filters import variant_qc_filter
 from . import variant_filters
 
 class InvalidDataError(ValueError):
@@ -126,7 +125,8 @@ class Patient(object):
                  normal_sample=None,
                  tumor_sample=None,
                  hla_alleles=None,
-                 additional_data=None):
+                 additional_data=None,
+                 cohort=None):
         require_id_str(id)
         self.id = id
         self.os = os
@@ -141,6 +141,10 @@ class Patient(object):
         self.tumor_sample = tumor_sample
         self.hla_alleles = hla_alleles
         self.additional_data = additional_data
+
+        # TODO: This can be removed once all patient-specific functions are
+        # removed from Cohort.
+        self.cohort = cohort
 
         self.add_progressed_or_deceased()
 
@@ -208,6 +212,10 @@ class Cohort(Collection):
     responder_pfs_equals_os : bool
         Ensure that the PFS values for responders (not progressed) are equal to
         OS values.
+    variant_type : {"snv", "indel"}, optional
+        Load variants of a specific type, default "snv"
+    merge_type : {"union", "intersection"}, optional
+        Use this method to merge multiple variant sets for a single patient, default "union"
     """
     def __init__(self,
                  patients,
@@ -219,10 +227,16 @@ class Cohort(Collection):
                  responder_pfs_equals_os=False,
                  check_provenance=False,
                  polyphen_dump_path=None,
-                 pageant_coverage_path=None,):
+                 pageant_coverage_path=None,
+                 variant_type="snv",
+                 merge_type="union"):
         Collection.__init__(
             self,
             elements=patients)
+        # TODO: Patients shouldn't actually need to reference their Cohort; remove
+        # this when patient-specific functions all live in Patient.
+        for patient in patients:
+            patient.cohort = self
         self.cache_dir = cache_dir
         self.cache_results = cache_results
 
@@ -237,6 +251,10 @@ class Cohort(Collection):
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
+        self.variant_type = variant_type
+        self.merge_type = merge_type
+
+        assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -285,7 +303,7 @@ class Cohort(Collection):
         patient_rows = []
         for patient in self:
             row = {} if patient.additional_data is None else patient.additional_data.copy()
-            row['patient_id'] = patient.id
+            row["patient_id"] = patient.id
             for clinical_col in ["benefit", "os", "pfs", "deceased",
                                 "progressed", "progressed_or_deceased"]:
                 row[clinical_col] = getattr(patient, clinical_col)
@@ -305,7 +323,7 @@ class Cohort(Collection):
                 df_loader.name,
                 old_len_df,
                 len(df)))
-        self.dataframe_hash = hash(str(df.sort_values('patient_id')))
+        self.dataframe_hash = hash(str(df.sort_values("patient_id")))
         return df
 
     def as_dataframe(self, on=None, col=None, join_with=None, join_how=None, **kwargs):
@@ -470,42 +488,39 @@ class Cohort(Collection):
                 return patient
         raise ValueError("No patient with ID %s found" % id)
 
-    def load_variants(self, patients=None, variant_type="snv", merge_type="union", filter_fn=variant_qc_filter):
+    def load_variants(self, patients=None, filter_fn=variant_qc_filter):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
         Parameters
         ----------
         patients : str, optional
             Filter to a subset of patients
-        variant_type : {'snv', 'indel'}, optional
-            Load variants of a specific type, default 'snv'
-        merge_type : {'union', 'intersection'}, optional
-            Use this method to merge multiple variant sets for a single patient, default 'union'
         filter_fn : function
-            Takes a variant and it's metadata and returns a boolean. Only variants returning True are preserved. Defaults to `variant_qc_filter`.
+            Takes a FilterableVariant and returns a boolean. Only variants returning True are preserved. Defaults to `variant_qc_filter`.
 
         Returns
         -------
         merged_variants
             Dictionary of patient_id to VariantCollection
         """
-        assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
-            variants = self._load_single_patient_variants(patient, variant_type, merge_type, filter_fn)
+            variants = self._load_single_patient_variants(patient, filter_fn)
             if variants is not None:
                 patient_variants[patient.id] = variants
         return patient_variants
 
-    def _load_single_patient_variants(self, patient, variant_type, merge_type, filter_fn):
+    def _load_single_patient_variants(self, patient, filter_fn):
         failed_io = False
         try:
-            cached_file_name = "%s-%s-variants.pkl" % (variant_type, merge_type)
+            cached_file_name = "%s-%s-variants.pkl" % (self.variant_type, self.merge_type)
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
-                return filter_variants_with_metadata(cached, filter_fn)
-            vcf_paths = patient.snv_vcf_paths if variant_type == "snv" else patient.indel_vcf_paths
+                return filter_variants(variant_collection=cached,
+                                       patient=patient,
+                                       filter_fn=filter_fn)
+            vcf_paths = patient.snv_vcf_paths if self.variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
                 (vcf_path, varcode.load_vcf_fast(vcf_path))
                 for vcf_path in vcf_paths
@@ -525,11 +540,12 @@ class Cohort(Collection):
             vcf_path, variants = variant_collections[0]
             merged_variants = variants
         else:
-            merged_variants = self._merge_variant_collections(dict(variant_collections), merge_type)
+            merged_variants = self._merge_variant_collections(dict(variant_collections), self.merge_type)
 
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
-
-        return filter_variants_with_metadata(merged_variants, filter_fn)
+        return filter_variants(variant_collection=merged_variants,
+                               patient=patient,
+                               filter_fn=filter_fn)
 
     def _merge_variant_collections(self, vcf_to_variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
@@ -551,18 +567,18 @@ class Cohort(Collection):
         return merged_variants
 
     def load_polyphen_annotations(self, as_dataframe=False,
-                                  filter_fn=polyphen_qc_filter):
+                                  filter_fn=variant_qc_filter):
         """Load a dataframe containing polyphen2 annotations for all variants
 
         Parameters
         ----------
         database_file : string, sqlite
             Path to the WHESS/Polyphen2 SQLite database.
-            Can be downloaded and bunzip2'ed from http://bit.ly/208mlIU
+            Can be downloaded and bunzip2"ed from http://bit.ly/208mlIU
         filter_fn : function
-            Takes an annotation row and variants and returns a boolean.
+            Takes a FilterablePolyphen and returns a boolean.
             Only annotations returning True are preserved. Defaults to
-            `polyphen_qc_filter`.
+            `variant_qc_filter`.
 
         Returns
         -------
@@ -585,15 +601,16 @@ class Cohort(Collection):
         cache_name = self.cache_names["polyphen"]
         cached_file_name = "polyphen-annotations.csv"
         variants = self._load_single_patient_variants(patient,
-                                                      variant_type="snv",
-                                                      merge_type="union",
                                                       filter_fn=None)
         if variants is None:
             return None
 
         cached = self.load_from_cache(cache_name, patient.id, cached_file_name)
         if cached is not None:
-            return filter_polyphen_with_metadata(cached, variants, filter_fn)
+            return filter_polyphen(polyphen_df=cached,
+                                   variant_collection=variants,
+                                   patient=patient,
+                                   filter_fn=filter_fn)
 
         engine = create_engine("sqlite:///{}".format(self.polyphen_dump_path))
         conn = engine.connect()
@@ -622,9 +639,13 @@ class Cohort(Collection):
         df["pos"] = df["pos"].astype("int")
         df["annotation_found"] = df["annotation_found"].astype("bool")
         self.save_to_cache(df, cache_name, patient.id, cached_file_name)
-        return filter_polyphen_with_metadata(df, variants, filter_fn)
+        return filter_polyphen(polyphen_df=df,
+                               variant_collection=variants,
+                               patient=patient,
+                               filter_fn=filter_fn)
 
-    def load_effects(self, patients=None, only_nonsynonymous=False, variant_type="snv", merge_type="union", filter_fn=effect_qc_filter):
+    def load_effects(self, patients=None, only_nonsynonymous=False,
+                     filter_fn=variant_qc_filter):
         """Load a dictionary of patient_id to varcode.EffectCollection
         Parameters
         ----------
@@ -632,12 +653,8 @@ class Cohort(Collection):
             Filter to a subset of patients
         only_nonsynonymous : bool, optional
             If true, load only nonsynonymous effects, default False
-        variant_type : {'snv', 'indel'}, optional
-            Load variants of a specific type, default 'snv'
-        merge_type : {'union', 'intersection'}, optional
-            Use this method to merge multiple variant sets for a single patient, default 'union'
         filter_fn : function
-            Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved. Defaults to `effect_qc_filter`.
+            Takes a FilterableEffect and returns a boolean. Only effects returning True are preserved. Defaults to `variant_qc_filter`.
 
         Returns
         -------
@@ -647,16 +664,14 @@ class Cohort(Collection):
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, variant_type, merge_type, filter_fn)
+                patient, only_nonsynonymous, filter_fn)
             if effects is not None:
                 patient_effects[patient.id] = effects
         return patient_effects
 
-    def _load_single_patient_effects(self, patient, only_nonsynonymous,
-                                     variant_type, merge_type, filter_fn):
-        cached_file_name = "%s-%s-effects.pkl" % (variant_type, merge_type)
-        variants = self._load_single_patient_variants(
-            patient, variant_type, merge_type, filter_fn=None)
+    def _load_single_patient_effects(self, patient, only_nonsynonymous, filter_fn):
+        cached_file_name = "%s-%s-effects.pkl" % (self.variant_type, self.merge_type)
+        variants = self._load_single_patient_variants(patient, filter_fn=None)
         if variants is None:
             return None
 
@@ -665,7 +680,10 @@ class Cohort(Collection):
         else:
             cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            return filter_effects_with_metadata(cached, variants.metadata, filter_fn)
+            return filter_effects(effect_collection=cached,
+                                  variant_collection=variants,
+                                  patient=patient,
+                                  filter_fn=filter_fn)
 
         effects = variants.effects()
         nonsynonymous_effects = EffectCollection(
@@ -673,10 +691,12 @@ class Cohort(Collection):
 
         self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
-
-        if only_nonsynonymous:
-            return filter_effects_with_metadata(nonsynonymous_effects, variants.metadata, filter_fn)
-        return filter_effects_with_metadata(effects, variants.metadata, filter_fn)
+        return filter_effects(
+            effect_collection=(
+                nonsynonymous_effects if only_nonsynonymous else effects),
+            variant_collection=variants,
+            patient=patient,
+            filter_fn=filter_fn)
 
     def load_cufflinks(self, filter_ok=True):
         """
@@ -685,7 +705,7 @@ class Cohort(Collection):
         Parameters
         ----------
         filter_ok : bool, optional
-            If true, filter Cufflinks data to row with FPKM_status == 'OK'
+            If true, filter Cufflinks data to row with FPKM_status == "OK"
 
         Returns
         -------
@@ -707,7 +727,7 @@ class Cohort(Collection):
         ----------
         patient : Patient
         filter_ok : bool, optional
-            If true, filter Cufflinks data to row with FPKM_status == 'OK'
+            If true, filter Cufflinks data to row with FPKM_status == "OK"
 
         Returns
         -------
@@ -723,16 +743,14 @@ class Cohort(Collection):
             data = data[data["FPKM_status"] == "OK"]
         return data
 
-    def load_neoantigens(self, patients=None, variant_type="snv", merge_type="union",
-                         only_expressed=False, epitope_lengths=[8, 9, 10, 11],
-                         ic50_cutoff=500, process_limit=10, max_file_records=None,
-                         filter_fn=neoantigen_qc_filter):
+    def load_neoantigens(self, patients=None, only_expressed=False,
+                         epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
+                         process_limit=10, max_file_records=None,
+                         filter_fn=variant_qc_filter):
         dfs = {}
         for patient in self.iter_patients(patients):
             df_epitopes = self._load_single_patient_neoantigens(
                 patient=patient,
-                variant_type=variant_type,
-                merge_type=merge_type,
                 only_expressed=only_expressed,
                 epitope_lengths=epitope_lengths,
                 ic50_cutoff=ic50_cutoff,
@@ -743,13 +761,11 @@ class Cohort(Collection):
                 dfs[patient.id] = df_epitopes
         return dfs
 
-    def _load_single_patient_neoantigens(self, patient, variant_type,
-                                         merge_type, only_expressed, epitope_lengths,
+    def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
-        cached_file_name = "%s-%s-neoantigens.csv" % (variant_type, merge_type)
-        variants = self._load_single_patient_variants(
-            patient, variant_type, merge_type, filter_fn=None)
+        cached_file_name = "%s-%s-neoantigens.csv" % (self.variant_type, self.merge_type)
+        variants = self._load_single_patient_variants(patient, filter_fn=None)
         if variants is None:
             return None
 
@@ -762,7 +778,10 @@ class Cohort(Collection):
         else:
             cached = self.load_from_cache(self.cache_names["neoantigen"], patient.id, cached_file_name)
         if cached is not None:
-            return filter_neoantigens_with_metadata(cached, variants, filter_fn)
+            return filter_neoantigens(neoantigens_df=cached,
+                                      variant_collection=variants,
+                                      patient=patient,
+                                      filter_fn=filter_fn)
 
         mhc_model = NetMHCcons(
             alleles=patient.hla_alleles,
@@ -770,38 +789,9 @@ class Cohort(Collection):
             max_file_records=max_file_records,
             process_limit=process_limit)
         if only_expressed:
-            isovar_cached_file_name = "%s-%s-isovar.csv" % (variant_type, merge_type)
-            df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
-            if df_isovar is None:
-                import logging
-                logging.disable(logging.INFO)
-                if patient.tumor_sample is None:
-                    raise ValueError("Patient %s has no tumor sample" % patient.id)
-                if patient.tumor_sample.bam_path_rna is None:
-                    raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
-                rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
-                from isovar.default_parameters import (
-                    MIN_TRANSCRIPT_PREFIX_LENGTH,
-                    MAX_REFERENCE_TRANSCRIPT_MISMATCHES
-                )
-
-                # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
-                # sequence length: (max peptide length * 2) - 1
-                # Example:
-                # 123456789AB
-                #           123456789AB
-                # AAAAAAAAAAVAAAAAAAAAA
-                protein_sequence_length = (max(epitope_lengths) * 2) - 1
-                df_isovar = variants_to_protein_sequences_dataframe(
-                    variants=variants,
-                    samfile=rna_bam_file,
-                    protein_sequence_length=protein_sequence_length,
-                    min_reads_supporting_rna_sequence=3, # Per Alex R.'s suggestion
-                    min_transcript_prefix_length=MIN_TRANSCRIPT_PREFIX_LENGTH,
-                    max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
-                    max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
-                    min_mapping_quality=1)
-                self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+            df_isovar = self.load_single_patient_isovar(patient=patient,
+                                                         variants=variants,
+                                                         epitope_lengths=epitope_lengths)
 
             # Map from isovar rows to protein sequences
             isovar_rows_to_protein_sequences = dict([
@@ -840,7 +830,10 @@ class Cohort(Collection):
 
             self.save_to_cache(df_epitopes, self.cache_names["neoantigen"], patient.id, cached_file_name)
 
-        return filter_neoantigens_with_metadata(df_epitopes, variants, filter_fn)
+        return filter_neoantigens(neoantigens_df=df_epitopes,
+                                  variant_collection=variants,
+                                  patient=patient,
+                                  filter_fn=filter_fn)
 
     def get_filtered_isovar_epitopes(self, epitopes, ic50_cutoff):
         """
@@ -865,6 +858,45 @@ class Cohort(Collection):
             if is_mutant and binding_prediction.value <= ic50_cutoff:
                 mutant_binding_predictions.append(binding_prediction)
         return EpitopeCollection(mutant_binding_predictions)
+
+    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        # TODO: different epitope lengths, and other parameters, should result in
+        # different caches
+        isovar_cached_file_name = "%s-%s-isovar.csv" % (self.variant_type, self.merge_type)
+        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+        if df_isovar is not None:
+            return df_isovar
+
+        import logging
+        logging.disable(logging.INFO)
+        if patient.tumor_sample is None:
+            raise ValueError("Patient %s has no tumor sample" % patient.id)
+        if patient.tumor_sample.bam_path_rna is None:
+            raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
+        rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
+        from isovar.default_parameters import (
+            MIN_TRANSCRIPT_PREFIX_LENGTH,
+            MAX_REFERENCE_TRANSCRIPT_MISMATCHES
+        )
+
+        # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
+        # sequence length: (max peptide length * 2) - 1
+        # Example:
+        # 123456789AB
+        #           123456789AB
+        # AAAAAAAAAAVAAAAAAAAAA
+        protein_sequence_length = (max(epitope_lengths) * 2) - 1
+        df_isovar = variants_to_protein_sequences_dataframe(
+            variants=variants,
+            samfile=rna_bam_file,
+            protein_sequence_length=protein_sequence_length,
+            min_reads_supporting_rna_sequence=3, # Per Alex R.'s suggestion
+            min_transcript_prefix_length=MIN_TRANSCRIPT_PREFIX_LENGTH,
+            max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
+            max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
+            min_mapping_quality=1)
+        self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+        return df_isovar
 
     def load_ensembl_coverage(self, min_depth=30):
         if self.pageant_coverage_path is None:
@@ -909,7 +941,7 @@ class Cohort(Collection):
         df = filter_not_null(df, "benefit")
         df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
-        return roc_curve_plot(df, plot_col, 'benefit', bootstrap_samples, ax=ax)
+        return roc_curve_plot(df, plot_col, "benefit", bootstrap_samples, ax=ax)
 
     def plot_benefit(self, on, col=None, benefit_col="benefit", ax=None,
                      mw_alternative="two-sided", **kwargs):
@@ -974,9 +1006,9 @@ class Cohort(Collection):
             See `cohort.load.as_dataframe`
         col : str, optional
             If specified, store the result of `on`. See `cohort.load.as_dataframe`
-        how : {'os', 'pfs'}, optional
+        how : {"os", "pfs"}, optional
             Whether to plot OS (overall survival) or PFS (progression free survival)
-        threshold : int or 'median', optional
+        threshold : int or "median", optional
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
@@ -994,7 +1026,6 @@ class Cohort(Collection):
             survival_col=how,
             threshold=threshold if threshold is not None else default_threshold,
             ax=ax)
-
         return results
 
     def plot_joint(self, on, on_two=None, **kwargs):
@@ -1024,32 +1055,34 @@ class Cohort(Collection):
         return(results)
 
     def summarize_provenance_per_cache(self):
-        """ Utility function to summarize provenance files for cached items used by a Cohort, for each cache_dir that exists.
-            Only existing cache_dirs are summarized. 
+        """Utility function to summarize provenance files for cached items used by a Cohort,
+        for each cache_dir that exists. Only existing cache_dirs are summarized.
 
-            This is a summary of provenance files because the function checks to see whether all patients data have 
-            the same provenance within the cache dir. The function assumes that it will be desireable to have all patients
-            data generated using the same environment, for each cache type.
+        This is a summary of provenance files because the function checks to see whether all
+        patients data have the same provenance within the cache dir. The function assumes
+        that it will be desireable to have all patients data generated using the same
+        environment, for each cache type.
 
-            At the moment, most PROVENANCE files contain details about packages used to generate the cached data file. However, this 
-            function is generic & so it summarizes the contents of those files irrespective of their contents.
-            
-            Returns
-            ----------
+        At the moment, most PROVENANCE files contain details about packages used to generat
+        e the cached data file. However, this function is generic & so it summarizes the
+        contents of those files irrespective of their contents.
 
-            Dict containing summarized provenance for each existing cache_dir, after checking to see that 
-            provenance files are identical among all patients in the data frame for that cache_dir.
+        Returns
+        ----------
+        Dict containing summarized provenance for each existing cache_dir, after checking
+        to see that provenance files are identical among all patients in the data frame for
+        that cache_dir.
 
-            If conflicting PROVENANCE files are discovered within a cache-dir:
-                - a warning is generated, describing the conflict
-                - and, a value of `None` is returned in the dictionary for that cache-dir
+        If conflicting PROVENANCE files are discovered within a cache-dir:
+         - a warning is generated, describing the conflict
+         - and, a value of `None` is returned in the dictionary for that cache-dir
 
-            See also
-            -----------
-            
-            * `?cohorts.Cohort.summarize_provenance` which summarizes provenance files among cache_dirs.
-            * `?cohorts.Cohort.summarize_dataframe` which hashes/summarizes contents of the data frame for this cohort
-
+        See also
+        -----------
+        * `?cohorts.Cohort.summarize_provenance` which summarizes provenance files among
+        cache_dirs.
+        * `?cohorts.Cohort.summarize_dataframe` which hashes/summarizes contents of the data
+        frame for this cohort.
         """
         provenance_summary = {}
         df = self.as_dataframe()
@@ -1075,36 +1108,36 @@ class Cohort(Collection):
                 else:
                     provenance_summary[cache_name] = None
         return(provenance_summary)
-    
+
     def summarize_dataframe(self):
-        """ Summarize default dataframe for this cohort using a hash function. 
-            Useful for confirming the version of data used in various reports, e.g. ipynbs
+        """Summarize default dataframe for this cohort using a hash function.
+        Useful for confirming the version of data used in various reports, e.g. ipynbs
         """
         if self.dataframe_hash:
             return(self.dataframe_hash)
         else:
             df = self._as_dataframe_unmodified()
             return(self.dataframe_hash)
-    
+
     def summarize_provenance(self):
-        """ Utility function to summarize provenance files for cached items used by a Cohort. 
+        """Utility function to summarize provenance files for cached items used by a Cohort.
 
-            At the moment, most PROVENANCE files contain details about packages used to generate files. However, this 
-            function is generic & so it summarizes the contents of those files irrespective of their contents.
-            
-            Returns
-            ----------
-            
-            Dict containing summary of provenance items, among all cache dirs used by the Cohort. 
+        At the moment, most PROVENANCE files contain details about packages used to
+        generate files. However, this function is generic & so it summarizes the contents
+        of those files irrespective of their contents.
 
-            IE if all provenances are identical across all cache dirs, then a single set of provenances is returned. 
-            Otherwise, if all provenances are not identical, the provenance items per cache_dir are returned.
+        Returns
+        ----------
+        Dict containing summary of provenance items, among all cache dirs used by the Cohort.
 
-            See also
-            ----------
-            
-            `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance for each existing cache_dir.
+        IE if all provenances are identical across all cache dirs, then a single set of
+        provenances is returned. Otherwise, if all provenances are not identical, the provenance
+        items per cache_dir are returned.
 
+        See also
+        ----------
+        `?cohorts.Cohort.summarize_provenance_per_cache` which is used to summarize provenance
+        for each existing cache_dir.
         """
         provenance_per_cache = self.summarize_provenance_per_cache()
         summary_provenance = None
@@ -1120,36 +1153,33 @@ class Cohort(Collection):
                 summary_provenance,
                 left_outer_diff = "In %s but not in %s" % (cache, summary_provenance_name),
                 right_outer_diff = "In %s but not in %s" % (summary_provenance_name, cache)
-                )
+            )
         ## compare provenance across cached items
         if num_discrepant == 0:
             prov = summary_provenance ## report summary provenance if exists
         else:
             prov = provenance_per_cache ## otherwise, return provenance per cache
         return(prov)
-    
+
     def summarize_data_sources(self):
-        """ Utility function to summarize data source status for this Cohort, useful for confirming
-            the state of data used for an analysis
+        """Utility function to summarize data source status for this Cohort, useful for confirming
+        the state of data used for an analysis
 
-            Returns
-            ----------
-            Dictionary with summary of data sources
+        Returns
+        ----------
+        Dictionary with summary of data sources
 
-            Currently contains
-
-            - dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
-            - provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
+        Currently contains
+        - dataframe_hash: hash of the dataframe (see `?cohorts.Cohort.summarize_dataframe`)
+        - provenance_file_summary: summary of provenance file contents (see `?cohorts.Cohort.summarize_provenance`)
         """
         provenance_file_summary = self.summarize_provenance()
         dataframe_hash = self.summarize_dataframe()
         results = {
-            'provenance_file_summary': provenance_file_summary,
-            'dataframe_hash': dataframe_hash
-            }
+            "provenance_file_summary": provenance_file_summary,
+            "dataframe_hash": dataframe_hash
+        }
         return(results)
-        
-
 
 def first_not_none_param(params, default):
     """
@@ -1170,34 +1200,29 @@ def filter_not_null(df, col):
     return df
 
 def _provenance_str(provenance):
-    """ utility function used by compare_provenance to print diff
+    """Utility function used by compare_provenance to print diff
     """
     return ["%s==%s" % (key, value) for (key, value) in provenance]
-
 
 def compare_provenance(
         this_provenance, other_provenance,
         left_outer_diff = "In current but not comparison",
-        right_outer_diff = "In comparison but not current"
-        ):
-    """ utility function to compare two abritrary provenance dicts
-        returns number of discrepancies.
+        right_outer_diff = "In comparison but not current"):
+    """Utility function to compare two abritrary provenance dicts
+    returns number of discrepancies.
 
-        Parameters
-        ----------
+    Parameters
+    ----------
+    this_provenance: provenance dict (to be compared to "other_provenance")
+    other_provenance: comparison provenance dict
 
-        this_provenance: provenance dict (to be compared to "other_provenance")
-        other_provenance: comparison provenance dict
+    (optional)
+    left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
+    right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
 
-        (optional)
-        left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
-        right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
-
-        Returns
-        -----------
-
-        Number of discrepancies (0: None)
-
+    Returns
+    -----------
+    Number of discrepancies (0: None)
     """
     this_items = set(this_provenance.items())
     other_items = set(other_provenance.items())
@@ -1217,6 +1242,6 @@ def compare_provenance(
 
     if len(warn_str) > 0:
         warnings.warn(warn_str, Warning)
-    
+
     return(len(new_diff)+len(old_diff))
 

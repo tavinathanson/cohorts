@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-from .variant_filters import variant_qc_filter, effect_qc_filter, neoantigen_qc_filter
+from .variant_filters import variant_qc_filter,effect_expressed_filter
 
 import numpy as np
 from varcode.effects import Substitution
@@ -34,7 +34,7 @@ def snv_count(row, cohort, filter_fn=variant_qc_filter,
         return count
     return np.nan
 
-def nonsynonymous_snv_count(row, cohort, filter_fn=effect_qc_filter,
+def nonsynonymous_snv_count(row, cohort, filter_fn=variant_qc_filter,
                             normalized_per_mb=True, **kwargs):
     patient_id = row["patient_id"]
     patient_nonsynonymous_effects = cohort.load_effects(
@@ -49,13 +49,14 @@ def nonsynonymous_snv_count(row, cohort, filter_fn=effect_qc_filter,
         return count
     return np.nan
 
-def missense_snv_count(row, cohort, filter_fn=effect_qc_filter,
+def missense_snv_count(row, cohort, filter_fn=variant_qc_filter,
                        normalized_per_mb=True, **kwargs):
     patient_id = row["patient_id"]
-    def missense_filter_fn(effect, variant_metadata):
+    def missense_filter_fn(filterable_effect):
         if filter_fn is not None:
-            return type(effect) == Substitution and filter_fn(effect, variant_metadata)
-        return type(effect) == Substitution
+            return (type(filterable_effect.effect) == Substitution and
+                    filter_fn(filterable_effect))
+        return type(filterable_effect.effect) == Substitution
     patient_missense_effects = cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],
@@ -68,7 +69,7 @@ def missense_snv_count(row, cohort, filter_fn=effect_qc_filter,
         return count
     return np.nan
 
-def neoantigen_count(row, cohort, filter_fn=neoantigen_qc_filter,
+def neoantigen_count(row, cohort, filter_fn=variant_qc_filter,
                      normalized_per_mb=True, **kwargs):
     patient_id = row["patient_id"]
     patient = cohort.patient_from_id(row["patient_id"])
@@ -83,8 +84,15 @@ def neoantigen_count(row, cohort, filter_fn=neoantigen_qc_filter,
         return count
     return np.nan
 
+def expressed_missense_snv_count(row, cohort, filter_fn=variant_qc_filter, **kwargs):
+    def expressed_filter_fn(filterable_effect):
+        if filter_fn is not None:
+            return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+        return effect_expressed_filter(filterable_effect)
+    return missense_snv_count(row, cohort, filter_fn=expressed_filter_fn, **kwargs)
+
 def expressed_neoantigen_count(row, cohort, **kwargs):
-    return neoantigen_count(row, cohort, only_expressed=True)
+    return neoantigen_count(row, cohort, only_expressed=True, **kwargs)
 
 @memoize
 def get_patient_to_mb(cohort):

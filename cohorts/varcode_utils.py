@@ -1,13 +1,71 @@
-from varcode import EffectCollection, VariantCollection
+from varcode import EffectCollection, VariantCollection, Variant
 
-def filter_variants_with_metadata(variant_collection, filter_fn):
+def genome(variant_collection):
+    return variant_collection[0].ensembl
+
+class FilterableVariant(object):
+    def __init__(self, variant, variant_collection, patient):
+        self.variant = variant
+        self.variant_collection = variant_collection
+        self.patient = patient
+
+    @property
+    def variant_metadata(self):
+        return self.variant_collection.metadata[self.variant]
+
+    @property
+    def genome(self):
+        return genome(self.variant_collection)
+
+class FilterableEffect(FilterableVariant):
+    def __init__(self, effect, variant_collection, patient):
+        self.effect = effect
+        FilterableVariant.__init__(self,
+                                   variant=effect.variant,
+                                   variant_collection=variant_collection,
+                                   patient=patient)
+
+class FilterableNeoantigen(FilterableVariant):
+    def __init__(self, neoantigen_row, variant_collection, patient):
+        self.neoantigen_row = neoantigen_row
+        def build_variant(row, genome):
+            return Variant(
+                contig=row["chr"],
+                ref=row["ref"],
+                alt=row["alt"],
+                start=row["start"],
+                ensembl=genome)
+        variant = build_variant(neoantigen_row, genome(variant_collection))
+        FilterableVariant.__init__(self,
+                                   variant=variant,
+                                   variant_collection=variant_collection,
+                                   patient=patient)
+
+class FilterablePolyphen(FilterableVariant):
+    def __init__(self, polyphen_row, variant_collection, patient):
+        self.polyphen_row = polyphen_row
+        def build_variant(row, genome):
+            return Variant(
+                contig=row["chrom"],
+                ref=row["ref"],
+                alt=row["alt"],
+                start=row["pos"],
+                ensembl=genome)
+        variant = build_variant(polyphen_row, genome(variant_collection))
+        FilterableVariant.__init__(self,
+                                   variant=variant,
+                                   variant_collection=variant_collection,
+                                   patient=patient)
+
+def filter_variants(variant_collection, patient, filter_fn):
     """Filter variants from the Variant Collection
 
     Parameters
     ----------
     variant_collection : varcode.VariantCollection
+    patient : cohorts.Patient
     filter_fn: function
-        Takes a variant and it's metadata and returns a boolean. Only variants returning True are preserved.
+        Takes a FilterableVariant and returns a boolean. Only variants returning True are preserved.
 
     Returns
     -------
@@ -15,21 +73,27 @@ def filter_variants_with_metadata(variant_collection, filter_fn):
         Filtered variant collection, with only the variants passing the filter
     """
     if filter_fn:
-        return VariantCollection([variant
-                                  for variant in variant_collection
-                                  if filter_fn(variant, variant_collection.metadata[variant])
-                                  ])
+        return variant_collection.clone_with_new_elements([
+            variant
+            for variant in variant_collection
+            if filter_fn(FilterableVariant(
+                    variant=variant,
+                    variant_collection=variant_collection,
+                    patient=patient))
+        ])
     else:
         return variant_collection
 
-def filter_effects_with_metadata(effect_collection, variant_collection_metadata, filter_fn):
+def filter_effects(effect_collection, variant_collection, patient, filter_fn):
     """Filter variants from the Effect Collection
 
     Parameters
     ----------
     effect_collection : varcode.EffectCollection
+    variant_collection : varcode.VariantCollection
+    patient : cohorts.Patient
     filter_fn: function
-        Takes an effect and it's variant's metadata and returns a boolean. Only effects returning True are preserved.
+        Takes a FilterableEffect and returns a boolean. Only effects returning True are preserved.
 
     Returns
     -------
@@ -37,25 +101,34 @@ def filter_effects_with_metadata(effect_collection, variant_collection_metadata,
         Filtered effect collection, with only the variants passing the filter
     """
     if filter_fn:
-        return EffectCollection([effect
-                                  for effect in effect_collection
-                                  if filter_fn(effect, variant_collection_metadata[effect.variant])
-                                  ])
+        return EffectCollection([
+            effect
+            for effect in effect_collection
+            if filter_fn(FilterableEffect(
+                    effect=effect,
+                    variant_collection=variant_collection,
+                    patient=patient))])
     else:
         return effect_collection
 
-def filter_neoantigens_with_metadata(neoantigens_df, variants, filter_fn):
+def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
     if filter_fn:
         filter_mask = neoantigens_df.apply(
-            lambda row: filter_fn(row, variants), axis=1)
+            lambda row: filter_fn(
+                FilterableNeoantigen(neoantigen_row=row,
+                                     variant_collection=variant_collection,
+                                     patient=patient)), axis=1)
         return neoantigens_df[filter_mask]
     else:
         return neoantigens_df
 
-def filter_polyphen_with_metadata(annotations_df, variants, filter_fn):
+def filter_polyphen(polyphen_df, variant_collection, patient, filter_fn):
     if filter_fn:
-        filter_mask = annotations_df.apply(
-            lambda row: filter_fn(row, variants), axis=1)
-        return annotations_df[filter_mask]
+        filter_mask = polyphen_df.apply(
+            lambda row: filter_fn(
+                FilterablePolyphen(polyphen_row=row,
+                                   variant_collection=variant_collection,
+                                   patient=patient)), axis=1)
+        return polyphen_df[filter_mask]
     else:
-        return annotations_df
+        return polyphen_df
