@@ -22,6 +22,8 @@ import numpy as np
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.utils import resample
 
+from .model import bootstrap_auc
+
 def stripboxplot(x, y, data, ax=None, **kwargs):
     """
     Overlay a stripplot on top of a boxplot.
@@ -130,34 +132,35 @@ def mann_whitney_plot(data, condition, distribution, ax=None,
 
 def roc_curve_plot(data, value_column, outcome_column, bootstrap_samples=100, ax=None):
     """Create a ROC curve and compute the bootstrap AUC for the given variable and outcome
- 
+
     Parameters
     ----------
     data : Pandas dataframe
         Dataframe to retrieve information from
     value_column : str
-        Column to retrieve the values from 
+        Column to retrieve the values from
     outcome_column : str
         Column to use as the outcome variable
     bootstrap_samples : int, optional
         Number of bootstrap samples to use to compute the AUC
     ax : Axes, default None
-        Axes to plot on 
+        Axes to plot on
 
     Returns
     -------
     (mean_bootstrap_auc, roc_plot) : (float, matplotlib plot)
         Mean AUC for the given number of bootstrap samples and the plot
     """
-    values = data[value_column]
-    outcome = data[outcome_column].astype(int)
-    scores = np.zeros(bootstrap_samples)
-    for i in range(bootstrap_samples):
-        svals, soutcome = resample(values, outcome)
-        scores[i] = roc_auc_score(soutcome, svals)
+    scores = bootstrap_auc(df=data,
+                           col=value_column,
+                           pred_col=outcome_column,
+                           n_bootstrap=bootstrap_samples)
     mean_bootstrap_auc = scores.mean()
-    print("{}, Bootstrap (samples = {}) AUC:{}, std={}".format(value_column, bootstrap_samples, mean_bootstrap_auc, scores.std()))
+    print("{}, Bootstrap (samples = {}) AUC:{}, std={}".format(
+        value_column, bootstrap_samples, mean_bootstrap_auc, scores.std()))
 
+    outcome = data[outcome_column].astype(int)
+    values = data[value_column]
     fpr, tpr, thresholds = roc_curve(outcome, values)
 
     if ax is None:

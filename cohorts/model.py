@@ -30,33 +30,43 @@ def is_single_class(arr, col):
         arr_negative_indices = (arr == 0).nonzero()[0]
     return len(arr_positive_indices) == 0 or len(arr_negative_indices) == 0
 
-def bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
+def bootstrap_auc(df, col, pred_col, n_bootstrap=1000):
     """
-    Calculate the boostrapped AUC for a given func trying to predict a pred_col.
+    Calculate the boostrapped AUC for a given col trying to predict a pred_col.
 
     Parameters
     ----------
-    cohort: cohorts.Cohort
-    func : see cohorts.functions
-    pred_col : the column we're trying to predict
-    n_boostrap : the number of bootstrap samples
+    df : pandas.DataFrame
+    col : str
+        column to retrieve the values from
+    pred_col : str
+        the column we're trying to predict
+    n_boostrap : int
+        the number of bootstrap samples
 
     Returns
     -------
     list : AUCs for each sampling
     """
     scores = np.zeros(n_bootstrap)
-    count_col, df = cohort.as_dataframe(func)
     preds = df[pred_col].astype(int)
     for i in range(n_bootstrap):
-        sampled_counts, sampled_pred = resample(df[count_col], preds)
+        sampled_counts, sampled_pred = resample(df[col], preds)
         if is_single_class(sampled_pred, col=pred_col):
             continue
         scores[i] = roc_auc_score(sampled_pred, sampled_counts)
     return scores
 
-def mean_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
-    return bootstrap_auc(cohort, func, pred_col, n_bootstrap).mean()
+def cohort_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
+    col, df = cohort.as_dataframe(func)
+    return bootstrap_auc(df=df,
+                         col=col,
+                         pred_col=pred_col,
+                         n_bootstrap=n_bootstrap)
+    return scores
+
+def cohort_mean_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
+    return cohort_bootstrap_auc(cohort, func, pred_col, n_bootstrap).mean()
 
 def coxph_model(formula, data, time_col, event_col, **kwargs):
     sdata = patsy.dmatrix(
