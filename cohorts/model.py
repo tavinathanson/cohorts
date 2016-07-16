@@ -63,12 +63,13 @@ def cohort_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
                          col=col,
                          pred_col=pred_col,
                          n_bootstrap=n_bootstrap)
-    return scores
 
 def cohort_mean_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
     return cohort_bootstrap_auc(cohort, func, pred_col, n_bootstrap).mean()
 
 def coxph_model(formula, data, time_col, event_col, **kwargs):
+    # pylint: disable=no-member
+    # pylint gets confused by dmatrix
     sdata = patsy.dmatrix(
         formula,
         data = data,
