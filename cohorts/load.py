@@ -504,7 +504,6 @@ class Cohort(Collection):
             Dictionary of patient_id to VariantCollection
         """
         patient_variants = {}
-
         for patient in self.iter_patients(patients):
             variants = self._load_single_patient_variants(patient, filter_fn)
             if variants is not None:

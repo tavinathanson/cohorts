@@ -15,6 +15,7 @@
 from cohorts.functions import (
     snv_count as cohorts_snv_count,
     missense_snv_count as cohorts_missense_snv_count,
+    nonsynonymous_snv_count as cohorts_nonsynonymous_snv_count,
     neoantigen_count as cohorts_neoantigen_count,
     expressed_neoantigen_count as cohorts_expressed_neoantigen_count
 )
@@ -26,6 +27,10 @@ from cohorts.functions import (
 def snv_count(row, cohort, **kwargs):
     return cohorts_snv_count(row, cohort, filter_fn=None,
                              normalized_per_mb=False, **kwargs)
+
+def nonsynonymous_snv_count(row, cohort, **kwargs):
+    return cohorts_nonsynonymous_snv_count(row, cohort, filter_fn=None,
+                                           normalized_per_mb=False, **kwargs)
 
 def missense_snv_count(row, cohort, **kwargs):
     return cohorts_missense_snv_count(row, cohort, filter_fn=None,

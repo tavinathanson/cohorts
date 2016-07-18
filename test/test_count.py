@@ -14,12 +14,13 @@
 
 from __future__ import print_function
 
-from varcode import ExonicSpliceSite, Substitution
+from varcode import ExonicSpliceSite, Substitution, Variant, VariantCollection
 
 from .data_generate import generate_vcfs
 from .functions import *
 
-from nose.tools import raises, eq_
+from nose.tools import raises, eq_, ok_
+from mock import MagicMock
 from os import path
 from shutil import rmtree
 
@@ -178,5 +179,28 @@ def test_filter_effects():
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
+        if cohort is not None:
+            cohort.clear_caches()
+
+def test_multiple_effects():
+    """
+    Make sure variants are not double counted when multiple effects exist.
+    """
+    cohort = None
+    try:
+        cohort = make_simple_cohort(merge_type="snv")
+        variants = VariantCollection([Variant("1", 46501738, "G", "C", ensembl=75)])
+        effects = variants.effects()
+        effects_dict = {}
+        for patient in cohort:
+            effects_dict[patient.id] = effects
+        cohort.load_effects = MagicMock(return_value=effects_dict)
+        col_nonsyn, df_nonsyn = cohort.as_dataframe(nonsynonymous_snv_count)
+        col_missense, df_missense = cohort.as_dataframe(missense_snv_count)
+        ok_((df_missense[col_missense] == 1).all(),
+            "Variant should only be counted once for each patient, but: %s" % df_missense[col_missense])
+        ok_((df_nonsyn[col_nonsyn] == 1).all(),
+            "Variant should only be counted once for each patient, but: %s" % df_nonsyn[col_nonsyn])
+    finally:
         if cohort is not None:
             cohort.clear_caches()
