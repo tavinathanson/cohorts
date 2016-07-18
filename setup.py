@@ -68,7 +68,8 @@ if __name__ == "__main__":
             "six>=1.10.0",
             "lifelines>=0.9.1.0",
             "scikit-learn>=0.17.1",
-            "vcf-annotate-polyphen>=0.1.2"
+            "vcf-annotate-polyphen>=0.1.2",
+            "patsy>=0.4.1"
         ],
         dependency_links=[
             "git+git://github.com/hammerlab/isovar",
