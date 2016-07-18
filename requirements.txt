@@ -14,4 +14,3 @@ pylint>=1.4.4
 scikit-bio==0.4.2
 isovar==0.0.6
 patsy>=0.4.1
-mock>=2.0.0

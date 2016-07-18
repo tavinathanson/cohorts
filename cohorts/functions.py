@@ -43,10 +43,7 @@ def nonsynonymous_snv_count(row, cohort, filter_fn=None,
         filter_fn=filter_fn,
         **kwargs)
     if patient_id in patient_nonsynonymous_effects:
-        patient_variants = set()
-        for effect in patient_nonsynonymous_effects[patient_id]:
-            patient_variants.add(effect.variant)
-        count = len(patient_variants)
+        count = len(patient_nonsynonymous_effects[patient_id])
         if normalized_per_mb:
             count /= float(get_patient_to_mb(cohort)[patient_id])
         return count
@@ -66,10 +63,7 @@ def missense_snv_count(row, cohort, filter_fn=None,
         filter_fn=missense_filter_fn,
         **kwargs)
     if patient_id in patient_missense_effects:
-        patient_variants = set()
-        for effect in patient_missense_effects[patient_id]:
-            patient_variants.add(effect.variant)
-        count = len(patient_variants)
+        count = len(patient_missense_effects[patient_id])
         if normalized_per_mb:
             count /= float(get_patient_to_mb(cohort)[patient_id])
         return count
