@@ -189,6 +189,11 @@ def test_multiple_effects():
     cohort = None
     try:
         cohort = make_simple_cohort(merge_type="snv")
+        """
+        <EffectCollection with 2 elements>
+        -- StopLoss(variant=chr1 g.46501738G>C, transcript_name=MAST2-001, transcript_id=ENST00000361297, effect_description=p.*1799Y (stop-loss))
+        -- StopLoss(variant=chr1 g.46501738G>C, transcript_name=MAST2-201, transcript_id=ENST00000372009, effect_description=p.*1609Y (stop-loss))
+        """
         variants = VariantCollection([Variant("1", 46501738, "G", "C", ensembl=75)])
         effects = variants.effects()
         effects_dict = {}
