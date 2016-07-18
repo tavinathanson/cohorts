@@ -22,6 +22,7 @@ from .functions import *
 from nose.tools import raises, eq_
 from os import path
 from shutil import rmtree
+from collections import defaultdict
 
 from .test_basic import make_simple_cohort
 
@@ -175,6 +176,26 @@ def test_filter_effects():
         for (sample, effects) in cohort_effects.items():
             eq_(len(effects), splice_site_counts[sample])
 
+    finally:
+        if vcf_dir is not None and path.exists(vcf_dir):
+            rmtree(vcf_dir)
+        if cohort is not None:
+            cohort.clear_caches()
+
+def test_multiple_effects():
+    vcf_dir, cohort = None, None
+    try:
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
+
+        effects = cohort.load_effects(only_nonsynonymous=False)
+        for patient in cohort:
+            variant_to_effect_set = defaultdict(set)
+            for effect in effects[patient.id]:
+                variant_to_effect_set[effect.variant].add(effect)
+            for variant, effect_set in variant_to_effect_set.items():
+                eq_(len(effect_set), 1,
+                    "Variant %s should only have 1 effect but it has %s"
+                    % (variant, len(effect_set)))
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)

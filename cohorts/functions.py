@@ -37,6 +37,7 @@ def snv_count(row, cohort, filter_fn=None,
 def nonsynonymous_snv_count(row, cohort, filter_fn=None,
                             normalized_per_mb=True, **kwargs):
     patient_id = row["patient_id"]
+    # This only loads one effect per variant.
     patient_nonsynonymous_effects = cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],
@@ -57,6 +58,7 @@ def missense_snv_count(row, cohort, filter_fn=None,
             return (type(filterable_effect.effect) == Substitution and
                     filter_fn(filterable_effect))
         return type(filterable_effect.effect) == Substitution
+    # This only loads one effect per variant.
     patient_missense_effects = cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],

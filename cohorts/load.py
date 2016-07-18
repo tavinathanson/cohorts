@@ -647,6 +647,9 @@ class Cohort(Collection):
     def load_effects(self, patients=None, only_nonsynonymous=False,
                      filter_fn=None):
         """Load a dictionary of patient_id to varcode.EffectCollection
+
+        Note that this only loads one effect per variant.
+
         Parameters
         ----------
         patients : str, optional
@@ -686,8 +689,12 @@ class Cohort(Collection):
                                   filter_fn=filter_fn)
 
         effects = variants.effects()
+
+        # Always take the top priority effect per variant so we end up with a single
+        # effect per variant.
         nonsynonymous_effects = EffectCollection(
             effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
+        effects = EffectCollection(effects.top_priority_effect_per_variant().values())
 
         self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
