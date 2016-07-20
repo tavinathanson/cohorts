@@ -267,6 +267,7 @@ class Cohort(Collection):
                             "expressed_neoantigen": "cached-expressed-neoantigens",
                             "polyphen": "cached-polyphen-annotations",
                             "isovar": "cached-isovar-output"}
+        print(self.summarize_provenance())
 
     def verify_id_uniqueness(self):
         patient_ids = set([patient.id for patient in self])
