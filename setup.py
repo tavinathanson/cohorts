@@ -40,11 +40,11 @@ except ImportError as e:
     pass
 
 # get the dependencies and installs
-with open(path.join(current_directory, 'requirements.txt'), encoding='utf-8') as f:
+with open(path.join(current_directory, "requirements.txt"), encoding='utf-8') as f:
     all_reqs = f.read().split('\n')
 
-install_requires = [x.strip() for x in all_reqs if 'git+' not in x]
-dependency_links = [x.strip().replace('git+','') for x in all_reqs if 'git+' in x]
+install_requires = [req.strip() for req in all_reqs if 'git+' not in req]
+dependency_links = [req.strip().replace('git+','') for req in all_reqs if 'git+' in req]
 
 if __name__ == "__main__":
     setup(
