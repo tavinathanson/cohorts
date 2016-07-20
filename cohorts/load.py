@@ -20,6 +20,7 @@ import pandas as pd
 import seaborn as sb
 import json
 import warnings
+import pprint
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -267,7 +268,7 @@ class Cohort(Collection):
                             "expressed_neoantigen": "cached-expressed-neoantigens",
                             "polyphen": "cached-polyphen-annotations",
                             "isovar": "cached-isovar-output"}
-        print(self.summarize_provenance())
+        pprint.pprint(self.summarize_data_sources())
 
     def verify_id_uniqueness(self):
         patient_ids = set([patient.id for patient in self])
