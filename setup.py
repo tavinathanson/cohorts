@@ -14,6 +14,8 @@
 
 from __future__ import print_function
 import os
+from os import path
+from codecs import open
 from setuptools import setup
 import versioneer
 
@@ -37,6 +39,12 @@ except ImportError as e:
     print("Failed to convert %s to reStructuredText", readme_filename)
     pass
 
+# get the dependencies and installs
+with open(path.join(current_directory, "requirements.txt"), encoding='utf-8') as f:
+    all_reqs = f.read().split('\n')
+
+install_requires = [req.strip() for req in all_reqs if 'git+' not in req]
+dependency_links = [req.strip().replace('git+','') for req in all_reqs if 'git+' in req]
 
 if __name__ == "__main__":
     setup(
@@ -57,23 +65,8 @@ if __name__ == "__main__":
             "Programming Language :: Python",
             "Topic :: Scientific/Engineering :: Bio-Informatics",
         ],
-        install_requires=[
-            "pandas>=0.15",
-            "seaborn>=0.7.0",
-            "scipy>=0.17.0",
-            "topiary>=0.0.20",
-            "mhctools>=0.2.3",
-            "varcode>=0.4.12",
-            "pyensembl>=0.8.12",
-            "six>=1.10.0",
-            "lifelines>=0.9.1.0",
-            "scikit-learn>=0.17.1",
-            "vcf-annotate-polyphen>=0.1.2",
-            "patsy>=0.4.1"
-        ],
-        dependency_links=[
-            "git+git://github.com/hammerlab/isovar",
-        ],
+        install_requires=install_requires,
+        dependency_links=dependency_links,
         long_description=readme,
         packages=["cohorts"],
     )
