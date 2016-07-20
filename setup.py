@@ -19,7 +19,6 @@ from codecs import open
 from setuptools import setup
 import versioneer
 
-here = path.abspath(path.dirname(__file__))
 current_directory = os.path.dirname(__file__)
 readme_filename = "README.md"
 readme_path = os.path.join(current_directory, readme_filename)
@@ -41,7 +40,7 @@ except ImportError as e:
     pass
 
 # get the dependencies and installs
-with open(path.join(here, 'requirements.txt'), encoding='utf-8') as f:
+with open(path.join(current_directory, 'requirements.txt'), encoding='utf-8') as f:
     all_reqs = f.read().split('\n')
 
 install_requires = [x.strip() for x in all_reqs if 'git+' not in x]
