@@ -420,7 +420,9 @@ class Cohort(Collection):
                 cols.append(col)
 
         if (rename_cols):
-            df = df.rename(columns=_strip_column_names(df.columns, keep_paren_contents=keep_paren_contents))
+            rename_dict = _strip_column_names(df.columns, keep_paren_contents=keep_paren_contents)
+            df.rename(columns=rename_dict, inplace=True)
+            cols = [rename_dict[col] for col in cols]
         return (cols, df)
 
     def load_dataframe(self, df_loader_name):
