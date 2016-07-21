@@ -104,7 +104,7 @@ def strip_column_names(cols, keep_paren_contents=True):
     Returns
     -------
 
-    dict mapping cols -> newcols
+    dict mapping col_names -> new_col_names
 
     Example
     -------
