@@ -30,9 +30,11 @@ def test_column_names():
          'PD L1 (>1)': pd.Series([0., 1., 1., 1.], index=['a', 'b', 'c', 'd']),
          }
     df = pd.DataFrame(d)
+
     # should not error & should rename columns
     df2 = df.rename(columns=clean_column_names(df.columns))
     ok_((df2.columns != df.columns).any())
+
     # should not rename columns -- should error
     df3 = d.rename(columns=clean_column_names(
         df.columns, keep_paren_contents=False))
