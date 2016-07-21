@@ -13,17 +13,17 @@
 # limitations under the License.
 
 import pandas as pd
-from cohorts.utils import clean_column_names, _clean_column_name
+from cohorts.utils import strip_column_names, _strip_column_name
 
 from nose.tools import eq_, ok_
 
 
-def test_clean_column_name():
-    res = [_clean_column_name(col) for col in ['PD-L1', 'PD L1', 'PD L1_']]
+def test_strip_single_column_name():
+    res = [_strip_column_name(col) for col in ['PD-L1', 'PD L1', 'PD L1_']]
     eq_(res, ['pd_l1', 'pd_l1', 'pd_l1'])
 
 
-def test_column_names():
+def test_strip_column_names():
     d = {'one': pd.Series([1., 2., 3.], index=['a', 'b', 'c']),
          'two': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
          'PD L1 (val)': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
@@ -32,10 +32,10 @@ def test_column_names():
     df = pd.DataFrame(d)
 
     # should not error & should rename columns
-    df2 = df.rename(columns=clean_column_names(df.columns))
+    df2 = df.rename(columns=strip_column_names(df.columns))
     ok_((df2.columns != df.columns).any())
 
     # should not rename columns -- should error
-    df3 = df.rename(columns=clean_column_names(
+    df3 = df.rename(columns=strip_column_names(
         df.columns, keep_paren_contents=False))
     ok_((df3.columns == df.columns).all())

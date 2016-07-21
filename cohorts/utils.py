@@ -16,10 +16,10 @@ import re
 import logging
 
 
-def _clean_column_name(col_name, keep_paren_contents=True):
+def _strip_column_name(col_name, keep_paren_contents=True):
     """
     Utility script applying several regexs to a string.
-    Intended to be used by `clean_column_names`.
+    Intended to be used by `strip_column_names`.
 
     This function will:
         1. replace informative punctuation components with text
@@ -41,7 +41,7 @@ def _clean_column_name(col_name, keep_paren_contents=True):
 
     Examples
     --------
-    > print([_clean_column_name(col) for col in ['PD-L1','PD L1','PD L1_']])
+    > print([_strip_column_name(col) for col in ['PD-L1','PD L1','PD L1_']])
     """
     # start with input
     new_col_name = col_name
@@ -77,12 +77,13 @@ def _clean_column_name(col_name, keep_paren_contents=True):
     return new_col_name.lower()
 
 
-def clean_column_names(cols, keep_paren_contents=True):
+def strip_column_names(cols, keep_paren_contents=True):
     """
     Utility script for renaming pandas columns to patsy-friendly names.
-    Revised names have:
-        - punctuation and whitespace -> text or _
-        - all text in lower case
+
+    Revised names have been:
+        - stripped of all punctuation and whitespace (converted to text or `_`)
+        - converted to lower case
 
     Takes a list of column names, returns a dict mapping
     names to revised names.
@@ -113,21 +114,22 @@ def clean_column_names(cols, keep_paren_contents=True):
       'PD L1 (>1)': pd.Series([0., 1., 1., 0.], index=['a', 'b', 'c', 'd']),
       }
     > df = pd.DataFrame(df)
-    > df = df.rename(columns = clean_column_names(df.columns))
+    > df = df.rename(columns = strip_column_names(df.columns))
 
     ## observe, by comparison
-    > df2 = df.rename(columns = clean_column_names(df.columns,
+    > df2 = df.rename(columns = strip_column_names(df.columns,
         keep_paren_contents=False))
     """
     logger = logging.getLogger()
 
-    # clean/replace punctuation
+    # strip/replace punctuation
     new_cols = [
-        _clean_column_name(col, keep_paren_contents=keep_paren_contents)
+        _strip_column_name(col, keep_paren_contents=keep_paren_contents)
         for col in cols]
 
     if not(len(new_cols) == len(set(new_cols))):
-        logger.warning('Warning: clean_column_names will introduce duplicate names. Reverting column names to the original.')
+        logger.warning('Warning: strip_column_names (if run) would introduce duplicate names.'
+            ' Reverting column names to the original.')
         return dict(zip(cols, cols))
 
     return dict(zip(cols, new_cols))

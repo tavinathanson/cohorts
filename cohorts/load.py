@@ -38,6 +38,7 @@ from topiary.sequence_helpers import contains_mutant_residues
 from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
 
+from .utils import strip_column_names as _strip_column_names
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
@@ -350,8 +351,9 @@ class Cohort(Collection):
         Other parameters
         ----------------
         `rename_cols`: (bool)
-                if True, then return columns using "clean" column names
-                ("clean" means lower-case names without punctuation other than `_`)
+                if True, then return columns using "stripped" column names
+                ("stripped" means lower-case names without punctuation other than `_`)
+                See `utils.strip_column_names` for more details
                 defaults to False
         `keep_paren_contents`: (bool)
                 if True, then contents of column names within parens are kept.
@@ -416,6 +418,10 @@ class Cohort(Collection):
                 col = elem.__name__ if not is_lambda(elem) else "column_%d" % i
                 col, df = apply_func(on=elem, col=col, df=df)
                 cols.append(col)
+
+        if (rename_cols):
+            df = df.rename(columns=_strip_column_names(d.columns,
+                   keep_paren_contents=keep_paren_contents))
         return (cols, df)
 
     def load_dataframe(self, df_loader_name):
