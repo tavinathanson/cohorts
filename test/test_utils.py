@@ -18,7 +18,7 @@ from cohorts import DataFrameLoader
 
 from nose.tools import eq_, ok_
 from .test_basic import make_simple_cohort
-
+from sets import Set
 
 def test_strip_single_column_name():
     res = [_strip_column_name(col) for col in ['PD-L1', 'PD L1', 'PD L1_']]
@@ -65,15 +65,22 @@ def test_as_dataframe_generic():
     # test that column names haven't changed
     df = cohort.as_dataframe(join_with="hello")
     # column names should match those in df_hello
-    ok_([col in df_hello.columns for col in df.columns])
+    expected = Set(df_hello.columns)
+    returned = Set(df.columns)
+    print('Expected:', expected)
+    print('Returned:', returned)
+    ok_(expected.issubset(returned))
 
 
 def test_as_dataframe_rename():
     df_hello, cohort = prep_test_cohort()
     # test behavior with rename_cols=True
     df = cohort.as_dataframe(rename_cols=True, join_with='hello')
-    expected = ['one', 'two', 'pd_l1_val', 'pd_l1_gt_1', 'the_id']
-    ok_([name in df.columns for name in expected])
+    expected = Set(['one', 'two', 'pd_l1_val', 'pd_l1_gt_1', 'the_id'])
+    returned = Set(df.columns)
+    print('Expected:', expected)
+    print('Returned:', returned)
+    ok_(expected.issubset(returned))
 
 
 def test_as_dataframe_drop_parens():
@@ -81,4 +88,8 @@ def test_as_dataframe_drop_parens():
     # test behavior with keep_paren_contents=False
     df = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
     # column names should match those in df_hello
-    ok_([col in df_hello.columns for col in df.columns])
+    expected = Set(df_hello.columns)
+    returned = Set(df.columns)
+    print('Expected:', expected)
+    print('Returned:', returned)
+    ok_(expected.issubset(returned))
