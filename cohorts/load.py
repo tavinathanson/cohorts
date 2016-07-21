@@ -330,7 +330,7 @@ class Cohort(Collection):
         return df
 
     def as_dataframe(self, on=None, col=None, join_with=None, join_how=None,
-                    rename_cols=False, keep_paren_contents=True, **kwargs):
+                     rename_cols=False, keep_paren_contents=True, **kwargs):
         """
         Return this Cohort as a DataFrame, and optionally include additional columns
         using `on`.
@@ -351,14 +351,14 @@ class Cohort(Collection):
         Other parameters
         ----------------
         `rename_cols`: (bool)
-                if True, then return columns using "stripped" column names
-                ("stripped" means lower-case names without punctuation other than `_`)
-                See `utils.strip_column_names` for more details
-                defaults to False
+            if True, then return columns using "stripped" column names
+            ("stripped" means lower-case names without punctuation other than `_`)
+            See `utils.strip_column_names` for more details
+            defaults to False
         `keep_paren_contents`: (bool)
-                if True, then contents of column names within parens are kept.
-                if False, contents of column names within-parens are dropped.
-                Defaults to True
+            if True, then contents of column names within parens are kept.
+            if False, contents of column names within-parens are dropped.
+            Defaults to True
         ----------
 
         Return : tuple or DataFrame
@@ -420,8 +420,7 @@ class Cohort(Collection):
                 cols.append(col)
 
         if (rename_cols):
-            df = df.rename(columns=_strip_column_names(df.columns,
-                   keep_paren_contents=keep_paren_contents))
+            df = df.rename(columns=_strip_column_names(df.columns, keep_paren_contents=keep_paren_contents))
         return (cols, df)
 
     def load_dataframe(self, df_loader_name):
