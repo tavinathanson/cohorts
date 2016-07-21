@@ -15,22 +15,25 @@
 import pandas as pd
 from cohorts.utils import clean_column_names, _clean_column_name
 
-from nose.tools import raises, eq_, ok_
+from nose.tools import eq_, ok_
+
 
 def test_clean_column_name():
-    res = [_clean_column_name(col) for col in ['PD-L1','PD L1','PD L1_']]
-    eq_(res, ['PD_L1','PD_L1','PD_L1'])
+    res = [_clean_column_name(col) for col in ['PD-L1', 'PD L1', 'PD L1_']]
+    eq_(res, ['PD_L1', 'PD_L1', 'PD_L1'])
+
 
 def test_column_names():
-    d = {'one' : pd.Series([1., 2., 3.], index=['a', 'b', 'c']),
-      'two' : pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
-      'PD L1 (value)': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
-      'PD L1 (>1)': pd.Series([0., 1., 1., 1.], index=['a', 'b', 'c', 'd']),
-      }
+    d = {'one': pd.Series([1., 2., 3.], index=['a', 'b', 'c']),
+         'two': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
+         'PD L1 (val)': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
+         'PD L1 (>1)': pd.Series([0., 1., 1., 1.], index=['a', 'b', 'c', 'd']),
+         }
     df = pd.DataFrame(d)
-    ## should not error & should rename columns
-    df2 = df.rename(columns = clean_column_names(df.columns))
-    ok_(df2.columns != df.columns)
-    ## should not rename columns -- should error
-    df3 = d.rename(columns = clean_column_names(df.columns, keep_paren_contents = False))
-    eq_(df3.columns, df.columns)
+    # should not error & should rename columns
+    df2 = df.rename(columns=clean_column_names(df.columns))
+    ok_((df2.columns != df.columns).any())
+    # should not rename columns -- should error
+    df3 = d.rename(columns=clean_column_names(
+        df.columns, keep_paren_contents=False))
+    eq_((df3.columns, df.columns).all())
