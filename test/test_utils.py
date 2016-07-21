@@ -43,14 +43,6 @@ def test_strip_column_names():
     ok_((df3.columns == df.columns).all())
 
 
-def test_as_dataframe_generic():
-    cohort = prep_test_cohort()
-    # test that column names haven't changed
-    df = cohort.as_dataframe(join_with="hello")
-    # column names should match those in df_hello
-    ok_([col in df_hello.columns for col in df.columns])
-
-
 def prep_test_cohort():
     cohort = make_simple_cohort()
     df_hello = pd.DataFrame({
@@ -65,17 +57,26 @@ def prep_test_cohort():
         return df_hello
     df_loader = DataFrameLoader("hello", load_df, join_on="the_id")
     cohort.df_loaders = [df_loader]
-    return cohort
+    return df_hello, cohort
+
+
+def test_as_dataframe_generic():
+    df_hello, cohort = prep_test_cohort()
+    # test that column names haven't changed
+    df = cohort.as_dataframe(join_with="hello")
+    # column names should match those in df_hello
+    ok_([col in df_hello.columns for col in df.columns])
+
 
 def test_as_dataframe_rename():
-    cohort = prep_test_cohort()
+    df_hello, cohort = prep_test_cohort()
     # test behavior with rename_cols=True
     df2 = cohort.as_dataframe(rename_cols=True, join_with='hello')
     eq_(df2.columns, ['one', 'two', 'pd_l1_val', 'pd_l1_gt_1', 'the_id'])
 
 
 def test_as_dataframe_drop_parens():
-    cohort = prep_test_cohort()
+    df_hello, cohort = prep_test_cohort()
     # test behavior with keep_paren_contents=False
     df3 = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
     # column names should match those in df_hello
