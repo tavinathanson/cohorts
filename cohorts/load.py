@@ -420,7 +420,7 @@ class Cohort(Collection):
                 cols.append(col)
 
         if (rename_cols):
-            df = df.rename(columns=_strip_column_names(d.columns,
+            df = df.rename(columns=_strip_column_names(df.columns,
                    keep_paren_contents=keep_paren_contents))
         return (cols, df)
 
