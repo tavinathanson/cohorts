@@ -38,7 +38,7 @@ def _clean_column_name(x, keep_parens = True):
 
         Examples
         --------- 
-        > print([clean_column_name(col) for col in ['PD-L1','PD L1','PD L1_']])
+        > print([_clean_column_name(col) for col in ['PD-L1','PD L1','PD L1_']])
 
     """
     ## start with input
