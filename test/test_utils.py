@@ -20,7 +20,7 @@ from nose.tools import eq_, ok_
 
 def test_clean_column_name():
     res = [_clean_column_name(col) for col in ['PD-L1', 'PD L1', 'PD L1_']]
-    eq_(res, ['PD_L1', 'PD_L1', 'PD_L1'])
+    eq_(res, ['pd_l1', 'pd_l1', 'pd_l1'])
 
 
 def test_column_names():
@@ -36,6 +36,6 @@ def test_column_names():
     ok_((df2.columns != df.columns).any())
 
     # should not rename columns -- should error
-    df3 = d.rename(columns=clean_column_names(
+    df3 = df.rename(columns=clean_column_names(
         df.columns, keep_paren_contents=False))
-    eq_((df3.columns, df.columns).all())
+    ok_((df3.columns == df.columns).all())

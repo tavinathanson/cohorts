@@ -25,7 +25,7 @@ def _clean_column_name(col_name, keep_paren_contents=True):
         1. replace informative punctuation components with text
         2. (optionally) remove text within parentheses
         3. replace remaining punctuation/whitespace with _
-        4. remove trailing punctuation/whitespace
+        4. strip leading/trailing punctuation/whitespace
 
     Parameters
     ----------
@@ -68,8 +68,8 @@ def _clean_column_name(col_name, keep_paren_contents=True):
     punct_replacement = '_'
     new_col_name = re.sub(punct_pattern, punct_replacement, new_col_name)
 
-    # remove trailing _ if it exists (if last char was punctuation)
-    new_col_name = re.sub('_$', '', new_col_name)
+    # remove leading/trailing _ if it exists (if last char was punctuation)
+    new_col_name = new_col_name.strip("_")
 
     # TODO: check for empty string
 
