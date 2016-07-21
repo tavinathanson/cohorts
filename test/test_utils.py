@@ -14,12 +14,48 @@
 
 import pandas as pd
 from cohorts.utils import strip_column_names, _strip_column_name
-from cohorts import DataFrameLoader
+from cohorts import DataFrameLoader, Cohort, Patient
 import warnings
+
+from . import data_path, generated_data_path, DATA_DIR
+from .data_generate import generate_vcfs
+from .functions import *
 
 from nose.tools import eq_, ok_
 from .test_basic import make_simple_cohort
 from sets import Set
+
+def make_alt_simple_clinical_dataframe(
+        os_list=None,
+        pfs_list=None,
+        deceased_list=None,
+        progressed_or_deceased_list=None):
+    return pd.DataFrame({"id": ["1", "4", "5"],
+                         "age": [15, 20, 25],
+                         "os": [100, 150, 120] if os_list is None else os_list,
+                         "pfs": [50, 40, 120] if pfs_list is None else pfs_list,
+                         "deceased": [True, False, False] if deceased_list is None else deceased_list,
+                         "progressed_or_deceased": [True, True, False] if progressed_or_deceased_list is None else progressed_or_deceased_list})
+
+def make_alt_simple_cohort(merge_type="union", **kwargs):
+    clinical_dataframe = make_alt_simple_clinical_dataframe(**kwargs)
+    patients = []
+    for i, row in clinical_dataframe.iterrows():
+        patient = Patient(id=row["id"],
+                          os=row["OS"],
+                          pfs=row["PFS"],
+                          deceased=row["deceased"],
+                          progressed_or_deceased=row["progressed_or_deceased"],
+                          additional_data=row
+                          )
+        patients.append(patient)
+
+    return Cohort(
+        patients=patients,
+        responder_pfs_equals_os=True,
+        merge_type=merge_type,
+        cache_dir=generated_data_path("cache"))
+
 
 def test_strip_single_column_name():
     res = [_strip_column_name(col) for col in ['PD-L1', 'PD L1', 'PD L1_']]
@@ -61,36 +97,64 @@ def prep_test_cohort():
     return df_hello, cohort
 
 
+def prep_alt_test_cohort():
+    cohort = make_alt_simple_cohort()
+    df_hello = pd.DataFrame({
+        'one': [1., 2., 3.],
+        'two': [1., 2., 3.],
+        'PD L1 (val)': [1., 2., 3.],
+        'PD L1 (>1)': [0., 1., 1.],
+        'the_id': ['1', '5', '7'],
+        })
+
+    def load_df():
+        return df_hello
+    df_loader = DataFrameLoader("hello", load_df, join_on="the_id")
+    cohort.df_loaders = [df_loader]
+    return df_hello, cohort
+
+
+def compare_column_names(expected, observed):
+    expected = set(expected)
+    observed = set(observed)
+    print('Expected:', expected)
+    print('Observed:', observed)
+    return(expected.issubset(observed))
+
+
 def test_as_dataframe_generic():
     df_hello, cohort = prep_test_cohort()
     # test that column names haven't changed
     df = cohort.as_dataframe(join_with="hello")
     # column names should match those in df_hello
-    expected = Set(df_hello.columns)
-    returned = Set(df.columns)
-    print('Expected:', expected)
-    print('Returned:', returned)
-    ok_(expected.issubset(returned))
+    res = compare_column_names(expected = df_hello.columns,
+                               observed = df.columns)
+    ok_(res, 'columns names failed to match expected')
 
 
-def test_as_dataframe_rename():
+def test_as_dataframe_good_rename():
+    df_hello, cohort = prep_alt_test_cohort()
+    # test behavior with rename_cols=True. should raise a warning
+    df = cohort.as_dataframe(rename_cols=True, join_with='hello')
+    res = compare_column_names(expected = strip_column_names(df_hello.columns),
+                               observed = df.columns)
+    ok_(res, 'column names failed to match expected')
+
+
+def test_as_dataframe_bad_rename():
     df_hello, cohort = prep_test_cohort()
     # test behavior with rename_cols=True. should raise a warning
     with warnings.catch_warnings(record=True) as w:
         df = cohort.as_dataframe(rename_cols=True, join_with='hello')
-    expected = Set(df_hello.columns)
-    returned = Set(df.columns)
-    print('Expected:', expected)
-    print('Returned:', returned)
-    ok_(expected.issubset(returned))
+    res = compare_column_names(expected = df_hello.columns,
+                               observed = df.columns)
+    ok_(res, 'columns names failed to match expected')
 
 def test_as_dataframe_drop_parens():
     df_hello, cohort = prep_test_cohort()
     # test behavior with keep_paren_contents=False
     with warnings.catch_warnings(record=True) as w:
         df = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
-    expected = Set(df_hello.columns)
-    returned = Set(df.columns)
-    print('Expected:', expected)
-    print('Returned:', returned)
-    ok_(expected.issubset(returned))
+    res = compare_column_names(expected = df_hello.columns,
+                               observed = df.columns)
+    ok_(res, 'columns names failed to match expected')
