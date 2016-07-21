@@ -17,13 +17,10 @@ from cohorts.utils import strip_column_names, _strip_column_name
 from cohorts import DataFrameLoader, Cohort, Patient
 import warnings
 
-from . import data_path, generated_data_path, DATA_DIR
-from .data_generate import generate_vcfs
 from .functions import *
 
 from nose.tools import eq_, ok_
 from .test_basic import make_simple_cohort
-from sets import Set
 
 def make_alt_simple_clinical_dataframe(
         os_list=None,
