@@ -14,6 +14,7 @@
 
 import re
 import logging
+import warnings
 
 
 def _strip_column_name(col_name, keep_paren_contents=True):
@@ -128,8 +129,11 @@ def strip_column_names(cols, keep_paren_contents=True):
         for col in cols]
 
     if not(len(new_cols) == len(set(new_cols))):
-        logger.warning('Warning: strip_column_names (if run) would introduce duplicate names.'
-                       ' Reverting column names to the original.')
+        warn_str = 'Warning: strip_column_names (if run) would introduce duplicate names.'
+        warn_str += ' Reverting column names to the original.'
+
+        logger.warning(warn_str)
+        warnings.warn(warn_str)
         print('Warning: strip_column_names would introduce duplicate names. Please fix & try again.')
         return dict(zip(cols, cols))
 
