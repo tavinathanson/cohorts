@@ -30,10 +30,10 @@ def test_column_names():
     d = pd.DataFrame(d)
     ## should not error & should rename columns
     d2 = d.rename(columns = clean_column_names(d.columns))
-    ok_(d2.columns != d.columns)
+    ok_((d2.columns != d.columns).any())
 
     ## should not rename columns -- should error
     d3 = d.rename(columns = clean_column_names(d.columns, keep_parens = False))
-    eq_(d3.columns, d.columns)
+    ok_((d3.columns == d.columns).all())
 
 
