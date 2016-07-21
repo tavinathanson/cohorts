@@ -328,7 +328,8 @@ class Cohort(Collection):
         self.dataframe_hash = hash(str(df.sort_values("patient_id")))
         return df
 
-    def as_dataframe(self, on=None, col=None, join_with=None, join_how=None, **kwargs):
+    def as_dataframe(self, on=None, col=None, join_with=None, join_how=None,
+                    rename_cols=False, keep_paren_contents=True, **kwargs):
         """
         Return this Cohort as a DataFrame, and optionally include additional columns
         using `on`.
@@ -345,6 +346,18 @@ class Cohort(Collection):
 
         If `on` is a function or functions, kwargs is passed to those functions.
         Otherwise kwargs is ignored.
+
+        Other parameters
+        ----------------
+        `rename_cols`: (bool)
+                if True, then return columns using "clean" column names
+                ("clean" means lower-case names without punctuation other than `_`)
+                defaults to False
+        `keep_paren_contents`: (bool)
+                if True, then contents of column names within parens are kept.
+                if False, contents of column names within-parens are dropped.
+                Defaults to True
+        ----------
 
         Return : tuple or DataFrame
             <dataframe>
@@ -397,14 +410,13 @@ class Cohort(Collection):
             for key, value in on.iteritems():
                 col, df = apply_func(on=value, col=key, df=df)
                 cols.append(col)
-            return (cols, df)
         if type(on) == list:
             cols = []
             for i, elem in enumerate(on):
                 col = elem.__name__ if not is_lambda(elem) else "column_%d" % i
                 col, df = apply_func(on=elem, col=col, df=df)
                 cols.append(col)
-            return (cols, df)
+        return (cols, df)
 
     def load_dataframe(self, df_loader_name):
         """
