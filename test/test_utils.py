@@ -14,9 +14,11 @@
 
 import pandas as pd
 from cohorts.utils import strip_column_names, _strip_column_name
+from cohorts import DataFrameLoader
 
 from nose.tools import eq_, ok_
 from .test_basic import make_simple_cohort
+
 
 def test_strip_single_column_name():
     res = [_strip_column_name(col) for col in ['PD-L1', 'PD L1', 'PD L1_']]
@@ -40,14 +42,17 @@ def test_strip_column_names():
         df.columns, keep_paren_contents=False))
     ok_((df3.columns == df.columns).all())
 
+
 def test_as_dataframe():
     cohort = make_simple_cohort()
-    df_hello = pd.DataFrame({'one': pd.Series([1., 2., 3.], index=['a', 'b', 'c']),
-         'two': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
-         'PD L1 (val)': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
-         'PD L1 (>1)': pd.Series([0., 1., 1., 1.], index=['a', 'b', 'c', 'd']),
-         'the_id': ['1', '5', '7'],
-         })
+    df_hello = pd.DataFrame({
+        'one': [1., 2., 3.],
+        'two': [1., 2., 3.],
+        'PD L1 (val)': [1., 2., 3.],
+        'PD L1 (>1)': [0., 1., 1.],
+        'the_id': ['1', '5', '7'],
+        })
+
     def load_df():
         return df_hello
     df_loader = DataFrameLoader("hello", load_df, join_on="the_id")
@@ -60,7 +65,7 @@ def test_as_dataframe():
 
     # test behavior with rename_cols=True
     df2 = cohort.as_dataframe(rename_cols=True)
-    eq_(df2.columns, ['one','two','pd_l1_val','pd_l1_gt_1','the_id'])
+    eq_(df2.columns, ['one', 'two', 'pd_l1_val', 'pd_l1_gt_1', 'the_id'])
 
     # test behavior with keep_paren_contents=False
     df3 = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False)
