@@ -25,15 +25,12 @@ def test_column_names():
     d = {'one' : pd.Series([1., 2., 3.], index=['a', 'b', 'c']),
       'two' : pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
       'PD L1 (value)': pd.Series([1., 2., 3., 4.], index=['a', 'b', 'c', 'd']),
-      'PD L1 (>1)': pd.Series([0., 1., 1., 0.], index=['a', 'b', 'c', 'd']),
+      'PD L1 (>1)': pd.Series([0., 1., 1., 1.], index=['a', 'b', 'c', 'd']),
       }
-    d = pd.DataFrame(d)
+    df = pd.DataFrame(d)
     ## should not error & should rename columns
-    d2 = d.rename(columns = clean_column_names(d.columns))
-    ok_(d2.columns != d.columns)
-
+    df2 = df.rename(columns = clean_column_names(df.columns))
+    ok_(df2.columns != df.columns)
     ## should not rename columns -- should error
-    d3 = d.rename(columns = clean_column_names(d.columns, keep_parens = False))
-    eq_(d3.columns, d.columns)
-
-
+    df3 = d.rename(columns = clean_column_names(df.columns, keep_paren_contents = False))
+    eq_(df3.columns, df.columns)
