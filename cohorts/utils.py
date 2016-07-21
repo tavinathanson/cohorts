@@ -128,7 +128,7 @@ def strip_column_names(cols, keep_paren_contents=True):
         _strip_column_name(col, keep_paren_contents=keep_paren_contents)
         for col in cols]
 
-    if not(len(new_cols) == len(set(new_cols))):
+    if len(new_cols) != len(set(new_cols)):
         warn_str = 'Warning: strip_column_names (if run) would introduce duplicate names.'
         warn_str += ' Reverting column names to the original.'
 

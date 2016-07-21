@@ -15,6 +15,7 @@
 import pandas as pd
 from cohorts.utils import strip_column_names, _strip_column_name
 from cohorts import DataFrameLoader
+import warnings
 
 from nose.tools import eq_, ok_
 from .test_basic import make_simple_cohort
@@ -74,20 +75,20 @@ def test_as_dataframe_generic():
 
 def test_as_dataframe_rename():
     df_hello, cohort = prep_test_cohort()
-    # test behavior with rename_cols=True
-    df = cohort.as_dataframe(rename_cols=True, join_with='hello')
-    expected = Set(['one', 'two', 'pd_l1_val', 'pd_l1_gt_1', 'the_id'])
+    # test behavior with rename_cols=True. should raise a warning
+    with warnings.catch_warnings(record=True) as w:
+        df = cohort.as_dataframe(rename_cols=True, join_with='hello')
+    expected = Set(df_hello.columns)
     returned = Set(df.columns)
     print('Expected:', expected)
     print('Returned:', returned)
     ok_(expected.issubset(returned))
 
-
 def test_as_dataframe_drop_parens():
     df_hello, cohort = prep_test_cohort()
     # test behavior with keep_paren_contents=False
-    df = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
-    # column names should match those in df_hello
+    with warnings.catch_warnings(record=True) as w:
+        df = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
     expected = Set(df_hello.columns)
     returned = Set(df.columns)
     print('Expected:', expected)
