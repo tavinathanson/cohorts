@@ -216,7 +216,7 @@ class Cohort(Collection):
     check_provenance : bool
         Verify that the cached provenance is equal to the current environment.
     print_provenance : bool
-        Print a cached provenance summary.
+        Print a summary of cache file provenance.
     polyphen_dump_path : str
         Path to a Polyphen database dump.
     pageant_coverage_path : str
