@@ -44,7 +44,7 @@ from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
 from .varcode_utils import (filter_variants, filter_effects,
                             filter_neoantigens, filter_polyphen)
-from .variant_filters import variant_qc_filter
+from .variant_filters import no_filter
 from . import variant_filters
 
 class InvalidDataError(ValueError):
@@ -211,6 +211,11 @@ class Cohort(Collection):
         The name of one or more `DataFrameLoader`s to join with by default.
     join_how : str
         What type of default join to use for joining `DataFrameLoader`s.
+    filter_fn : Function
+        Specify a default filter function for `load_variants`, `load_effects`,
+        `functions.missense_snv_count`, etc.
+    normalized_per_mb : bool
+        Whether or not to normalize by number of loci.
     responder_pfs_equals_os : bool
         Ensure that the PFS values for responders (not progressed) are equal to
         OS values.
@@ -234,6 +239,8 @@ class Cohort(Collection):
                  extra_df_loaders=[],
                  join_with=None,
                  join_how="inner",
+                 filter_fn=None,
+                 normalized_per_mb=False,
                  responder_pfs_equals_os=False,
                  check_provenance=False,
                  print_provenance=True,
@@ -258,6 +265,8 @@ class Cohort(Collection):
         self.df_loaders = df_loaders
         self.join_with = join_with
         self.join_how = join_how
+        self.filter_fn = filter_fn
+        self.normalized_per_mb = normalized_per_mb
         self.responder_pfs_equals_os = responder_pfs_equals_os
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
@@ -527,13 +536,15 @@ class Cohort(Collection):
         patients : str, optional
             Filter to a subset of patients
         filter_fn : function
-            Takes a FilterableVariant and returns a boolean. Only variants returning True are preserved. Defaults to `variant_qc_filter`.
+            Takes a FilterableVariant and returns a boolean. Only variants returning True are preserved.
+            Overrides default self.filter_fn. `None` passes through to self.filter_fn.
 
         Returns
         -------
         merged_variants
             Dictionary of patient_id to VariantCollection
         """
+        filter_fn = first_not_none_param([filter_fn, self.filter_fn], no_filter)
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
@@ -608,14 +619,15 @@ class Cohort(Collection):
             Can be downloaded and bunzip2"ed from http://bit.ly/208mlIU
         filter_fn : function
             Takes a FilterablePolyphen and returns a boolean.
-            Only annotations returning True are preserved. Defaults to
-            `variant_qc_filter`.
+            Only annotations returning True are preserved.
+            Overrides default self.filter_fn. `None` passes through to self.filter_fn.
 
         Returns
         -------
         annotations
             Dictionary of patient_id to a DataFrame that contains annotations
         """
+        filter_fn = first_not_none_param([filter_fn, self.filter_fn], no_filter)
         patient_annotations = {}
         for patient in self:
             annotations = self._load_single_patient_polyphen(
@@ -631,6 +643,9 @@ class Cohort(Collection):
     def _load_single_patient_polyphen(self, patient, filter_fn):
         cache_name = self.cache_names["polyphen"]
         cached_file_name = "polyphen-annotations.csv"
+
+        # Don't filter here, as these variants are used to generate the
+        # PolyPhen cache; and cached items are never filtered.
         variants = self._load_single_patient_variants(patient,
                                                       filter_fn=None)
         if variants is None:
@@ -688,13 +703,15 @@ class Cohort(Collection):
         only_nonsynonymous : bool, optional
             If true, load only nonsynonymous effects, default False
         filter_fn : function
-            Takes a FilterableEffect and returns a boolean. Only effects returning True are preserved. Defaults to `variant_qc_filter`.
+            Takes a FilterableEffect and returns a boolean. Only effects returning True are preserved.
+            Overrides default self.filter_fn. `None` passes through to self.filter_fn.
 
         Returns
         -------
         effects
              Dictionary of patient_id to varcode.EffectCollection
         """
+        filter_fn = first_not_none_param([filter_fn, self.filter_fn], no_filter)
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
@@ -705,6 +722,9 @@ class Cohort(Collection):
 
     def _load_single_patient_effects(self, patient, only_nonsynonymous, filter_fn):
         cached_file_name = "%s-%s-effects.pkl" % (self.variant_type, self.merge_type)
+
+        # Don't filter here, as these variants are used to generate the
+        # effects cache; and cached items are never filtered.
         variants = self._load_single_patient_variants(patient, filter_fn=None)
         if variants is None:
             return None
@@ -785,6 +805,8 @@ class Cohort(Collection):
                          epitope_lengths=[8, 9, 10, 11], ic50_cutoff=500,
                          process_limit=10, max_file_records=None,
                          filter_fn=None):
+        filter_fn = first_not_none_param([filter_fn, self.filter_fn], no_filter)
+
         dfs = {}
         for patient in self.iter_patients(patients):
             df_epitopes = self._load_single_patient_neoantigens(
@@ -803,6 +825,9 @@ class Cohort(Collection):
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
         cached_file_name = "%s-%s-neoantigens.csv" % (self.variant_type, self.merge_type)
+
+        # Don't filter here, as these variants are used to generate the
+        # neoantigen cache; and cached items are never filtered.
         variants = self._load_single_patient_variants(patient, filter_fn=None)
         if variants is None:
             return None

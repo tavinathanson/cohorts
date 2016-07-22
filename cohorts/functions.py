@@ -14,14 +14,17 @@
 
 from __future__ import print_function
 
-from .variant_filters import variant_qc_filter,effect_expressed_filter
+from .variant_filters import no_filter, effect_expressed_filter
+from .load import first_not_none_param
 
 import numpy as np
 from varcode.effects import Substitution
 from varcode.common import memoize
 
 def snv_count(row, cohort, filter_fn=None,
-              normalized_per_mb=True, **kwargs):
+              normalized_per_mb=None, **kwargs):
+    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
+    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
     patient_id = row["patient_id"]
     patient_variants = cohort.load_variants(
         patients=[cohort.patient_from_id(patient_id)],
@@ -35,7 +38,9 @@ def snv_count(row, cohort, filter_fn=None,
     return np.nan
 
 def nonsynonymous_snv_count(row, cohort, filter_fn=None,
-                            normalized_per_mb=True, **kwargs):
+                            normalized_per_mb=None, **kwargs):
+    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
+    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
     patient_id = row["patient_id"]
     # This only loads one effect per variant.
     patient_nonsynonymous_effects = cohort.load_effects(
@@ -51,7 +56,9 @@ def nonsynonymous_snv_count(row, cohort, filter_fn=None,
     return np.nan
 
 def missense_snv_count(row, cohort, filter_fn=None,
-                       normalized_per_mb=True, **kwargs):
+                       normalized_per_mb=None, **kwargs):
+    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
+    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
     patient_id = row["patient_id"]
     def missense_filter_fn(filterable_effect):
         if filter_fn is not None:
@@ -72,7 +79,9 @@ def missense_snv_count(row, cohort, filter_fn=None,
     return np.nan
 
 def neoantigen_count(row, cohort, filter_fn=None,
-                     normalized_per_mb=True, **kwargs):
+                     normalized_per_mb=None, **kwargs):
+    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
+    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
     patient_id = row["patient_id"]
     patient = cohort.patient_from_id(row["patient_id"])
     patient_neoantigens = cohort.load_neoantigens(patients=[patient],
@@ -93,8 +102,8 @@ def expressed_missense_snv_count(row, cohort, filter_fn=None, **kwargs):
         return effect_expressed_filter(filterable_effect)
     return missense_snv_count(row, cohort, filter_fn=expressed_filter_fn, **kwargs)
 
-def expressed_neoantigen_count(row, cohort, **kwargs):
-    return neoantigen_count(row, cohort, only_expressed=True, **kwargs)
+def expressed_neoantigen_count(row, cohort, filter_fn=None, **kwargs):
+    return neoantigen_count(row, cohort, filter_fn=filter_fn, only_expressed=True, **kwargs)
 
 @memoize
 def get_patient_to_mb(cohort):

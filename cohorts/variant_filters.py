@@ -27,6 +27,9 @@ DEFAULT_MIN_TUMOR_VAF = 0
 DEFAULT_MAX_NORMAL_VAF = 0.02
 DEFAULT_MIN_TUMOR_ALT_DEPTH = 5
 
+def no_filter(filterable_variant):
+    return True
+
 def variant_qc_filter(filterable_variant,
                       min_tumor_depth=DEFAULT_MIN_TUMOR_DEPTH,
                       min_normal_depth=DEFAULT_MIN_NORMAL_DEPTH,
