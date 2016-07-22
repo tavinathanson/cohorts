@@ -38,6 +38,7 @@ from topiary.sequence_helpers import contains_mutant_residues
 from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
 
+from .utils import strip_column_names as _strip_column_names
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
@@ -328,7 +329,8 @@ class Cohort(Collection):
         self.dataframe_hash = hash(str(df.sort_values("patient_id")))
         return df
 
-    def as_dataframe(self, on=None, col=None, join_with=None, join_how=None, **kwargs):
+    def as_dataframe(self, on=None, col=None, join_with=None, join_how=None,
+                     rename_cols=False, keep_paren_contents=True, **kwargs):
         """
         Return this Cohort as a DataFrame, and optionally include additional columns
         using `on`.
@@ -345,6 +347,19 @@ class Cohort(Collection):
 
         If `on` is a function or functions, kwargs is passed to those functions.
         Otherwise kwargs is ignored.
+
+        Other parameters
+        ----------------
+        `rename_cols`: (bool)
+            if True, then return columns using "stripped" column names
+            ("stripped" means lower-case names without punctuation other than `_`)
+            See `utils.strip_column_names` for more details
+            defaults to False
+        `keep_paren_contents`: (bool)
+            if True, then contents of column names within parens are kept.
+            if False, contents of column names within-parens are dropped.
+            Defaults to True
+        ----------
 
         Return : tuple or DataFrame
             <dataframe>
@@ -397,14 +412,18 @@ class Cohort(Collection):
             for key, value in on.iteritems():
                 col, df = apply_func(on=value, col=key, df=df)
                 cols.append(col)
-            return (cols, df)
         if type(on) == list:
             cols = []
             for i, elem in enumerate(on):
                 col = elem.__name__ if not is_lambda(elem) else "column_%d" % i
                 col, df = apply_func(on=elem, col=col, df=df)
                 cols.append(col)
-            return (cols, df)
+
+        if (rename_cols):
+            rename_dict = _strip_column_names(df.columns, keep_paren_contents=keep_paren_contents)
+            df.rename(columns=rename_dict, inplace=True)
+            cols = [rename_dict[col] for col in cols]
+        return (cols, df)
 
     def load_dataframe(self, df_loader_name):
         """
