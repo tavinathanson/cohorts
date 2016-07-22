@@ -216,6 +216,10 @@ class Cohort(Collection):
         `functions.missense_snv_count`, etc.
     normalized_per_mb : bool
         Whether or not to normalize by number of loci.
+    min_coverage_depth_normal : int
+        When counting number of exonic loci, only count loci with at least this much normal depth.
+    min_coverage_depth_tumor : int
+        When counting number of exonic loci, only count loci with at least this much tumor depth.
     responder_pfs_equals_os : bool
         Ensure that the PFS values for responders (not progressed) are equal to
         OS values.
@@ -241,6 +245,8 @@ class Cohort(Collection):
                  join_how="inner",
                  filter_fn=None,
                  normalized_per_mb=False,
+                 min_coverage_normal_depth=0,
+                 min_coverage_tumor_depth=0,
                  responder_pfs_equals_os=False,
                  check_provenance=False,
                  print_provenance=True,
@@ -267,6 +273,8 @@ class Cohort(Collection):
         self.join_how = join_how
         self.filter_fn = filter_fn
         self.normalized_per_mb = normalized_per_mb
+        self.min_coverage_normal_depth = min_coverage_normal_depth
+        self.min_coverage_tumor_depth = min_coverage_tumor_depth
         self.responder_pfs_equals_os = responder_pfs_equals_os
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
@@ -961,12 +969,14 @@ class Cohort(Collection):
         self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         return df_isovar
 
-    def load_ensembl_coverage(self, min_depth=30):
+    def load_ensembl_coverage(self):
         if self.pageant_coverage_path is None:
             raise ValueError("Need a Pageant CoverageDepth path to load ensembl coverage values")
-        return variant_filters.load_ensembl_coverage(cohort=self,
-                                                     coverage_path=self.pageant_coverage_path,
-                                                     min_depth=min_depth)
+        return variant_filters.load_ensembl_coverage(
+            cohort=self,
+            coverage_path=self.pageant_coverage_path,
+            min_normal_depth=self.min_coverage_normal_depth,
+            min_tumor_depth=self.min_coverage_tumor_depth)
 
     def clear_caches(self):
         for cache in self.cache_names.keys():
