@@ -213,6 +213,14 @@ class Cohort(Collection):
     responder_pfs_equals_os : bool
         Ensure that the PFS values for responders (not progressed) are equal to
         OS values.
+    check_provenance : bool
+        Verify that the cached provenance is equal to the current environment.
+    print_provenance : bool
+        Print a cached provenance summary.
+    polyphen_dump_path : str
+        Path to a Polyphen database dump.
+    pageant_coverage_path : str
+        Path to Pageant CoverageDepth output.
     variant_type : {"snv", "indel"}, optional
         Load variants of a specific type, default "snv"
     merge_type : {"union", "intersection"}, optional
@@ -227,6 +235,7 @@ class Cohort(Collection):
                  join_how="inner",
                  responder_pfs_equals_os=False,
                  check_provenance=False,
+                 print_provenance=True,
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
                  variant_type="snv",
@@ -268,7 +277,8 @@ class Cohort(Collection):
                             "expressed_neoantigen": "cached-expressed-neoantigens",
                             "polyphen": "cached-polyphen-annotations",
                             "isovar": "cached-isovar-output"}
-        pprint.pprint(self.summarize_data_sources())
+        if print_provenance:
+            pprint.pprint(self.summarize_data_sources())
 
     def verify_id_uniqueness(self):
         patient_ids = set([patient.id for patient in self])
