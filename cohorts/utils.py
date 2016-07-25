@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import re
-import logging
 import warnings
 
 
@@ -121,7 +120,6 @@ def strip_column_names(cols, keep_paren_contents=True):
     > df2 = df.rename(columns = strip_column_names(df.columns,
         keep_paren_contents=False))
     """
-    #logger = logging.getLogger()
 
     # strip/replace punctuation
     new_cols = [
@@ -132,7 +130,6 @@ def strip_column_names(cols, keep_paren_contents=True):
         warn_str = 'Warning: strip_column_names (if run) would introduce duplicate names.'
         warn_str += ' Reverting column names to the original.'
 
-        #logger.warning(warn_str)
         warnings.warn(warn_str, Warning)
         print('Warning: strip_column_names would introduce duplicate names. Please fix & try again.')
         return dict(zip(cols, cols))
