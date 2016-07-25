@@ -152,6 +152,7 @@ def test_as_dataframe_drop_parens():
     df_hello, cohort = prep_test_cohort()
     # test behavior with keep_paren_contents=False
     with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
         df = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
     res = compare_column_names(expected = df_hello.columns,
                                observed = df.columns)
