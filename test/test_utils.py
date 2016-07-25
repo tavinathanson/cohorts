@@ -20,7 +20,7 @@ import warnings
 from . import generated_data_path
 from .functions import *
 
-from nose.tools import eq_, ok_
+from nose.tools import eq_, ok_, nottest
 from .test_basic import make_simple_cohort
 
 def make_alt_simple_clinical_dataframe(
@@ -132,27 +132,30 @@ def test_as_dataframe_generic():
 
 def test_as_dataframe_good_rename():
     df_hello, cohort = prep_alt_test_cohort()
-    # test behavior with rename_cols=True. should raise a warning
+    # test behavior with rename_cols=True. should not raise a warning
     df = cohort.as_dataframe(rename_cols=True, join_with='hello')
     res = compare_column_names(expected = strip_column_names(df_hello.columns),
                                observed = df.columns)
     ok_(res, 'column names failed to match expected')
 
 
+@nottest
 def test_as_dataframe_bad_rename():
     df_hello, cohort = prep_test_cohort()
     # test behavior with rename_cols=True. should raise a warning
     with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("ignore")
         df = cohort.as_dataframe(rename_cols=True, join_with='hello')
-    res = compare_column_names(expected = df_hello.columns,
-                               observed = df.columns)
-    ok_(res, 'columns names failed to match expected')
+        res = compare_column_names(expected = df_hello.columns,
+                                   observed = df.columns)
+        ok_(res, 'columns names failed to match expected')
 
+@nottest
 def test_as_dataframe_drop_parens():
     df_hello, cohort = prep_test_cohort()
     # test behavior with keep_paren_contents=False
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter("ignore")
         df = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
     res = compare_column_names(expected = df_hello.columns,
                                observed = df.columns)
