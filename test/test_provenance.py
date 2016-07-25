@@ -17,6 +17,7 @@ from __future__ import print_function
 from nose.tools import eq_, ok_
 import pandas as pd
 from os import path
+import os
 import cohorts
 import warnings
 
@@ -117,6 +118,11 @@ def test_summarize_provenance():
             warnings.simplefilter("always")
             ok_(not cohort.summarize_provenance_per_cache()[cache_name])
             ok_(len(w)>0)
+
+        ## now test whether deleting second patient's provenance file causes an error 
+        os.remove(provenance_path)
+        summary = cohort.summarize_provenance()
+
 
     finally:
         if cohort is not None:
