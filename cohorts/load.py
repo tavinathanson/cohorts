@@ -1297,6 +1297,10 @@ def compare_provenance(
     -----------
     Number of discrepancies (0: None)
     """
+    ## if either this or other items is null, return 0
+    if (not this_provenance or not other_provenance):
+        return 0
+    
     this_items = set(this_provenance.items())
     other_items = set(other_provenance.items())
 
