@@ -18,6 +18,7 @@ from nose.tools import eq_, ok_
 import pandas as pd
 from os import path
 import os
+from shutil import rmtree
 import cohorts
 import warnings
 
@@ -119,8 +120,10 @@ def test_summarize_provenance():
             ok_(not cohort.summarize_provenance_per_cache()[cache_name])
             ok_(len(w)>0)
 
-        ## now test whether deleting second patient's provenance file causes an error 
-        os.remove(provenance_path)
+        ## now test whether deleting contents of cache_dir causes an error 
+        dirlist = [ f for f in os.listdir(cache_dir) ]
+        for dir in dirlist:
+            rmtree(path.join(cache_dir, dir))
         summary = cohort.summarize_provenance()
 
 
