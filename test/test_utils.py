@@ -69,7 +69,7 @@ def test_strip_column_names():
     df = pd.DataFrame(d)
 
     # should not error & should rename columns
-    df2 = df.rename(columns=strip_column_names(df.columns)) 
+    df2 = df.rename(columns=strip_column_names(df.columns))
     ok_((df2.columns != df.columns).any())
     # should not rename columns -- should raise a warning
     with warnings.catch_warnings(record=True) as w:
