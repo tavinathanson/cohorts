@@ -69,12 +69,15 @@ def test_strip_column_names():
     df = pd.DataFrame(d)
 
     # should not error & should rename columns
-    df2 = df.rename(columns=strip_column_names(df.columns))
+    df2 = df.rename(columns=strip_column_names(df.columns)) 
     ok_((df2.columns != df.columns).any())
 
     # should not rename columns -- should error
-    df3 = df.rename(columns=strip_column_names(
-        df.columns, keep_paren_contents=False))
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        df3 = df.rename(columns=strip_column_names(
+                        df.columns, keep_paren_contents=False))
+        ok_(len(w)>0)
     ok_((df3.columns == df.columns).all())
 
 
@@ -132,7 +135,7 @@ def test_as_dataframe_generic():
 
 def test_as_dataframe_good_rename():
     df_hello, cohort = prep_alt_test_cohort()
-    # test behavior with rename_cols=True. should raise a warning
+    # test behavior with rename_cols=True. should not raise a warning
     df = cohort.as_dataframe(rename_cols=True, join_with='hello')
     res = compare_column_names(expected = strip_column_names(df_hello.columns),
                                observed = df.columns)
@@ -143,7 +146,9 @@ def test_as_dataframe_bad_rename():
     df_hello, cohort = prep_test_cohort()
     # test behavior with rename_cols=True. should raise a warning
     with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
         df = cohort.as_dataframe(rename_cols=True, join_with='hello')
+        ok_(len(w)>0)
     res = compare_column_names(expected = df_hello.columns,
                                observed = df.columns)
     ok_(res, 'columns names failed to match expected')
@@ -154,6 +159,7 @@ def test_as_dataframe_drop_parens():
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         df = cohort.as_dataframe(rename_cols=True, keep_paren_contents=False, join_with='hello')
+        ok_(len(w)>0)
     res = compare_column_names(expected = df_hello.columns,
                                observed = df.columns)
     ok_(res, 'columns names failed to match expected')
