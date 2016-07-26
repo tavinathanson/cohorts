@@ -121,12 +121,10 @@ def test_summarize_provenance():
             ok_(len(w)>0)
 
         ## now test whether deleting contents of cache_dir causes an error 
-        dirlist = [ f for f in os.listdir(cache_dir) ]
+        dirlist = [f for f in os.listdir(cache_dir)]
         for dir in dirlist:
             rmtree(path.join(cache_dir, dir))
         summary = cohort.summarize_provenance()
-
-
     finally:
         if cohort is not None:
             cohort.clear_caches()
