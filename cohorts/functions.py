@@ -61,10 +61,9 @@ def missense_snv_count(row, cohort, filter_fn=None,
     normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
     patient_id = row["patient_id"]
     def missense_filter_fn(filterable_effect):
-        if filter_fn is not None:
-            return (type(filterable_effect.effect) == Substitution and
-                    filter_fn(filterable_effect))
-        return type(filterable_effect.effect) == Substitution
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (type(filterable_effect.effect) == Substitution and
+                filter_fn(filterable_effect))
     # This only loads one effect per variant.
     patient_missense_effects = cohort.load_effects(
         only_nonsynonymous=True,
@@ -95,13 +94,15 @@ def neoantigen_count(row, cohort, filter_fn=None,
         return count
     return np.nan
 
-def expressed_missense_snv_count(row, cohort, **kwargs):
-    filter_fn = kwargs.pop("filter_fn")
+def expressed_missense_snv_count(row, cohort, filter_fn=None,
+                                 normalized_per_mb=None):
+    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
+    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
     def expressed_filter_fn(filterable_effect):
-        if filter_fn is not None:
-            return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-        return effect_expressed_filter(filterable_effect)
-    return missense_snv_count(row, cohort, filter_fn=expressed_filter_fn, **kwargs)
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return missense_snv_count(row, cohort, filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb)
 
 def expressed_neoantigen_count(row, cohort, **kwargs):
     return neoantigen_count(row, cohort, only_expressed=True, **kwargs)
