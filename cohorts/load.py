@@ -243,6 +243,7 @@ class Cohort(Collection):
     def __init__(self,
                  patients,
                  cache_dir,
+                 ensembl_version,
                  cache_results=True,
                  extra_df_loaders=[],
                  join_with=None,
@@ -267,6 +268,7 @@ class Cohort(Collection):
             patient.cohort = self
         self.cache_dir = cache_dir
         self.cache_results = cache_results
+        self.ensembl_version = ensembl_version
 
         df_loaders = [
             DataFrameLoader("kallisto", self.load_kallisto),
@@ -769,14 +771,12 @@ class Cohort(Collection):
             patient=patient,
             filter_fn=filter_fn)
 
-    def load_kallisto(self, ensembl_cached_release_version):
+    def load_kallisto(self):
         """
         Load Kallisto transcript quantification data for a cohort
 
         Parameters
         ----------
-        ensembl_cached_release_version : int
-            e.g. 75
 
         Returns
         -------
@@ -789,7 +789,7 @@ class Cohort(Collection):
             copy=False
         )
 
-        ensembl_release = cached_release(ensembl_cached_release_version)
+        ensembl_release = cached_release(self.ensembl_version)
 
         kallisto_data['gene_name'] = \
             kallisto_data['target_id'].map(lambda t: ensembl_release.gene_name_of_transcript_id(t))
