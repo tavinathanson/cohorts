@@ -74,11 +74,13 @@ class Sample(object):
                  is_tumor,
                  bam_path_dna=None,
                  bam_path_rna=None,
-                 cufflinks_path=None):
+                 cufflinks_path=None,
+                 kallisto_path=None):
         self.is_tumor = is_tumor
         self.bam_path_dna = bam_path_dna
         self.bam_path_rna = bam_path_rna
         self.cufflinks_path = cufflinks_path
+        self.kallisto_path = kallisto_path
 
 class Patient(object):
     """
@@ -265,6 +267,7 @@ class Cohort(Collection):
         self.cache_results = cache_results
 
         df_loaders = [
+            DataFrameLoader("kallisto", self.load_kallisto),
             DataFrameLoader("cufflinks", self.load_cufflinks),
             DataFrameLoader("ensembl_coverage", self.load_ensembl_coverage)]
         df_loaders.extend(extra_df_loaders)
@@ -764,6 +767,43 @@ class Cohort(Collection):
             patient=patient,
             filter_fn=filter_fn)
 
+    def load_kallisto(self):
+        """
+        Load a Kallisto gene expression data for a cohort
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        kallisto_data : Pandas dataframe
+            Pandas dataframe with Kallisto data for all patients
+            columns include patient_id, target_id, length, eff_length, est_counts, tpm
+        """
+        return \
+            pd.concat(
+                [self._load_single_patient_kallisto(patient) for patient in self],
+                copy=False
+        )
+
+    def _load_single_patient_kallisto(self, patient):
+        """
+        Load Kallisto gene quantification given a patient
+
+        Parameters
+        ----------
+        patient : Patient
+
+        Returns
+        -------
+        data: Pandas dataframe
+            Pandas dataframe of sample's Kallisto data
+            columns include patient_id, target_id, length, eff_length, est_counts, tpm
+        """
+        data = pd.read_csv(patient.tumor_sample.kallisto_path, sep="\t")
+        data["patient_id"] = patient.id
+        return data
+
     def load_cufflinks(self, filter_ok=True):
         """
         Load a Cufflinks gene expression data for a cohort
@@ -797,7 +837,7 @@ class Cohort(Collection):
 
         Returns
         -------
-        cufflinks_data: Pandas dataframe
+        data: Pandas dataframe
             Pandas dataframe of sample's Cufflinks data
             columns include patient_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
         """

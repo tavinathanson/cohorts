@@ -6,3 +6,4 @@ cache
 ENV.sh
 .coverage
 generated/
+.idea/
