@@ -30,6 +30,8 @@ from types import FunctionType
 import vap  ## vcf-annotate-polyphen
 from sqlalchemy import create_engine
 
+from pyensembl import cached_release
+
 import varcode
 from varcode import VariantCollection, EffectCollection, Variant
 from mhctools import NetMHCcons, EpitopeCollection
@@ -767,12 +769,14 @@ class Cohort(Collection):
             patient=patient,
             filter_fn=filter_fn)
 
-    def load_kallisto(self):
+    def load_kallisto(self, ensembl_cached_release_version):
         """
-        Load a Kallisto gene expression data for a cohort
+        Load Kallisto transcript quantification data for a cohort
 
         Parameters
         ----------
+        ensembl_cached_release_version : int
+            e.g. 75
 
         Returns
         -------
@@ -780,11 +784,18 @@ class Cohort(Collection):
             Pandas dataframe with Kallisto data for all patients
             columns include patient_id, target_id, length, eff_length, est_counts, tpm
         """
-        return \
-            pd.concat(
-                [self._load_single_patient_kallisto(patient) for patient in self],
-                copy=False
+        kallisto_data = pd.concat(
+            [self._load_single_patient_kallisto(patient) for patient in self],
+            copy=False
         )
+
+        ensembl_release = cached_release(ensembl_cached_release_version)
+
+        kallisto_data['gene_name'] = \
+            kallisto_data['target_id'].map(lambda t: ensembl_release.gene_name_of_transcript_id(t))
+
+        return kallisto_data
+
 
     def _load_single_patient_kallisto(self, patient):
         """
