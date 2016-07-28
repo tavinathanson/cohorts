@@ -207,6 +207,8 @@ class Cohort(Collection):
         A list of `Patient`s for this cohort.
     cache_dir : str
         Path to store cached results, e.g. cached variant effects.
+    ensembl_version : int
+        Cached release version to use from pyensembl e.g. for Kallisto
     cache_results : bool
         Whether or not to cache results.
     extra_df_loaders : List
