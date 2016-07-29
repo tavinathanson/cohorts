@@ -207,8 +207,8 @@ class Cohort(Collection):
         A list of `Patient`s for this cohort.
     cache_dir : str
         Path to store cached results, e.g. cached variant effects.
-    ensembl_version : int
-        Cached release version to use from pyensembl e.g. for Kallisto
+    kallisto_ensembl_version : int
+        Cached release version to use from pyensembl to annotate Kallisto data
     cache_results : bool
         Whether or not to cache results.
     extra_df_loaders : List
@@ -245,7 +245,7 @@ class Cohort(Collection):
     def __init__(self,
                  patients,
                  cache_dir,
-                 ensembl_version,
+                 kallisto_ensembl_version=None,
                  cache_results=True,
                  extra_df_loaders=[],
                  join_with=None,
@@ -270,7 +270,7 @@ class Cohort(Collection):
             patient.cohort = self
         self.cache_dir = cache_dir
         self.cache_results = cache_results
-        self.ensembl_version = ensembl_version
+        self.kallisto_ensembl_version = kallisto_ensembl_version
 
         df_loaders = [
             DataFrameLoader("kallisto", self.load_kallisto),
@@ -791,13 +791,15 @@ class Cohort(Collection):
             copy=False
         )
 
-        ensembl_release = cached_release(self.ensembl_version)
+        if self.kallisto_ensembl_version is None:
+            raise ValueError("Required a kallisto_ensembl_version but none was specified")
+
+        ensembl_release = cached_release(self.kallisto_ensembl_version)
 
         kallisto_data['gene_name'] = \
             kallisto_data['target_id'].map(lambda t: ensembl_release.gene_name_of_transcript_id(t))
 
         return kallisto_data
-
 
     def _load_single_patient_kallisto(self, patient):
         """

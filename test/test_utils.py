@@ -50,7 +50,6 @@ def make_alt_simple_cohort(merge_type="union", **kwargs):
 
     return Cohort(
         patients=patients,
-        ensembl_version=75,
         responder_pfs_equals_os=True,
         merge_type=merge_type,
         cache_dir=generated_data_path("cache"))
