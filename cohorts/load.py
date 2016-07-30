@@ -30,6 +30,8 @@ from types import FunctionType
 import vap  ## vcf-annotate-polyphen
 from sqlalchemy import create_engine
 
+from pyensembl import cached_release
+
 import varcode
 from varcode import VariantCollection, EffectCollection, Variant
 from mhctools import NetMHCcons, EpitopeCollection
@@ -74,11 +76,13 @@ class Sample(object):
                  is_tumor,
                  bam_path_dna=None,
                  bam_path_rna=None,
-                 cufflinks_path=None):
+                 cufflinks_path=None,
+                 kallisto_path=None):
         self.is_tumor = is_tumor
         self.bam_path_dna = bam_path_dna
         self.bam_path_rna = bam_path_rna
         self.cufflinks_path = cufflinks_path
+        self.kallisto_path = kallisto_path
 
 class Patient(object):
     """
@@ -203,6 +207,8 @@ class Cohort(Collection):
         A list of `Patient`s for this cohort.
     cache_dir : str
         Path to store cached results, e.g. cached variant effects.
+    kallisto_ensembl_version : int
+        Cached release version to use from pyensembl to annotate Kallisto data
     cache_results : bool
         Whether or not to cache results.
     extra_df_loaders : List
@@ -239,6 +245,7 @@ class Cohort(Collection):
     def __init__(self,
                  patients,
                  cache_dir,
+                 kallisto_ensembl_version=None,
                  cache_results=True,
                  extra_df_loaders=[],
                  join_with=None,
@@ -263,8 +270,10 @@ class Cohort(Collection):
             patient.cohort = self
         self.cache_dir = cache_dir
         self.cache_results = cache_results
+        self.kallisto_ensembl_version = kallisto_ensembl_version
 
         df_loaders = [
+            DataFrameLoader("kallisto", self.load_kallisto),
             DataFrameLoader("cufflinks", self.load_cufflinks),
             DataFrameLoader("ensembl_coverage", self.load_ensembl_coverage)]
         df_loaders.extend(extra_df_loaders)
@@ -764,6 +773,52 @@ class Cohort(Collection):
             patient=patient,
             filter_fn=filter_fn)
 
+    def load_kallisto(self):
+        """
+        Load Kallisto transcript quantification data for a cohort
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        kallisto_data : Pandas dataframe
+            Pandas dataframe with Kallisto data for all patients
+            columns include patient_id, target_id, length, eff_length, est_counts, tpm
+        """
+        kallisto_data = pd.concat(
+            [self._load_single_patient_kallisto(patient) for patient in self],
+            copy=False
+        )
+
+        if self.kallisto_ensembl_version is None:
+            raise ValueError("Required a kallisto_ensembl_version but none was specified")
+
+        ensembl_release = cached_release(self.kallisto_ensembl_version)
+
+        kallisto_data['gene_name'] = \
+            kallisto_data['target_id'].map(lambda t: ensembl_release.gene_name_of_transcript_id(t))
+
+        return kallisto_data
+
+    def _load_single_patient_kallisto(self, patient):
+        """
+        Load Kallisto gene quantification given a patient
+
+        Parameters
+        ----------
+        patient : Patient
+
+        Returns
+        -------
+        data: Pandas dataframe
+            Pandas dataframe of sample's Kallisto data
+            columns include patient_id, target_id, length, eff_length, est_counts, tpm
+        """
+        data = pd.read_csv(patient.tumor_sample.kallisto_path, sep="\t")
+        data["patient_id"] = patient.id
+        return data
+
     def load_cufflinks(self, filter_ok=True):
         """
         Load a Cufflinks gene expression data for a cohort
@@ -797,7 +852,7 @@ class Cohort(Collection):
 
         Returns
         -------
-        cufflinks_data: Pandas dataframe
+        data: Pandas dataframe
             Pandas dataframe of sample's Cufflinks data
             columns include patient_id, gene_id, gene_short_name, FPKM, FPKM_conf_lo, FPKM_conf_hi
         """
