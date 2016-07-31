@@ -784,7 +784,7 @@ class Cohort(Collection):
         -------
         kallisto_data : Pandas dataframe
             Pandas dataframe with Kallisto data for all patients
-            columns include patient_id, target_id, length, eff_length, est_counts, tpm
+            columns include patient_id, gene_name, est_counts
         """
         kallisto_data = pd.concat(
             [self._load_single_patient_kallisto(patient) for patient in self],
@@ -798,6 +798,10 @@ class Cohort(Collection):
 
         kallisto_data['gene_name'] = \
             kallisto_data['target_id'].map(lambda t: ensembl_release.gene_name_of_transcript_id(t))
+
+        # sum counts across genes
+        kallisto_data = \
+            kallisto_data.groupby(['patient_id', 'gene_name'])[['est_counts']].sum().reset_index()
 
         return kallisto_data
 
