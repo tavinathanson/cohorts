@@ -6,4 +6,5 @@ cache
 ENV.sh
 .coverage
 generated/
-.idea/
+.idea
+*.DS_Store
