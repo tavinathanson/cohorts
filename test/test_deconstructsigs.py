@@ -8,8 +8,9 @@ from cohorts.signatures.deconstructsigs_utils \
 
 from shutil import rmtree
 from os import path, makedirs, listdir
-from nose.tools import raises, eq_, ok_
+from nose.tools import eq_, assert_not_equal
 import pandas as pd
+import numpy as np
 
 FILE_FORMAT_1 = "patient_format1_%s.vcf"
 
@@ -18,7 +19,39 @@ def test_deconstructsigs_output():
     Run on a subset (3 patients)
     Test that output csv is non-empty
     """
-    return
+
+    try:
+        input_dir = data_path("signatures")
+        sample_id_list = ["1", "2", "3"]
+        output_dir = generated_data_path("deconstructsigs-outputs")
+        path_to_write_r_script = generated_data_path("tmp_r")
+        if not path.exists(output_dir):
+            makedirs(output_dir)
+
+        run_deconstructsigs(input_dir,
+                            sample_id_list,
+                            output_dir=output_dir,
+                            path_to_write_r_script=path_to_write_r_script
+                            )
+        signatures_path = "{}/cohort_signatures.csv".format(output_dir)
+        variant_counts_path = "{}/signature_variant_counts.csv".format(output_dir)
+
+        # check that vals in the csvs are non-zero
+        sigs_matrix = _sigs_csv_to_matrix(signatures_path, sample_id_list)
+        sum = np.sum(sigs_matrix)
+        assert_not_equal(sum, 0)
+
+        variant_counts = _sigs_csv_to_matrix(variant_counts_path, sample_id_list)
+        counts_sum = np.sum(variant_counts)
+        assert_not_equal(counts_sum, 0)
+
+    finally:
+        if output_dir is not None and path.exists(output_dir):
+            rmtree(output_dir)
+
+def _sigs_csv_to_matrix(path, samples_ordering):
+    df = pd.read_csv(path)
+    return df[df.columns[1:-1]].values
 
 def test_input_generation():
     """

@@ -2,8 +2,9 @@ import pandas as pd
 import sys
 import os
 from cohorts.r_utils import call_R, write_r_template_to_file
+from shutil import rmtree
 
-R_TEMPLATE = r"""
+R_TEMPLATE = """
 library('deconstructSigs')
 
 result <- list()
@@ -11,7 +12,7 @@ counts <- list()
 
 ids <- c({sample_ids})
 
-for(sample in ids){
+for(sample in ids) {{
   print(sample)
   data <- read.csv(sprintf("{input_dir}/%s.input", sample), colClasses=c("Sample"="character"));
 
@@ -32,7 +33,7 @@ for(sample in ids){
   # Save the weights dataframe with a key/index of the `sample`
   result[[sample]] <- output$weights
   counts[[sample]] <- sigs.input
-}
+}}
 # Merge all variant counts into a single dataframe
 finalCounts <- reshape::merge_all(counts)
 write.csv(file = '{output_dir}/signature_variant_counts.csv', finalCounts)
@@ -43,7 +44,7 @@ write.csv(file = '{output_dir}/cohort_signatures.csv', signatureDeconvolutions)
 
 def run_deconstructsigs(input_dir,
                         sample_id_list,
-                        output_dir,
+                        output_dir=None,
                         path_to_write_r_script=None,
                         write_variant_counts=True):
     """
@@ -55,20 +56,20 @@ def run_deconstructsigs(input_dir,
     if output_dir is None:
         home_dir = os.path.expanduser('~')
         output_dir = "{}/cohort_deconstructsigs_output".format(home_dir)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     signatures_path = "{}/cohort_signatures.csv".format(output_dir)
     variant_counts_path = "{}/cohort_signature_variant_counts.csv".format(output_dir)
 
-    sample_ids = ",".join(sample_id_list)
+    sample_ids = "'" + "','".join(sample_id_list) + "'"
     r_script = R_TEMPLATE.format(sample_ids=sample_ids,
                                  input_dir=input_dir,
                                  output_dir=output_dir)
+    #import pdb
+    #pdb.set_trace()
     r_path = write_r_template_to_file(r_script, path_to_write_r_script)
     call_R(r_path)
-
-    # check outputs
-    print "\n".join(os.listdir(output_dir))
+    rmtree(path_to_write_r_script)
 
 def make_deconstructsigs_patient_inputs(destination_dir, variants):
     """
@@ -79,13 +80,11 @@ def make_deconstructsigs_patient_inputs(destination_dir, variants):
     variants : dict {str : VariantCollection}
         output of cohort.load_variants()
     """
-    import pdb
     if not os.path.exists(destination_dir):
         os.mkdir(destination_dir)
         print "created dir"
     for sample in variants:
         df = variant_collection_to_df(variants[sample], sample)
-        #pdb.set_trace()
         df.to_csv('{}/{}.input'.format(destination_dir, sample), index=False)
     print "completed"
 
