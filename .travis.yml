@@ -1,4 +1,4 @@
-sudo: false  # Use container-based infrastructure
+sudo: required  # Use container-based infrastructure
 language: python
 python:
   - "2.7"
@@ -34,8 +34,8 @@ install:
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
-  - apt-get -y install r-base
-  - R -f cohorts/R_code/packages.R
+  - sudo apt-get -y install r-base
+  - sudo R -f cohorts/R_code/packages.R
 script:
   - pyensembl install --release 75 --species human
   - nosetests test --with-coverage --cover-package=cohorts && ./lint.sh
