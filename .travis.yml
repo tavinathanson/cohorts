@@ -34,6 +34,8 @@ install:
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
+  - sudo apt-get -y install r-base
+  - sudo R -f cohorts/R_code/packages.R
 script:
   - pyensembl install --release 75 --species human
   - nosetests test --with-coverage --cover-package=cohorts && ./lint.sh
