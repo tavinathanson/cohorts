@@ -45,7 +45,7 @@ def run_deconstructsigs(input_dir,
                         sample_id_list,
                         output_dir,
                         path_to_write_r_script=None,
-                        write_variant_counts=True)
+                        write_variant_counts=True):
     """
     Uses subprocess to call the R script.
     Patient IDs are loaded (how?)
@@ -64,7 +64,7 @@ def run_deconstructsigs(input_dir,
     r_script = R_TEMPLATE.format(sample_ids=sample_ids,
                                  input_dir=input_dir,
                                  output_dir=output_dir)
-    r_path = write_r_template_to_file(r_script)
+    r_path = write_r_template_to_file(r_script, path_to_write_r_script)
     call_R(r_path)
 
     # check outputs
@@ -79,13 +79,15 @@ def make_deconstructsigs_patient_inputs(destination_dir, variants):
     variants : dict {str : VariantCollection}
         output of cohort.load_variants()
     """
+    import pdb
     if not os.path.exists(destination_dir):
         os.mkdir(destination_dir)
-
+        print "created dir"
     for sample in variants:
         df = variant_collection_to_df(variants[sample], sample)
+        #pdb.set_trace()
         df.to_csv('{}/{}.input'.format(destination_dir, sample), index=False)
-
+    print "completed"
 
 def variant_collection_to_df(collection, sample_id):
     """

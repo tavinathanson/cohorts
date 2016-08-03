@@ -8,3 +8,4 @@ ENV.sh
 generated/
 .idea
 *.DS_Store
+cohorts.egg-info/
