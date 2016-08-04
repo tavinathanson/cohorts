@@ -18,10 +18,7 @@ from scipy.stats import mannwhitneyu, fisher_exact
 import seaborn as sb
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.utils import resample
-
+from sklearn.metrics import roc_curve
 from .model import bootstrap_auc
 
 def stripboxplot(x, y, data, ax=None, **kwargs):
@@ -45,7 +42,7 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         **kwargs
     )
 
-def fishers_exact_plot(data, condition1, condition2):
+def fishers_exact_plot(data, condition1, condition2, ax=None):
     """
     Perform a Fisher's exact test to compare to binary columns
 
@@ -59,11 +56,14 @@ def fishers_exact_plot(data, condition1, condition2):
 
     condition2: str
         Second binary column to compare
+
+    ax : Axes, default None
+        Axes to plot on
     """
-    plot = sb.factorplot(
+    plot = sb.barplot(
         x=condition1,
         y=condition2,
-        kind='bar',
+        ax=ax,
         data=data
     )
     count_table = pd.crosstab(data[condition1], data[condition2])
@@ -89,6 +89,9 @@ def mann_whitney_plot(data, condition, distribution, ax=None,
 
     distribution: str
         Column to use as the Y-axis or distribution in the test
+
+    ax : Axes, default None
+        Axes to plot on
 
     condition_value:
         If `condition` is not a binary column, split on =/!= to condition_value
