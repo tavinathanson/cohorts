@@ -29,7 +29,8 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         x=x,
         y=y,
         data=data,
-        ax=ax
+        ax=ax, 
+        fliersize=0
     )
 
     return sb.stripplot(
