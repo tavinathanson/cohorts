@@ -86,7 +86,9 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
-    sided_str = sided_str_from_alternative(alternative, condition=condition1)
+    if alternative != "two-sided":
+        raise ValueError("We need to better understand the one-sided Fisher's Exact test")
+    sided_str = "two-sided"
     print("Fisher's Exact Test: OR: {}, p-value={} ({})".format(oddsratio, pvalue, sided_str))
     return FishersExactResults(oddsratio=oddsratio,
                                pvalue=pvalue,
