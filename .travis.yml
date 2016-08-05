@@ -28,6 +28,7 @@ addons:
     - pandoc
     - r-base
 install:
+  - sudo R -f install_r_packages.R
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy nose pandas matplotlib
   - source activate test-environment
   - conda install -c bioconda pysam=0.9.0
@@ -35,7 +36,6 @@ install:
   - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
-  - sudo Rscript -e 'install.packages('deconstructSigs', repos='http://cran.us.r-project.org', dependencies=TRUE)'
 script:
   - pyensembl install --release 75 --species human
   - nosetests test --with-coverage --cover-package=cohorts && ./lint.sh
