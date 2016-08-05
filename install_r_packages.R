@@ -6,7 +6,7 @@ biocLite("BSgenome.Hsapiens.UCSC.hg19", dependencies=TRUE)
 biocLite("GenomeInfoDb", dependencies=TRUE)
 biocLite("VariantAnnotation", dependencies=TRUE)
 
-cran_mirror <- "http://cran.us.r-project.org"
+cran_mirror <- "http://cran.cnr.berkeley.edu/"
 
 install.packages('plyr', repos=cran_mirror, dependencies=TRUE)
 install.packages('Rcpp', repos=cran_mirror, dependencies=TRUE)
