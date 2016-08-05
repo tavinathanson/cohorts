@@ -1,6 +1,6 @@
 # commands to install needed R packages
 
-source("https://bioconductor.org/biocLite.R")
+source("http://bioconductor.org/biocLite.R")
 biocLite("BSgenome")
 biocLite("BSgenome.Hsapiens.UCSC.hg19")
 biocLite("GenomeInfoDb")
