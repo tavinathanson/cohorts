@@ -1,7 +1,6 @@
 # commands to install needed R packages
 
-bio_source <- "https://bioconductor.org/biocLite.R"
-source(bio_source)
+source("https://bioconductor.org/biocLite.R")
 biocLite("BSgenome")
 biocLite("BSgenome.Hsapiens.UCSC.hg19")
 biocLite("GenomeInfoDb")
