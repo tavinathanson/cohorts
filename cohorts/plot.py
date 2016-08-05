@@ -30,7 +30,7 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         x=x,
         y=y,
         data=data,
-        ax=ax, 
+        ax=ax,
         fliersize=0
     )
 
@@ -44,7 +44,7 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         **kwargs
     )
 
-def sided_str_from_alternative(alternative):
+def sided_str_from_alternative(alternative, condition):
     if alternative is None:
         raise ValueError("Must pick an alternative")
     if alternative == "two-sided":
@@ -65,7 +65,7 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
         Dataframe to retrieve information from
 
     condition1: str
-        First binary column compare
+        First binary column to compare (and used for test sidedness)
 
     condition2: str
         Second binary column to compare
@@ -86,7 +86,7 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
-    sided_str = sided_str_from_alternative(alternative)
+    sided_str = sided_str_from_alternative(alternative, condition=condition1)
     print("Fisher's Exact Test: OR: {}, p-value={} ({})".format(oddsratio, pvalue, sided_str))
     return FishersExactResults(oddsratio=oddsratio,
                                pvalue=pvalue,
@@ -145,7 +145,7 @@ def mann_whitney_plot(data, condition, distribution, ax=None,
         alternative=alternative
     )
 
-    sided_str = sided_str_from_alternative(alternative)
+    sided_str = sided_str_from_alternative(alternative, condition)
     print("Mann-Whitney test: U={}, p-value={} ({})".format(U, pvalue, sided_str))
     return MannWhitneyResults(U=U,
                               pvalue=pvalue,
