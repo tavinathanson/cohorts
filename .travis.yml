@@ -26,7 +26,7 @@ addons:
     # install pandoc for use with pypandoc for converting the README
     # from markdown to RST
     - pandoc
-    - r-base=3.3.0
+    - r-base
 install:
   - sudo R -f install_r_packages.R
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy nose pandas matplotlib
