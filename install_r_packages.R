@@ -1,10 +1,10 @@
 # commands to install needed R packages
 
 source("http://bioconductor.org/biocLite.R")
-biocLite("BSgenome")
-biocLite("BSgenome.Hsapiens.UCSC.hg19")
-biocLite("GenomeInfoDb")
-biocLite("VariantAnnotation")
+biocLite("BSgenome", dependencies=TRUE)
+biocLite("BSgenome.Hsapiens.UCSC.hg19", dependencies=TRUE)
+biocLite("GenomeInfoDb", dependencies=TRUE)
+biocLite("VariantAnnotation", dependencies=TRUE)
 
 cran_mirror <- "http://cran.us.r-project.org"
 
