@@ -1076,18 +1076,18 @@ class Cohort(Collection):
         return roc_curve_plot(df, plot_col, "benefit", bootstrap_samples, ax=ax)
 
     def plot_benefit(self, on, col=None, benefit_col="benefit", ax=None,
-                     mw_alternative="two-sided", **kwargs):
+                     alternative="two-sided", **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
         """
         return self.plot_boolean(on=on,
                                  boolean_col=benefit_col,
                                  col=col,
-                                 mw_alternative=mw_alternative,
+                                 alternative=alternative,
                                  ax=ax,
                                  **kwargs)
 
     def plot_boolean(self, on, boolean_col, col=None, ax=None,
-                     mw_alternative="two-sided", **kwargs):
+                     alternative="two-sided", **kwargs):
         """Plot a comparison of `boolean_col` in the cohort on a given variable via
         `on` or `col`.
 
@@ -1103,8 +1103,8 @@ class Cohort(Collection):
             See `cohort.load.as_dataframe`
         col : str, optional
             If specified, store the result of `on`. See `cohort.load.as_dataframe`
-        mw_alternative : str, optional
-            Choose the sidedness of the mannwhitneyu test.
+        alternative : str, optional
+            Choose the sidedness of the mannwhitneyu or Fisher's Exact test.
 
         Returns
         -------
@@ -1119,13 +1119,15 @@ class Cohort(Collection):
             results = fishers_exact_plot(
                 data=df,
                 condition1=boolean_col,
-                condition2=plot_col)
+                condition2=plot_col,
+                alternative=alternative,
+                ax=ax)
         else:
             results = mann_whitney_plot(
                 data=df,
                 condition=boolean_col,
                 distribution=plot_col,
-                alternative=mw_alternative,
+                alternative=alternative,
                 ax=ax)
         return results
 

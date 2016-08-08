@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from __future__ import print_function
+from collections import namedtuple
 
 from scipy.stats import mannwhitneyu, fisher_exact
 import seaborn as sb
@@ -29,7 +30,7 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         x=x,
         y=y,
         data=data,
-        ax=ax, 
+        ax=ax,
         fliersize=0
     )
 
@@ -43,7 +44,18 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         **kwargs
     )
 
-def fishers_exact_plot(data, condition1, condition2, ax=None):
+def sided_str_from_alternative(alternative, condition):
+    if alternative is None:
+        raise ValueError("Must pick an alternative")
+    if alternative == "two-sided":
+        return alternative
+    # alternative hypothesis: condition is 'less' or 'greater' than no-condition
+    op_str = ">" if alternative == "greater" else "<"
+    return "one-sided: %s %s not %s" % (condition, op_str, condition)
+
+FishersExactResults = namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "plot"])
+
+def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-sided"):
     """
     Perform a Fisher's exact test to compare to binary columns
 
@@ -53,13 +65,17 @@ def fishers_exact_plot(data, condition1, condition2, ax=None):
         Dataframe to retrieve information from
 
     condition1: str
-        First binary column compare
+        First binary column to compare (and used for test sidedness)
 
     condition2: str
         Second binary column to compare
 
     ax : Axes, default None
         Axes to plot on
+
+    alternative:
+        Specify the sidedness of the test: "two-sided", "less"
+        or "greater"
     """
     plot = sb.barplot(
         x=condition1,
@@ -69,9 +85,17 @@ def fishers_exact_plot(data, condition1, condition2, ax=None):
     )
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
-    oddsratio, pvalue = fisher_exact(count_table)
-    print("Fisher's Exact Test: OR: {}, p-value={}".format(oddsratio, pvalue))
-    return (oddsratio, pvalue, plot)
+    oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
+    if alternative != "two-sided":
+        raise ValueError("We need to better understand the one-sided Fisher's Exact test")
+    sided_str = "two-sided"
+    print("Fisher's Exact Test: OR: {}, p-value={} ({})".format(oddsratio, pvalue, sided_str))
+    return FishersExactResults(oddsratio=oddsratio,
+                               pvalue=pvalue,
+                               sided_str=sided_str,
+                               plot=plot)
+
+MannWhitneyResults = namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])
 
 def mann_whitney_plot(data, condition, distribution, ax=None,
                       condition_value=None, alternative="two-sided",
@@ -123,16 +147,14 @@ def mann_whitney_plot(data, condition, distribution, ax=None,
         alternative=alternative
     )
 
-    if alternative is None:
-        raise ValueError("Must pick a mannwhitneyu alternative")
-    if alternative == "two-sided":
-        sided_str = alternative
-    else:
-        # alternative hypothesis: condition is 'less' or 'greater' than no-condition
-        op_str = ">" if alternative == "greater" else "<"
-        sided_str = "one-sided: %s %s not %s" % (condition, op_str, condition)
+    sided_str = sided_str_from_alternative(alternative, condition)
     print("Mann-Whitney test: U={}, p-value={} ({})".format(U, pvalue, sided_str))
-    return (U, pvalue, plot)
+    return MannWhitneyResults(U=U,
+                              pvalue=pvalue,
+                              sided_str=sided_str,
+                              with_condition_series=data[condition_mask][distribution],
+                              without_condition_series=data[~condition_mask][distribution],
+                              plot=plot)
 
 def roc_curve_plot(data, value_column, outcome_column, bootstrap_samples=100, ax=None):
     """Create a ROC curve and compute the bootstrap AUC for the given variable and outcome
