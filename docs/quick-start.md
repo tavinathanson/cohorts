@@ -12,24 +12,24 @@ The motivating use case for Cohorts is a clinical study for checkpoint blockade 
 
 These studies typically collect a wide range of data for each patient, such as:
 
-    - clinical data (e.g. outcome, treatment assignment, gender, risk factors, etc)
-    - whole-exome sequencing (WES) or whole-genome sequencing (WGS) data
-        - typically for tumor & normal samples
-    - expression data (e.g. RNA-seq)
-    - immune infiltrate data 
-    - targeted sequencing data (e.g. IMPACT calls or foundation panel data)
-    - etc.
+     - clinical data (e.g. outcome, treatment assignment, gender, risk factors, etc)
+     - whole-exome sequencing (WES) or whole-genome sequencing (WGS) data
+         - typically for tumor & normal samples
+     - expression data (e.g. RNA-seq)
+     - immune infiltrate data 
+     - targeted sequencing data (e.g. IMPACT calls or foundation panel data)
+     - etc.
 
 These data inputs are processed into clinically-relevant features, such as:
 
-    - somatic mutations
-    - predicted neoantigens
-    - mutational signatures
-    - tumor heterogeneity estimates
-    - etc.
+     - somatic mutations
+     - predicted neoantigens
+     - mutational signatures
+     - tumor heterogeneity estimates
+     - etc.
 
 Because of the computational overhead frequently involved in computing the above-mentioned 
-features, `cohorts` caches these computed features by default. The [caching strategy](#Caching_Strategy)
+features, `cohorts` caches these computed features by default. The [caching strategy](#caching-strategy)
 will be described in some detail below, but in general `Cohorts` uses file-based caching.
 
 Cohorts then provides utilities to aid in filtering, summarizing & evaluating these features and 
