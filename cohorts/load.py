@@ -47,6 +47,7 @@ from .collection import Collection
 from .varcode_utils import (filter_variants, filter_effects,
                             filter_neoantigens, filter_polyphen)
 from .variant_filters import no_filter
+from .styling import set_styling
 from . import variant_filters
 
 class InvalidDataError(ValueError):
@@ -306,6 +307,8 @@ class Cohort(Collection):
                             "isovar": "cached-isovar-output"}
         if print_provenance:
             pprint.pprint(self.summarize_data_sources())
+
+        set_styling()
 
     def verify_id_uniqueness(self):
         patient_ids = set([patient.id for patient in self])
@@ -1089,25 +1092,25 @@ class Cohort(Collection):
                                  ax=ax,
                                  **kwargs)
 
-    def plot_boolean(self, 
-                     on, 
-                     boolean_col, 
+    def plot_boolean(self,
+                     on,
+                     boolean_col,
                      boolean_label=None,
                      boolean_value_map={},
-                     col=None, 
-                     order=None, 
+                     col=None,
+                     order=None,
                      ax=None,
-                     alternative="two-sided", 
+                     alternative="two-sided",
                      **kwargs):
         """Plot a comparison of `boolean_col` in the cohort on a given variable via
         `on` or `col`.
-        
+
         If the variable (through `on` or `col`) is binary this will compare
         odds-ratios and perform a Fisher's exact test.
-        
+
         If the variable is numeric, this will compare the distributions through
         a Mann-Whitney test and plot the distributions with box-strip plot
-        
+
         Parameters
         ----------
         on : str or function
@@ -1153,6 +1156,7 @@ class Cohort(Collection):
                 condition1=boolean_col,
                 condition2=plot_col,
                 alternative=alternative,
+                order=order,
                 ax=ax)
         else:
             results = mann_whitney_plot(

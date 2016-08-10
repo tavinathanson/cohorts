@@ -105,7 +105,7 @@ def sided_str_from_alternative(alternative, condition):
 
 FishersExactResults = namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "plot"])
 
-def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-sided"):
+def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-sided", **kwargs):
     """
     Perform a Fisher's exact test to compare to binary columns
 
@@ -131,7 +131,8 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
         x=condition1,
         y=condition2,
         ax=ax,
-        data=data
+        data=data,
+        **kwargs
     )
 
     count_table = pd.crosstab(data[condition1], data[condition2])
@@ -151,11 +152,11 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
 
 MannWhitneyResults = namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])
 
-def mann_whitney_plot(data, 
+def mann_whitney_plot(data,
                       condition,
-                      distribution, 
+                      distribution,
                       ax=None,
-                      condition_value=None, 
+                      condition_value=None,
                       alternative="two-sided",
                       skip_plot=False,
                       **kwargs):
