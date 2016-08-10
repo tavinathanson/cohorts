@@ -31,7 +31,8 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         y=y,
         data=data,
         ax=ax,
-        fliersize=0
+        fliersize=0,
+        **kwargs
     )
 
     return sb.stripplot(
@@ -97,9 +98,14 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
 
 MannWhitneyResults = namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])
 
-def mann_whitney_plot(data, condition, distribution, ax=None,
-                      condition_value=None, alternative="two-sided",
-                      skip_plot=False):
+def mann_whitney_plot(data, 
+                      condition,
+                      distribution, 
+                      ax=None,
+                      condition_value=None, 
+                      alternative="two-sided",
+                      skip_plot=False,
+                      **kwargs):
     """
     Create a box plot comparing a condition and perform a
     Mann Whitney test to compare the distribution in condition A v B
@@ -134,7 +140,8 @@ def mann_whitney_plot(data, condition, distribution, ax=None,
             x=condition,
             y=distribution,
             data=data,
-            ax=ax
+            ax=ax,
+            **kwargs
         )
 
     if condition_value:
