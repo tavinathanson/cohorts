@@ -1142,7 +1142,7 @@ class Cohort(Collection):
 
         condition_value = None
         if boolean_value_map:
-            assert (True in boolean_value_map) and (False in boolean_value_map), \
+            assert set(boolean_value_map.keys()) == set([True, False]), \
                 "Improper mapping of boolean column provided"
             df[boolean_col] = df[boolean_col].map(lambda v: boolean_value_map[v])
             condition_value = boolean_value_map[True]
