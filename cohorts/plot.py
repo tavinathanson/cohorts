@@ -26,11 +26,11 @@ def vertical_percent(plot, percent=0.1):
     plot_bottom, plot_top = plot.get_ylim()
     return percent * (plot_top - plot_bottom)
 
-def set_min_y_from_data(y, data, plot):
+def set_min_y_from_data(y_series, plot):
     """
     If data is >= 0, don't show negative axis values.
     """
-    min_y_val = data[y].min()
+    min_y_val = y_series.min()
     if min_y_val >= 0:
         # Add a bit of padding so that we don't cut the plot off in an ugly way
         extra_space = -1 * vertical_percent(plot, 0.05)
@@ -76,7 +76,7 @@ def stripboxplot(x, y, data, ax=None, significant=False, **kwargs):
         **kwargs
     )
 
-    set_min_y_from_data(y=y, data=data, plot=plot)
+    set_min_y_from_data(y_series=data[y], plot=plot)
     add_significance_indicator(plot=plot, significant=significant)
 
     return plot
