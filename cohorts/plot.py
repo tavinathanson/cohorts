@@ -22,7 +22,38 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve
 from .model import bootstrap_auc
 
-def stripboxplot(x, y, data, ax=None, **kwargs):
+def vertical_percent(plot, percent=0.1):
+    plot_bottom, plot_top = plot.get_ylim()
+    return percent * (plot_top - plot_bottom)
+
+def set_min_y_from_data(y, data, plot):
+    """
+    If data is >= 0, don't show negative axis values.
+    """
+    min_y_val = data[y].min()
+    if min_y_val >= 0:
+        # Add a bit of padding so that we don't cut the plot off in an ugly way
+        extra_space = -1 * vertical_percent(plot, 0.05)
+        plot.set_ylim(bottom=extra_space)
+
+def add_significance_indicator(plot, col_a=0, col_b=1, significant=False):
+    """
+    Add a p-value significance indicator.
+    """
+    plot_bottom, plot_top = plot.get_ylim()
+    # Give the plot a little room for the significance indicator
+    line_height = vertical_percent(plot, 0.1)
+    # Add some extra spacing below the indicator
+    plot_top = plot_top + line_height
+    # Add some extra spacing above the indicator
+    plot.set_ylim(top=plot_top + line_height * 2)
+    color = "black"
+    line_top = plot_top + line_height
+    plot.plot([col_a, col_a, col_b, col_b], [plot_top, line_top, line_top, plot_top], lw=1.5, color=color)
+    indicator = "*" if significant else "ns"
+    plot.text((col_a + col_b) * 0.5, line_top, indicator, ha="center", va="bottom", color=color)
+
+def stripboxplot(x, y, data, ax=None, show_significance=True, significant=False, **kwargs):
     """
     Overlay a stripplot on top of a boxplot.
     """
@@ -35,7 +66,7 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         **kwargs
     )
 
-    return sb.stripplot(
+    plot = sb.stripplot(
         x=x,
         y=y,
         data=data,
@@ -44,6 +75,11 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         color=kwargs.pop("color", "0.3"),
         **kwargs
     )
+
+    set_min_y_from_data(y=y, data=data, plot=plot)
+    add_significance_indicator(plot=plot, significant=significant)
+
+    return plot
 
 def sided_str_from_alternative(alternative, condition):
     if alternative is None:
@@ -84,9 +120,11 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
         ax=ax,
         data=data
     )
+
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
+    add_significance_indicator(plot=plot, significant=pvalue <= 0.05)
     if alternative != "two-sided":
         raise ValueError("We need to better understand the one-sided Fisher's Exact test")
     sided_str = "two-sided"
@@ -134,16 +172,6 @@ def mann_whitney_plot(data,
     skip_plot:
         Calculate the test statistic and p-value, but don't plot.
     """
-    plot = None
-    if not skip_plot:
-        plot = stripboxplot(
-            x=condition,
-            y=distribution,
-            data=data,
-            ax=ax,
-            **kwargs
-        )
-
     if condition_value:
         condition_mask = data[condition] == condition_value
     else:
@@ -153,6 +181,18 @@ def mann_whitney_plot(data,
         data[~condition_mask][distribution],
         alternative=alternative
     )
+
+    plot = None
+    if not skip_plot:
+        plot = stripboxplot(
+            x=condition,
+            y=distribution,
+            data=data,
+            ax=ax,
+            show_significance=True,
+            significant=pvalue <= 0.05,
+            **kwargs
+        )
 
     sided_str = sided_str_from_alternative(alternative, condition)
     print("Mann-Whitney test: U={}, p-value={} ({})".format(U, pvalue, sided_str))
