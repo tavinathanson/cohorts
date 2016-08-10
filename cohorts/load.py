@@ -1253,6 +1253,7 @@ class Cohort(Collection):
         frame for this cohort.
         """
         provenance_summary = {}
+        df = self.as_dataframe()
         for cache in self.cache_names:
             cache_name = self.cache_names[cache]
             cache_provenance = None
@@ -1283,6 +1284,7 @@ class Cohort(Collection):
         if self.dataframe_hash:
             return(self.dataframe_hash)
         else:
+            df = self._as_dataframe_unmodified()
             return(self.dataframe_hash)
 
     def summarize_provenance(self):
