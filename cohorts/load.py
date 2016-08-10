@@ -1095,6 +1095,7 @@ class Cohort(Collection):
     def plot_boolean(self,
                      on,
                      boolean_col,
+                     plot_col=None,
                      boolean_label=None,
                      boolean_value_map={},
                      col=None,
@@ -1113,10 +1114,13 @@ class Cohort(Collection):
 
         Parameters
         ----------
-        on : str or function
+        on : str or function or list or dict
             See `cohort.load.as_dataframe`
+        plot_col : str, optional
+            If on has many columns, this is the one whose values we are plotting.
+            If on has a single column, this is unnecessary.
         boolean_col : str
-            Column name of boolean column to plot or compare against
+            Column name of boolean column to plot or compare against.
         boolean_label : None, optional
             Label to give boolean column in the plot
         boolean_value_map : dict, optional
@@ -1135,7 +1139,15 @@ class Cohort(Collection):
         (Test statistic, p-value): (float, float)
 
         """
-        plot_col, df = self.as_dataframe(on, col, **kwargs)
+        cols, df = self.as_dataframe(on, col, **kwargs)
+        if type(cols) == str:
+            if plot_col is not None:
+                raise ValueError("plot_col is specified when it isn't ndeeded.")
+            plot_col = cols
+        elif type(cols) == list:
+            if plot_col is None:
+                raise ValueError("plot_col must be specified when multiple `on`s are present.")
+
         df = filter_not_null(df, boolean_col)
         df = filter_not_null(df, plot_col)
 
