@@ -28,7 +28,7 @@ def set_styling():
     custom_palette = [red, blue, green]
     custom_palette.extend(deep_colors[3:])
     sb.set_palette(custom_palette)
-    mpl.rcParams.update({'figure.figsize': np.array([8, 5.5]),
+    mpl.rcParams.update({"figure.figsize": np.array([6, 6]),
                          "font.size": 16,
                          "axes.labelsize": 16,
                          "axes.labelweight": "bold",
