@@ -23,18 +23,31 @@ from sklearn.metrics import roc_curve
 from .model import bootstrap_auc
 
 def vertical_percent(plot, percent=0.1):
+    """
+    Using the size of the y axis, return a fraction of that size.
+    """
     plot_bottom, plot_top = plot.get_ylim()
     return percent * (plot_top - plot_bottom)
 
-def set_min_y_from_data(y_series, plot):
+def as_numeric(text):
+    try:
+        return float(text)
+    except:
+        return None
+
+def hide_negative_y_ticks(plot):
+    y_ticks = plot.get_yticks()
+    plot.set_yticks([tick for tick in y_ticks if as_numeric(tick) is not None and as_numeric(tick) >= 0])
+
+def only_percentage_ticks(plot):
     """
-    If data is >= 0, don't show negative axis values.
+    Only show ticks from 0.0 to 1.0.
     """
-    min_y_val = y_series.min()
-    if min_y_val >= 0:
-        # Add a bit of padding so that we don't cut the plot off in an ugly way
-        extra_space = -1 * vertical_percent(plot, 0.05)
-        plot.set_ylim(bottom=extra_space)
+    y_ticks = plot.get_yticks()
+    less_1_ticks = [tick for tick in y_ticks if as_numeric(tick) is not None and as_numeric(tick) <= 1]
+    if 1.0 not in less_1_ticks:
+        less_1_ticks.append(1.0)
+    plot.set_yticks(less_1_ticks)
 
 def add_significance_indicator(plot, col_a=0, col_b=1, significant=False):
     """
@@ -76,7 +89,7 @@ def stripboxplot(x, y, data, ax=None, significant=False, **kwargs):
         **kwargs
     )
 
-    set_min_y_from_data(y_series=data[y], plot=plot)
+    hide_negative_y_ticks(plot)
     add_significance_indicator(plot=plot, significant=significant)
 
     return plot
@@ -124,6 +137,8 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
+    hide_negative_y_ticks(plot)
+    only_percentage_ticks(plot)
     add_significance_indicator(plot=plot, significant=pvalue <= 0.05)
     if alternative != "two-sided":
         raise ValueError("We need to better understand the one-sided Fisher's Exact test")
