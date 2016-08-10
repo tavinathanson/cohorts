@@ -103,7 +103,13 @@ def sided_str_from_alternative(alternative, condition):
     op_str = ">" if alternative == "greater" else "<"
     return "one-sided: %s %s not %s" % (condition, op_str, condition)
 
-FishersExactResults = namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "plot"])
+class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "plot"])):
+    def __str__(self):
+        return "FishersExactResults(oddsratio=%s, pvalue=%s, sided_str='%s')" % (
+            self.oddsratio, self.pvalue, self.sided_str)
+
+    def __repr__(self):
+        return self.__str__()
 
 def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-sided", **kwargs):
     """
@@ -150,7 +156,13 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
                                sided_str=sided_str,
                                plot=plot)
 
-MannWhitneyResults = namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])
+class MannWhitneyResults(namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])):
+    def __str__(self):
+        return "MannWhitneyResults(U=%s, pvalue=%s, sided_str='%s')" % (
+            self.U, self.pvalue, self.sided_str)
+
+    def __repr__(self):
+        return self.__str__()
 
 def mann_whitney_plot(data,
                       condition,
