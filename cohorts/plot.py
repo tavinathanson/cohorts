@@ -53,7 +53,7 @@ def add_significance_indicator(plot, col_a=0, col_b=1, significant=False):
     indicator = "*" if significant else "ns"
     plot.text((col_a + col_b) * 0.5, line_top, indicator, ha="center", va="bottom", color=color)
 
-def stripboxplot(x, y, data, ax=None, show_significance=True, significant=False, **kwargs):
+def stripboxplot(x, y, data, ax=None, significant=False, **kwargs):
     """
     Overlay a stripplot on top of a boxplot.
     """
@@ -189,7 +189,6 @@ def mann_whitney_plot(data,
             y=distribution,
             data=data,
             ax=ax,
-            show_significance=True,
             significant=pvalue <= 0.05,
             **kwargs
         )
