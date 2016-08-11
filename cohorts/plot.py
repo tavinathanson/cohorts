@@ -43,6 +43,7 @@ def only_percentage_ticks(plot):
     """
     Only show ticks from 0.0 to 1.0.
     """
+    hide_negative_y_ticks(plot)
     y_ticks = plot.get_yticks()
     less_1_ticks = [tick for tick in y_ticks if as_numeric(tick) is not None and as_numeric(tick) <= 1]
     if 1.0 not in less_1_ticks:
@@ -146,7 +147,6 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
-    hide_negative_y_ticks(plot)
     only_percentage_ticks(plot)
     add_significance_indicator(plot=plot, significant=pvalue <= 0.05)
     if alternative != "two-sided":
