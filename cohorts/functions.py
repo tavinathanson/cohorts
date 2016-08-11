@@ -15,11 +15,36 @@
 from __future__ import print_function
 
 from .variant_filters import no_filter, effect_expressed_filter
-from .load import first_not_none_param
+from .utils import first_not_none_param
 
 import numpy as np
 from varcode.effects import Substitution
 from varcode.common import memoize
+
+def default_pretty_name(cohort, fn, column_num=None, **kwargs):
+    """
+    Instead of missense_snv_count, return "Missense SNV Count" or
+    "Missense SNV Count / MB".
+    """
+    def is_lambda(func):
+        return func.__name__ == (lambda: None).__name__
+
+    # Use the function name, or "column" for lambdas, if no
+    # name is provided for the newly created column.
+    if is_lambda(fn):
+        if column_num is not None:
+            return "Column %d" % column_num
+        return "Column"
+
+    name = fn.__name__
+    pretty_name = name.replace("_", " ").title()
+    if "Snv" in pretty_name:
+        pretty_name = pretty_name.replace("Snv", "SNV")
+    normalized_per_mb = first_not_none_param([kwargs.get("normalized_per_mb", None),
+                                              cohort.normalized_per_mb], False)
+    if normalized_per_mb:
+        pretty_name += " / MB"
+    return pretty_name
 
 def snv_count(row, cohort, filter_fn=None,
               normalized_per_mb=None, **kwargs):

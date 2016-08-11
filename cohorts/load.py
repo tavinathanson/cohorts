@@ -40,12 +40,13 @@ from topiary.sequence_helpers import contains_mutant_residues
 from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
 
-from .utils import strip_column_names as _strip_column_names
+from .utils import first_not_none_param, filter_not_null, compare_provenance, _provenance_str, strip_column_names as _strip_column_names
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
 from .collection import Collection
 from .varcode_utils import (filter_variants, filter_effects,
                             filter_neoantigens, filter_polyphen)
+from .functions import default_pretty_name
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
@@ -246,7 +247,6 @@ class Cohort(Collection):
     def __init__(self,
                  patients,
                  cache_dir,
-                 kallisto_ensembl_version=None,
                  cache_results=True,
                  extra_df_loaders=[],
                  join_with=None,
@@ -260,6 +260,8 @@ class Cohort(Collection):
                  print_provenance=True,
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
+                 kallisto_ensembl_version=None,
+                 pretty_name_fn=default_pretty_name,
                  variant_type="snv",
                  merge_type="union"):
         Collection.__init__(
@@ -271,7 +273,6 @@ class Cohort(Collection):
             patient.cohort = self
         self.cache_dir = cache_dir
         self.cache_results = cache_results
-        self.kallisto_ensembl_version = kallisto_ensembl_version
 
         df_loaders = [
             DataFrameLoader("kallisto", self.load_kallisto),
@@ -289,6 +290,8 @@ class Cohort(Collection):
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
+        self.kallisto_ensembl_version = kallisto_ensembl_version
+        self.pretty_name_fn = pretty_name_fn
         self.variant_type = variant_type
         self.merge_type = merge_type
 
@@ -423,9 +426,7 @@ class Cohort(Collection):
             (as `self`) along if the function accepts a `cohort` argument.
             """
             if col is None:
-                # Use the function name, or "column" for lambdas, if no
-                # name is provided for the newly created column.
-                col = on.__name__ if not is_lambda(on) else "column"
+                col = self.pretty_name_fn(self, on, **kwargs)
             on_argnames = on.__code__.co_varnames
             if "cohort" not in on_argnames:
                 func = lambda row: on(row=row, **kwargs)
@@ -433,9 +434,6 @@ class Cohort(Collection):
                 func = lambda row: on(row=row, cohort=self, **kwargs)
             df[col] = df.apply(func, axis=1)
             return (col, df)
-
-        def is_lambda(func):
-            return func.__name__ == (lambda: None).__name__
 
         if type(on) == FunctionType:
             return apply_func(on, col, df)
@@ -454,7 +452,7 @@ class Cohort(Collection):
         if type(on) == list:
             cols = []
             for i, elem in enumerate(on):
-                col = elem.__name__ if not is_lambda(elem) else "column_%d" % i
+                col = self.pretty_name_fn(self, elem, column_num=i, **kwargs)
                 col, df = apply_func(on=elem, col=col, df=df)
                 cols.append(col)
 
@@ -1364,72 +1362,3 @@ class Cohort(Collection):
             "dataframe_hash": dataframe_hash
         }
         return(results)
-
-def first_not_none_param(params, default):
-    """
-    Given a list of `params`, use the first param in the list that is
-    not None. If all are None, fall back to `default`.
-    """
-    for param in params:
-        if param is not None:
-            return param
-    return default
-
-def filter_not_null(df, col):
-    original_len = len(df)
-    df = df[df[col].notnull()]
-    updated_len = len(df)
-    if updated_len < original_len:
-        print("Missing %s for %d patients: from %d to %d" % (col, original_len - updated_len, original_len, updated_len))
-    return df
-
-def _provenance_str(provenance):
-    """Utility function used by compare_provenance to print diff
-    """
-    return ["%s==%s" % (key, value) for (key, value) in provenance]
-
-def compare_provenance(
-        this_provenance, other_provenance,
-        left_outer_diff = "In current but not comparison",
-        right_outer_diff = "In comparison but not current"):
-    """Utility function to compare two abritrary provenance dicts
-    returns number of discrepancies.
-
-    Parameters
-    ----------
-    this_provenance: provenance dict (to be compared to "other_provenance")
-    other_provenance: comparison provenance dict
-
-    (optional)
-    left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
-    right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
-
-    Returns
-    -----------
-    Number of discrepancies (0: None)
-    """
-    ## if either this or other items is null, return 0
-    if (not this_provenance or not other_provenance):
-        return 0
-    
-    this_items = set(this_provenance.items())
-    other_items = set(other_provenance.items())
-
-    # Two-way diff: are any modules introduced, and are any modules lost?
-    new_diff = this_items.difference(other_items)
-    old_diff = other_items.difference(this_items)
-    warn_str = ""
-    if len(new_diff) > 0:
-        warn_str += "%s: %s" % (
-            left_outer_diff,
-            _provenance_str(new_diff))
-    if len(old_diff) > 0:
-        warn_str += "%s: %s" % (
-            right_outer_diff,
-            _provenance_str(old_diff))
-
-    if len(warn_str) > 0:
-        warnings.warn(warn_str, Warning)
-
-    return(len(new_diff)+len(old_diff))
-
