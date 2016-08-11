@@ -22,7 +22,52 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve
 from .model import bootstrap_auc
 
-def stripboxplot(x, y, data, ax=None, **kwargs):
+def vertical_percent(plot, percent=0.1):
+    """
+    Using the size of the y axis, return a fraction of that size.
+    """
+    plot_bottom, plot_top = plot.get_ylim()
+    return percent * (plot_top - plot_bottom)
+
+def as_numeric(text):
+    try:
+        return float(text)
+    except:
+        return None
+
+def hide_negative_y_ticks(plot):
+    y_ticks = plot.get_yticks()
+    plot.set_yticks([tick for tick in y_ticks if as_numeric(tick) is not None and as_numeric(tick) >= 0])
+
+def only_percentage_ticks(plot):
+    """
+    Only show ticks from 0.0 to 1.0.
+    """
+    hide_negative_y_ticks(plot)
+    y_ticks = plot.get_yticks()
+    less_1_ticks = [tick for tick in y_ticks if as_numeric(tick) is not None and as_numeric(tick) <= 1]
+    if 1.0 not in less_1_ticks:
+        less_1_ticks.append(1.0)
+    plot.set_yticks(less_1_ticks)
+
+def add_significance_indicator(plot, col_a=0, col_b=1, significant=False):
+    """
+    Add a p-value significance indicator.
+    """
+    plot_bottom, plot_top = plot.get_ylim()
+    # Give the plot a little room for the significance indicator
+    line_height = vertical_percent(plot, 0.1)
+    # Add some extra spacing below the indicator
+    plot_top = plot_top + line_height
+    # Add some extra spacing above the indicator
+    plot.set_ylim(top=plot_top + line_height * 2)
+    color = "black"
+    line_top = plot_top + line_height
+    plot.plot([col_a, col_a, col_b, col_b], [plot_top, line_top, line_top, plot_top], lw=1.5, color=color)
+    indicator = "*" if significant else "ns"
+    plot.text((col_a + col_b) * 0.5, line_top, indicator, ha="center", va="bottom", color=color)
+
+def stripboxplot(x, y, data, ax=None, significant=None, **kwargs):
     """
     Overlay a stripplot on top of a boxplot.
     """
@@ -35,7 +80,7 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         **kwargs
     )
 
-    return sb.stripplot(
+    plot = sb.stripplot(
         x=x,
         y=y,
         data=data,
@@ -44,6 +89,13 @@ def stripboxplot(x, y, data, ax=None, **kwargs):
         color=kwargs.pop("color", "0.3"),
         **kwargs
     )
+
+    if data[y].min() >= 0:
+        hide_negative_y_ticks(plot)
+    if significant is not None:
+        add_significance_indicator(plot=plot, significant=significant)
+
+    return plot
 
 def sided_str_from_alternative(alternative, condition):
     if alternative is None:
@@ -54,9 +106,15 @@ def sided_str_from_alternative(alternative, condition):
     op_str = ">" if alternative == "greater" else "<"
     return "one-sided: %s %s not %s" % (condition, op_str, condition)
 
-FishersExactResults = namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "plot"])
+class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "plot"])):
+    def __str__(self):
+        return "FishersExactResults(oddsratio=%s, pvalue=%s, sided_str='%s')" % (
+            self.oddsratio, self.pvalue, self.sided_str)
 
-def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-sided"):
+    def __repr__(self):
+        return self.__str__()
+
+def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-sided", **kwargs):
     """
     Perform a Fisher's exact test to compare to binary columns
 
@@ -82,11 +140,15 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
         x=condition1,
         y=condition2,
         ax=ax,
-        data=data
+        data=data,
+        **kwargs
     )
+
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
+    only_percentage_ticks(plot)
+    add_significance_indicator(plot=plot, significant=pvalue <= 0.05)
     if alternative != "two-sided":
         raise ValueError("We need to better understand the one-sided Fisher's Exact test")
     sided_str = "two-sided"
@@ -96,13 +158,19 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
                                sided_str=sided_str,
                                plot=plot)
 
-MannWhitneyResults = namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])
+class MannWhitneyResults(namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])):
+    def __str__(self):
+        return "MannWhitneyResults(U=%s, pvalue=%s, sided_str='%s')" % (
+            self.U, self.pvalue, self.sided_str)
 
-def mann_whitney_plot(data, 
+    def __repr__(self):
+        return self.__str__()
+
+def mann_whitney_plot(data,
                       condition,
-                      distribution, 
+                      distribution,
                       ax=None,
-                      condition_value=None, 
+                      condition_value=None,
                       alternative="two-sided",
                       skip_plot=False,
                       **kwargs):
@@ -134,16 +202,6 @@ def mann_whitney_plot(data,
     skip_plot:
         Calculate the test statistic and p-value, but don't plot.
     """
-    plot = None
-    if not skip_plot:
-        plot = stripboxplot(
-            x=condition,
-            y=distribution,
-            data=data,
-            ax=ax,
-            **kwargs
-        )
-
     if condition_value:
         condition_mask = data[condition] == condition_value
     else:
@@ -153,6 +211,17 @@ def mann_whitney_plot(data,
         data[~condition_mask][distribution],
         alternative=alternative
     )
+
+    plot = None
+    if not skip_plot:
+        plot = stripboxplot(
+            x=condition,
+            y=distribution,
+            data=data,
+            ax=ax,
+            significant=pvalue <= 0.05,
+            **kwargs
+        )
 
     sided_str = sided_str_from_alternative(alternative, condition)
     print("Mann-Whitney test: U={}, p-value={} ({})".format(U, pvalue, sided_str))

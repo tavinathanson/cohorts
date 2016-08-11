@@ -47,6 +47,7 @@ from .collection import Collection
 from .varcode_utils import (filter_variants, filter_effects,
                             filter_neoantigens, filter_polyphen)
 from .variant_filters import no_filter
+from .styling import set_styling
 from . import variant_filters
 
 class InvalidDataError(ValueError):
@@ -306,6 +307,8 @@ class Cohort(Collection):
                             "isovar": "cached-isovar-output"}
         if print_provenance:
             pprint.pprint(self.summarize_data_sources())
+
+        set_styling()
 
     def verify_id_uniqueness(self):
         patient_ids = set([patient.id for patient in self])
@@ -1089,31 +1092,35 @@ class Cohort(Collection):
                                  ax=ax,
                                  **kwargs)
 
-    def plot_boolean(self, 
-                     on, 
-                     boolean_col, 
+    def plot_boolean(self,
+                     on,
+                     boolean_col,
+                     plot_col=None,
                      boolean_label=None,
                      boolean_value_map={},
-                     col=None, 
-                     order=None, 
+                     col=None,
+                     order=None,
                      ax=None,
-                     alternative="two-sided", 
+                     alternative="two-sided",
                      **kwargs):
         """Plot a comparison of `boolean_col` in the cohort on a given variable via
         `on` or `col`.
-        
+
         If the variable (through `on` or `col`) is binary this will compare
         odds-ratios and perform a Fisher's exact test.
-        
+
         If the variable is numeric, this will compare the distributions through
         a Mann-Whitney test and plot the distributions with box-strip plot
-        
+
         Parameters
         ----------
-        on : str or function
+        on : str or function or list or dict
             See `cohort.load.as_dataframe`
+        plot_col : str, optional
+            If on has many columns, this is the one whose values we are plotting.
+            If on has a single column, this is unnecessary.
         boolean_col : str
-            Column name of boolean column to plot or compare against
+            Column name of boolean column to plot or compare against.
         boolean_label : None, optional
             Label to give boolean column in the plot
         boolean_value_map : dict, optional
@@ -1132,7 +1139,15 @@ class Cohort(Collection):
         (Test statistic, p-value): (float, float)
 
         """
-        plot_col, df = self.as_dataframe(on, col, **kwargs)
+        cols, df = self.as_dataframe(on, col, **kwargs)
+        if type(cols) == str:
+            if plot_col is not None:
+                raise ValueError("plot_col is specified when it isn't ndeeded.")
+            plot_col = cols
+        elif type(cols) == list:
+            if plot_col is None:
+                raise ValueError("plot_col must be specified when multiple `on`s are present.")
+
         df = filter_not_null(df, boolean_col)
         df = filter_not_null(df, plot_col)
 
@@ -1153,6 +1168,7 @@ class Cohort(Collection):
                 condition1=boolean_col,
                 condition2=plot_col,
                 alternative=alternative,
+                order=order,
                 ax=ax)
         else:
             results = mann_whitney_plot(
