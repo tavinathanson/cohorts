@@ -66,7 +66,7 @@ def add_significance_indicator(plot, col_a=0, col_b=1, significant=False):
     indicator = "*" if significant else "ns"
     plot.text((col_a + col_b) * 0.5, line_top, indicator, ha="center", va="bottom", color=color)
 
-def stripboxplot(x, y, data, ax=None, significant=False, **kwargs):
+def stripboxplot(x, y, data, ax=None, significant=None, **kwargs):
     """
     Overlay a stripplot on top of a boxplot.
     """
@@ -89,8 +89,10 @@ def stripboxplot(x, y, data, ax=None, significant=False, **kwargs):
         **kwargs
     )
 
-    hide_negative_y_ticks(plot)
-    add_significance_indicator(plot=plot, significant=significant)
+    if data[y].min() >= 0:
+        hide_negative_y_ticks(plot)
+    if significant is not None:
+        add_significance_indicator(plot=plot, significant=significant)
 
     return plot
 
