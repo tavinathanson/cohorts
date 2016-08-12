@@ -106,6 +106,17 @@ def sided_str_from_alternative(alternative, condition):
     op_str = ">" if alternative == "greater" else "<"
     return "one-sided: %s %s not %s" % (condition, op_str, condition)
 
+def get_condition_mask(df, condition, condition_value):
+    if condition_value:
+        condition_mask = df[condition] == condition_value
+    else:
+        # This is necessary in the event that condition has a non-bool dtype,
+        # such as object. This may happen if a function returns np.nan in
+        # addition to True/False (later filtered down to just True/False).
+        # ~condition_mask will behave incorrectly if dtype is not bool.
+        condition_mask = df[condition].astype("bool")
+    return condition_mask
+
 class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "with_condition1_fraction", "without_condition1_fraction", "plot"])):
     def __str__(self):
         return "FishersExactResults(oddsratio=%s, pvalue=%s, sided_str='%s')" % (
@@ -149,15 +160,7 @@ def fishers_exact_plot(data, condition1, condition2, ax=None,
         **kwargs
     )
     plot.set_ylabel("Percent %s" % condition2)
-
-    def get_condition_mask(condition, condition_value):
-        if condition_value:
-            condition_mask = data[condition] == condition_value
-        else:
-            condition_mask = data[condition]
-        return condition_mask
-    condition1_mask = get_condition_mask(condition1, condition1_value)
-
+    condition1_mask = get_condition_mask(data, condition1, condition1_value)
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
@@ -218,10 +221,7 @@ def mann_whitney_plot(data,
     skip_plot:
         Calculate the test statistic and p-value, but don't plot.
     """
-    if condition_value:
-        condition_mask = data[condition] == condition_value
-    else:
-        condition_mask = data[condition]
+    condition_mask = get_condition_mask(data, condition, condition_value)
     U, pvalue = mannwhitneyu(
         data[condition_mask][distribution],
         data[~condition_mask][distribution],
