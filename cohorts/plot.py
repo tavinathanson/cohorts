@@ -106,7 +106,7 @@ def sided_str_from_alternative(alternative, condition):
     op_str = ">" if alternative == "greater" else "<"
     return "one-sided: %s %s not %s" % (condition, op_str, condition)
 
-class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "plot"])):
+class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "with_condition1_fraction", "without_condition1_fraction", "plot"])):
     def __str__(self):
         return "FishersExactResults(oddsratio=%s, pvalue=%s, sided_str='%s')" % (
             self.oddsratio, self.pvalue, self.sided_str)
@@ -143,6 +143,7 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
         data=data,
         **kwargs
     )
+    plot.set_ylabel("Percent %s" % condition2)
 
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
@@ -156,6 +157,8 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     return FishersExactResults(oddsratio=oddsratio,
                                pvalue=pvalue,
                                sided_str=sided_str,
+                               with_condition1_fraction=data[data[condition1]][condition2].mean(),
+                               without_condition1_fraction=data[~data[condition1]][condition2].mean(),
                                plot=plot)
 
 class MannWhitneyResults(namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])):
