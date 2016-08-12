@@ -114,7 +114,9 @@ class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "pvalu
     def __repr__(self):
         return self.__str__()
 
-def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-sided", **kwargs):
+def fishers_exact_plot(data, condition1, condition2, ax=None,
+                       condition1_value=None,
+                       alternative="two-sided", **kwargs):
     """
     Perform a Fisher's exact test to compare to binary columns
 
@@ -132,6 +134,9 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     ax : Axes, default None
         Axes to plot on
 
+    condition1_value:
+        If `condition1` is not a binary column, split on =/!= to condition1_value
+
     alternative:
         Specify the sidedness of the test: "two-sided", "less"
         or "greater"
@@ -145,6 +150,14 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     )
     plot.set_ylabel("Percent %s" % condition2)
 
+    def get_condition_mask(condition, condition_value):
+        if condition_value:
+            condition_mask = data[condition] == condition_value
+        else:
+            condition_mask = data[condition]
+        return condition_mask
+    condition1_mask = get_condition_mask(condition1, condition1_value)
+
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
@@ -157,8 +170,8 @@ def fishers_exact_plot(data, condition1, condition2, ax=None, alternative="two-s
     return FishersExactResults(oddsratio=oddsratio,
                                pvalue=pvalue,
                                sided_str=sided_str,
-                               with_condition1_fraction=data[data[condition1]][condition2].mean(),
-                               without_condition1_fraction=data[~data[condition1]][condition2].mean(),
+                               with_condition1_fraction=data[condition1_mask][condition2].mean(),
+                               without_condition1_fraction=data[~condition1_mask][condition2].mean(),
                                plot=plot)
 
 class MannWhitneyResults(namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])):

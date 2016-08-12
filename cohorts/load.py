@@ -1167,6 +1167,7 @@ class Cohort(Collection):
                 data=df,
                 condition1=boolean_col,
                 condition2=plot_col,
+                condition1_value=condition_value,
                 alternative=alternative,
                 order=order,
                 ax=ax)
