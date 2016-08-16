@@ -42,7 +42,7 @@ def plot_kmf(df,
         survival_col: string, column which contains the survival time
         censor_col: string,
         threshold: int or string, if int, condition_col is thresholded,
-                                  if 'median', condition_col thresholded 
+                                  if 'median', condition_col thresholded
                                   at its median
         title: Title for the plot, default None
         ax: an existing matplotlib ax, optional, default None
@@ -92,10 +92,12 @@ def plot_kmf(df,
     if xlabel:
         ax.set_xlabel(xlabel)
 
-    results = logrank_test(survival_no_condition, 
-                           survival_with_condition, 
-                           event_observed_A=event_no_condition, 
+    results = logrank_test(survival_no_condition,
+                           survival_with_condition,
+                           event_observed_A=event_no_condition,
                            event_observed_B=event_with_condition)
+    results.without_condition_series = survival_no_condition
+    results.with_condition_series = survival_with_condition
     return results
 
 def logrank(df,
