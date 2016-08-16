@@ -117,10 +117,10 @@ def get_condition_mask(df, condition, condition_value):
         condition_mask = df[condition].astype("bool")
     return condition_mask
 
-class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "pvalue", "sided_str", "with_condition1_fraction", "without_condition1_fraction", "plot"])):
+class FishersExactResults(namedtuple("FishersExactResults", ["oddsratio", "p_value", "sided_str", "with_condition1_series", "without_condition1_series", "plot"])):
     def __str__(self):
-        return "FishersExactResults(oddsratio=%s, pvalue=%s, sided_str='%s')" % (
-            self.oddsratio, self.pvalue, self.sided_str)
+        return "FishersExactResults(oddsratio=%s, p_value=%s, sided_str='%s')" % (
+            self.oddsratio, self.p_value, self.sided_str)
 
     def __repr__(self):
         return self.__str__()
@@ -163,24 +163,24 @@ def fishers_exact_plot(data, condition1, condition2, ax=None,
     condition1_mask = get_condition_mask(data, condition1, condition1_value)
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
-    oddsratio, pvalue = fisher_exact(count_table, alternative=alternative)
+    oddsratio, p_value = fisher_exact(count_table, alternative=alternative)
     only_percentage_ticks(plot)
-    add_significance_indicator(plot=plot, significant=pvalue <= 0.05)
+    add_significance_indicator(plot=plot, significant=p_value <= 0.05)
     if alternative != "two-sided":
         raise ValueError("We need to better understand the one-sided Fisher's Exact test")
     sided_str = "two-sided"
-    print("Fisher's Exact Test: OR: {}, p-value={} ({})".format(oddsratio, pvalue, sided_str))
+    print("Fisher's Exact Test: OR: {}, p-value={} ({})".format(oddsratio, p_value, sided_str))
     return FishersExactResults(oddsratio=oddsratio,
-                               pvalue=pvalue,
+                               p_value=p_value,
                                sided_str=sided_str,
-                               with_condition1_fraction=data[condition1_mask][condition2].mean(),
-                               without_condition1_fraction=data[~condition1_mask][condition2].mean(),
+                               with_condition1_series=data[condition1_mask][condition2],
+                               without_condition1_series=data[~condition1_mask][condition2],
                                plot=plot)
 
-class MannWhitneyResults(namedtuple("MannWhitneyResults", ["U", "pvalue", "sided_str", "with_condition_series", "without_condition_series", "plot"])):
+class MannWhitneyResults(namedtuple("MannWhitneyResults", ["U", "p_value", "sided_str", "with_condition_series", "without_condition_series", "plot"])):
     def __str__(self):
-        return "MannWhitneyResults(U=%s, pvalue=%s, sided_str='%s')" % (
-            self.U, self.pvalue, self.sided_str)
+        return "MannWhitneyResults(U=%s, p_value=%s, sided_str='%s')" % (
+            self.U, self.p_value, self.sided_str)
 
     def __repr__(self):
         return self.__str__()
@@ -222,7 +222,7 @@ def mann_whitney_plot(data,
         Calculate the test statistic and p-value, but don't plot.
     """
     condition_mask = get_condition_mask(data, condition, condition_value)
-    U, pvalue = mannwhitneyu(
+    U, p_value = mannwhitneyu(
         data[condition_mask][distribution],
         data[~condition_mask][distribution],
         alternative=alternative
@@ -235,14 +235,14 @@ def mann_whitney_plot(data,
             y=distribution,
             data=data,
             ax=ax,
-            significant=pvalue <= 0.05,
+            significant=p_value <= 0.05,
             **kwargs
         )
 
     sided_str = sided_str_from_alternative(alternative, condition)
-    print("Mann-Whitney test: U={}, p-value={} ({})".format(U, pvalue, sided_str))
+    print("Mann-Whitney test: U={}, p-value={} ({})".format(U, p_value, sided_str))
     return MannWhitneyResults(U=U,
-                              pvalue=pvalue,
+                              p_value=p_value,
                               sided_str=sided_str,
                               with_condition_series=data[condition_mask][distribution],
                               without_condition_series=data[~condition_mask][distribution],
