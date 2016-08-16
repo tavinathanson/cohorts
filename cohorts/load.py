@@ -1206,7 +1206,8 @@ class Cohort(Collection):
         results = plot_kmf(
             df=df,
             condition_col=plot_col,
-            xlabel="Overall Survival" if how == "os" else "Progression-Free Survival",
+            xlabel="Days",
+            ylabel="Overall Survival (%)" if how == "os" else "Progression-Free Survival (%)",
             censor_col="deceased" if how == "os" else "progressed_or_deceased",
             survival_col=how,
             threshold=threshold if threshold is not None else default_threshold,
