@@ -1183,7 +1183,7 @@ class Cohort(Collection):
         return results
 
     def plot_survival(self, on, col=None, how="os", ax=None,
-                      threshold=None, **kwargs):
+                      threshold=None, legend_label=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
         Parameters
         ----------
@@ -1211,7 +1211,8 @@ class Cohort(Collection):
             censor_col="deceased" if how == "os" else "progressed_or_deceased",
             survival_col=how,
             threshold=threshold if threshold is not None else default_threshold,
-            ax=ax)
+            ax=ax,
+            legend_label=legend_label)
         return results
 
     def plot_joint(self, on, on_two=None, **kwargs):

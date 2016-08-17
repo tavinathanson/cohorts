@@ -23,6 +23,7 @@ def plot_kmf(df,
              condition_col,
              censor_col,
              survival_col,
+             legend_label=None,
              threshold=None,
              title=None,
              xlabel=None,
@@ -53,19 +54,25 @@ def plot_kmf(df,
           within the plot's title vs. stdout, default False
     """
     kmf = KaplanMeierFitter()
+    label_to_use = ""
+    if legend_label is not None:
+        label_to_use = legend_label
+    else:
+        label_to_use = condition_col
+
     if threshold is not None:
         is_median = threshold == "median"
         if is_median:
             threshold = df[condition_col].median()
         label_suffix = "%.2f" % threshold
         condition = df[condition_col] > threshold
-        label_no_condition = "%s ≤ %s" % (condition_col, label_suffix)
+        label_no_condition = "%s ≤ %s" % (label_to_use, label_suffix)
         if is_median:
             label_suffix += " (median)"
-        label_with_condition = "%s > %s" % (condition_col, label_suffix)
+        label_with_condition = "%s > %s" % (label_to_use, label_suffix)
     else:
         condition = df[condition_col]
-        label = "{}".format(condition_col)
+        label = "{}".format(label_to_use)
 
     df_with_condition = df[condition]
     df_no_condition = df[~condition]
