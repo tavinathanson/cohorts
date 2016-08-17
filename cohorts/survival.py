@@ -28,6 +28,7 @@ def plot_kmf(df,
              xlabel=None,
              ylabel=None,
              ax=None,
+             ci_show=False,
              print_as_title=False):
     """
     Plot survival curves by splitting the dataset into two groups based on
@@ -65,7 +66,8 @@ def plot_kmf(df,
         label_with_condition = "%s > %s" % (condition_col, label_suffix)
     else:
         condition = df[condition_col]
-        label = "{}".format(condition_col)
+        label_with_condition = "{}".format(condition_col)
+        label_no_condition = ""
 
     df_with_condition = df[condition]
     df_no_condition = df[~condition]
@@ -77,12 +79,12 @@ def plot_kmf(df,
 
     kmf.fit(survival_no_condition, event_no_condition, label=(label_no_condition))
     if ax:
-        kmf.plot(ax=ax, show_censors=True, ci_show=False)
+        kmf.plot(ax=ax, show_censors=True, ci_show=ci_show)
     else:
-        ax = kmf.plot(show_censors=True, ci_show=False)
+        ax = kmf.plot(show_censors=True, ci_show=ci_show)
 
     kmf.fit(survival_with_condition, event_with_condition, label=(label_with_condition))
-    plot = kmf.plot(ax=ax, show_censors=True, ci_show=False)
+    plot = kmf.plot(ax=ax, show_censors=True, ci_show=ci_show)
 
     # Set the y-axis to range 0 to 1
     ax.set_ylim(0, 1)
