@@ -1195,6 +1195,8 @@ class Cohort(Collection):
             Whether to plot OS (overall survival) or PFS (progression free survival)
         survival_units : str
             Unit of time for the survival measure, i.e. Days or Months
+        ci_show : bool
+            Display the confidence interval around the survival curve
         threshold : int or "median", optional
             Threshold of `col` on which to split the cohort
         """
