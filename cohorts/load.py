@@ -39,6 +39,7 @@ from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
 from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
+from scipy.stats import pearsonr
 
 from .utils import strip_column_names as _strip_column_names
 from .survival import plot_kmf
@@ -1219,7 +1220,7 @@ class Cohort(Collection):
             ci_show=ci_show)
         return results
 
-    def plot_joint(self, on, on_two=None, **kwargs):
+    def plot_joint(self, on, on_two=None, stat_func=pearsonr, **kwargs):
         """Plot a jointplot.
 
         Parameters
@@ -1234,7 +1235,7 @@ class Cohort(Collection):
         plot_cols, df = self.as_dataframe(on, **kwargs)
         for plot_col in plot_cols:
             df = filter_not_null(df, plot_col)
-        p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
+        p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1], stat_func=stat_func)
         return p
 
     def _list_patient_ids(self):
