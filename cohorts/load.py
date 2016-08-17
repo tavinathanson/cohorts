@@ -1220,15 +1220,17 @@ class Cohort(Collection):
             ci_show=ci_show)
         return results
 
-    def plot_joint(self, on, on_two=None, plot_type="jointplot", stat_func=pearsonr, **kwargs):
+    def plot_joint(self, on, on_two=None, x_col=None, plot_type="jointplot", stat_func=pearsonr, **kwargs):
         """Plot the correlation between two variables.
 
         Parameters
         ----------
-        on : function or list or map of functions
+        on : function or list or dict of functions
             See `cohort.load.as_dataframe`
         on_two : function, optional
             Can specify the second function here rather than creating a list.
+        x_col : str, optional
+            If `on` is a dict, this guarantees we have the expected ordering.
         plot_type : str, optional
             Specify "jointplot" or "boxplot".
         stat_func : function, optional.
@@ -1241,8 +1243,14 @@ class Cohort(Collection):
         plot_cols, df = self.as_dataframe(on, **kwargs)
         for plot_col in plot_cols:
             df = filter_not_null(df, plot_col)
-        x_col = plot_cols[0]
-        y_col = plot_cols[1]
+        if x_col is None:
+            x_col = plot_cols[0]
+            y_col = plot_cols[1]
+        else:
+            if x_col == plot_cols[0]:
+                y_col = plot_cols[1]
+            else:
+                y_col = plot_cols[0]
         series_x = df[x_col]
         series_y = df[y_col]
         coeff, p_value = stat_func(series_x, series_y)
