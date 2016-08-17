@@ -1182,7 +1182,7 @@ class Cohort(Collection):
                 ax=ax)
         return results
 
-    def plot_survival(self, on, col=None, how="os", ax=None,
+    def plot_survival(self, on, col=None, how="os", survival_units="Days", ax=None, ci_show=False,
                       threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
         Parameters
@@ -1193,6 +1193,10 @@ class Cohort(Collection):
             If specified, store the result of `on`. See `cohort.load.as_dataframe`
         how : {"os", "pfs"}, optional
             Whether to plot OS (overall survival) or PFS (progression free survival)
+        survival_units : str
+            Unit of time for the survival measure, i.e. Days or Months
+        ci_show : bool
+            Display the confidence interval around the survival curve
         threshold : int or "median", optional
             Threshold of `col` on which to split the cohort
         """
@@ -1206,12 +1210,13 @@ class Cohort(Collection):
         results = plot_kmf(
             df=df,
             condition_col=plot_col,
-            xlabel="Days",
+            xlabel=survival_units,
             ylabel="Overall Survival (%)" if how == "os" else "Progression-Free Survival (%)",
             censor_col="deceased" if how == "os" else "progressed_or_deceased",
             survival_col=how,
             threshold=threshold if threshold is not None else default_threshold,
-            ax=ax)
+            ax=ax,
+            ci_show=ci_show)
         return results
 
     def plot_joint(self, on, on_two=None, **kwargs):
