@@ -7,3 +7,4 @@ ENV.sh
 .coverage
 generated/
 .idea/
+cohorts.egg_info/
