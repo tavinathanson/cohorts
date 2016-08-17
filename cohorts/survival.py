@@ -66,8 +66,8 @@ def plot_kmf(df,
         label_with_condition = "%s > %s" % (condition_col, label_suffix)
     else:
         condition = df[condition_col]
-        label_with_condition = "{}".format(condition_col)
-        label_no_condition = ""
+        label_with_condition = "= {}".format(condition_col)
+        label_no_condition = "¬ {}".format(condition_col)
 
     df_with_condition = df[condition]
     df_no_condition = df[~condition]
