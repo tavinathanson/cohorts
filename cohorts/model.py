@@ -57,15 +57,15 @@ def bootstrap_auc(df, col, pred_col, n_bootstrap=1000):
         scores[i] = roc_auc_score(sampled_pred, sampled_counts)
     return scores
 
-def cohort_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
-    col, df = cohort.as_dataframe(func)
+def cohort_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
+    col, df = cohort.as_dataframe(func, **kwargs)
     return bootstrap_auc(df=df,
                          col=col,
                          pred_col=pred_col,
                          n_bootstrap=n_bootstrap)
 
-def cohort_mean_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000):
-    return cohort_bootstrap_auc(cohort, func, pred_col, n_bootstrap).mean()
+def cohort_mean_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
+    return cohort_bootstrap_auc(cohort, func, pred_col, n_bootstrap, **kwargs).mean()
 
 def coxph_model(formula, data, time_col, event_col, **kwargs):
     # pylint: disable=no-member

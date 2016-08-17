@@ -39,10 +39,11 @@ from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
 from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
+from scipy.stats import pearsonr
 
 from .utils import strip_column_names as _strip_column_names
 from .survival import plot_kmf
-from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot
+from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot, stripboxplot, CorrelationResults
 from .collection import Collection
 from .varcode_utils import (filter_variants, filter_effects,
                             filter_neoantigens, filter_polyphen)
@@ -1219,23 +1220,52 @@ class Cohort(Collection):
             ci_show=ci_show)
         return results
 
-    def plot_joint(self, on, on_two=None, **kwargs):
-        """Plot a jointplot.
+    def plot_joint(self, on, on_two=None, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, jointplot_kwargs={}, **kwargs):
+        """Plot the correlation between two variables.
 
         Parameters
         ----------
-        on : function or list or map of functions
+        on : function or list or dict of functions
             See `cohort.load.as_dataframe`
         on_two : function, optional
             Can specify the second function here rather than creating a list.
+        x_col : str, optional
+            If `on` is a dict, this guarantees we have the expected ordering.
+        plot_type : str, optional
+            Specify "jointplot" or "boxplot".
+        stat_func : function, optional.
+            Specify which function to use for the statistical test.
+        show_stat_func : bool, optional
+            Whether or not to show the stat_func result in the plot itself.
+        jointplot_kwargs : dict, optional
+            kwargs to pass through to seaborn.jointplot.
         """
+        if plot_type not in ["boxplot", "jointplot"]:
+            raise ValueError("Invalid plot_type %s" % plot_type)
         if on_two is not None:
             on = [on, on_two]
         plot_cols, df = self.as_dataframe(on, **kwargs)
         for plot_col in plot_cols:
             df = filter_not_null(df, plot_col)
-        p = sb.jointplot(data=df, x=plot_cols[0], y=plot_cols[1])
-        return p
+        if x_col is None:
+            x_col = plot_cols[0]
+            y_col = plot_cols[1]
+        else:
+            if x_col == plot_cols[0]:
+                y_col = plot_cols[1]
+            else:
+                y_col = plot_cols[0]
+        series_x = df[x_col]
+        series_y = df[y_col]
+        coeff, p_value = stat_func(series_x, series_y)
+        if plot_type == "jointplot":
+            plot = sb.jointplot(data=df, x=x_col, y=y_col,
+                                stat_func=stat_func if show_stat_func else None,
+                                **jointplot_kwargs)
+        else:
+            plot = stripboxplot(data=df, x=x_col, y=y_col)
+        return CorrelationResults(coeff=coeff, p_value=p_value, stat_func=stat_func,
+                                  series_x=series_x, series_y=series_y, plot=plot)
 
     def _list_patient_ids(self):
         """ Utility function to return a list of patient ids in the Cohort

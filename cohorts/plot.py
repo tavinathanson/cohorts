@@ -248,6 +248,14 @@ def mann_whitney_plot(data,
                               without_condition_series=data[~condition_mask][distribution],
                               plot=plot)
 
+class CorrelationResults(namedtuple("CorrelationResults", ["coeff", "p_value", "stat_func", "series_x", "series_y", "plot"])):
+    def __str__(self):
+        return "CorrelationResults(coeff=%s, p_value=%s, stat_func=%s)" % (
+            self.coeff, self.p_value, self.stat_func.__name__)
+
+    def __repr__(self):
+        return self.__str__()
+
 def roc_curve_plot(data, value_column, outcome_column, bootstrap_samples=100, ax=None):
     """Create a ROC curve and compute the bootstrap AUC for the given variable and outcome
 
