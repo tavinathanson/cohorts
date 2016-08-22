@@ -29,8 +29,8 @@ def plot_kmf(df,
              xlabel=None,
              ylabel=None,
              ax=None,
-             with_condition_color=colors.hex2color("#5B3636"),
-             no_condition_color=colors.hex2color("#A941AC"),
+             with_condition_color="#B38600",
+             no_condition_color="#A941AC",
              ci_show=False,
              print_as_title=False):
     """
@@ -53,11 +53,13 @@ def plot_kmf(df,
                                   at its median
         title: Title for the plot, default None
         ax: an existing matplotlib ax, optional, default None
-        with_condition_color: tuple, color for the with-condition curve
-        no_condition_color: tuple, color for the no-condition curve
+        with_condition_color: str, hex code color for the with-condition curve
+        no_condition_color: str, hex code color for the no-condition curve
         print_as_title: bool, optional, whether or not to print text
           within the plot's title vs. stdout, default False
     """
+    with_condition_color = colors.hex2color(with_condition_color)
+    no_condition_color = colors.hex2color(no_condition_color)
     kmf = KaplanMeierFitter()
     if threshold is not None:
         is_median = threshold == "median"
