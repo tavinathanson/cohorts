@@ -18,6 +18,7 @@ from __future__ import print_function
 
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
+import matplotlib.colors as colors
 
 def plot_kmf(df,
              condition_col,
@@ -28,6 +29,8 @@ def plot_kmf(df,
              xlabel=None,
              ylabel=None,
              ax=None,
+             with_condition_color=colors.hex2color("#5B3636"),
+             no_condition_color=colors.hex2color("#A941AC"),
              ci_show=False,
              print_as_title=False):
     """
@@ -50,6 +53,8 @@ def plot_kmf(df,
                                   at its median
         title: Title for the plot, default None
         ax: an existing matplotlib ax, optional, default None
+        with_condition_color: tuple, color for the with-condition curve
+        no_condition_color: tuple, color for the no-condition curve
         print_as_title: bool, optional, whether or not to print text
           within the plot's title vs. stdout, default False
     """
@@ -79,12 +84,12 @@ def plot_kmf(df,
 
     kmf.fit(survival_no_condition, event_no_condition, label=(label_no_condition))
     if ax:
-        kmf.plot(ax=ax, show_censors=True, ci_show=ci_show)
+        kmf.plot(ax=ax, show_censors=True, ci_show=ci_show, color=no_condition_color)
     else:
-        ax = kmf.plot(show_censors=True, ci_show=ci_show)
+        ax = kmf.plot(show_censors=True, ci_show=ci_show, color=no_condition_color)
 
     kmf.fit(survival_with_condition, event_with_condition, label=(label_with_condition))
-    plot = kmf.plot(ax=ax, show_censors=True, ci_show=ci_show)
+    plot = kmf.plot(ax=ax, show_censors=True, ci_show=ci_show, color=with_condition_color)
 
     # Set the y-axis to range 0 to 1
     ax.set_ylim(0, 1)
