@@ -31,6 +31,8 @@ def plot_kmf(df,
              ax=None,
              with_condition_color="#B38600",
              no_condition_color="#A941AC",
+             with_condition_label=None,
+             no_condition_label=None,
              ci_show=False,
              print_as_title=False):
     """
@@ -67,14 +69,17 @@ def plot_kmf(df,
             threshold = df[condition_col].median()
         label_suffix = "%.2f" % threshold
         condition = df[condition_col] > threshold
-        label_no_condition = "%s ≤ %s" % (condition_col, label_suffix)
+        default_label_no_condition = "%s ≤ %s" % (condition_col, label_suffix)
         if is_median:
             label_suffix += " (median)"
-        label_with_condition = "%s > %s" % (condition_col, label_suffix)
+        default_label_with_condition = "%s > %s" % (condition_col, label_suffix)
     else:
         condition = df[condition_col]
-        label_with_condition = "= {}".format(condition_col)
-        label_no_condition = "¬ {}".format(condition_col)
+        default_label_with_condition = "= {}".format(condition_col)
+        default_label_no_condition = "¬ {}".format(condition_col)
+
+    with_condition_label = with_condition_label or default_label_with_condition
+    no_condition_label = no_condition_label or default_label_no_condition
 
     df_with_condition = df[condition]
     df_no_condition = df[~condition]
@@ -84,13 +89,13 @@ def plot_kmf(df,
     event_no_condition = (df_no_condition[censor_col].astype(bool))
     event_with_condition = (df_with_condition[censor_col].astype(bool))
 
-    kmf.fit(survival_no_condition, event_no_condition, label=(label_no_condition))
+    kmf.fit(survival_no_condition, event_no_condition, label=(no_condition_label))
     if ax:
         kmf.plot(ax=ax, show_censors=True, ci_show=ci_show, color=no_condition_color)
     else:
         ax = kmf.plot(show_censors=True, ci_show=ci_show, color=no_condition_color)
 
-    kmf.fit(survival_with_condition, event_with_condition, label=(label_with_condition))
+    kmf.fit(survival_with_condition, event_with_condition, label=(with_condition_label))
     plot = kmf.plot(ax=ax, show_censors=True, ci_show=ci_show, color=with_condition_color)
 
     # Set the y-axis to range 0 to 1
