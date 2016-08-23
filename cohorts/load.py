@@ -1183,7 +1183,17 @@ class Cohort(Collection):
                 ax=ax)
         return results
 
-    def plot_survival(self, on, col=None, how="os", survival_units="Days", ax=None, ci_show=False,
+    def plot_survival(self, 
+                      on, 
+                      col=None, 
+                      how="os", 
+                      survival_units="Days", 
+                      ax=None, 
+                      ci_show=False,
+                      with_condition_color="#B38600",
+                      no_condition_color="#A941AC",
+                      with_condition_label=None,
+                      no_condition_label=None,
                       threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
         Parameters
@@ -1217,7 +1227,12 @@ class Cohort(Collection):
             survival_col=how,
             threshold=threshold if threshold is not None else default_threshold,
             ax=ax,
-            ci_show=ci_show)
+            ci_show=ci_show,
+            with_condition_color=with_condition_color,
+            no_condition_color=no_condition_color,
+            with_condition_label=with_condition_label,
+            no_condition_label=no_condition_label
+        )
         return results
 
     def plot_joint(self, on, on_two=None, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, jointplot_kwargs={}, **kwargs):
