@@ -35,20 +35,23 @@ def as_numeric(text):
     except:
         return None
 
+def hide_ticks(plot, min_tick_value=None, max_tick_value=None):
+    """Hide tick values that are outside of [min_tick_value, max_tick_value]"""
+    for tick, tick_value in zip(plot.get_yticklabels(), plot.get_yticks()):
+        tick_label = as_numeric(tick_value)
+        if tick_label:
+            if (min_tick_value is not None and tick_label < min_tick_value or 
+                 max_tick_value is not None and tick_label > max_tick_value):
+                tick.set_visible(False)
+
 def hide_negative_y_ticks(plot):
-    y_ticks = plot.get_yticks()
-    plot.set_yticks([tick for tick in y_ticks if as_numeric(tick) is not None and as_numeric(tick) >= 0])
+    hide_ticks(plot, min_tick_value=0)
 
 def only_percentage_ticks(plot):
     """
     Only show ticks from 0.0 to 1.0.
     """
-    hide_negative_y_ticks(plot)
-    y_ticks = plot.get_yticks()
-    less_1_ticks = [tick for tick in y_ticks if as_numeric(tick) is not None and as_numeric(tick) <= 1]
-    if 1.0 not in less_1_ticks:
-        less_1_ticks.append(1.0)
-    plot.set_yticks(less_1_ticks)
+    hide_ticks(plot, min_tick_value=0, max_tick_value=1.0)
 
 def add_significance_indicator(plot, col_a=0, col_b=1, significant=False):
     """
@@ -159,13 +162,15 @@ def fishers_exact_plot(data, condition1, condition2, ax=None,
         data=data,
         **kwargs
     )
+
     plot.set_ylabel("Percent %s" % condition2)
     condition1_mask = get_condition_mask(data, condition1, condition1_value)
     count_table = pd.crosstab(data[condition1], data[condition2])
     print(count_table)
     oddsratio, p_value = fisher_exact(count_table, alternative=alternative)
-    only_percentage_ticks(plot)
     add_significance_indicator(plot=plot, significant=p_value <= 0.05)
+    only_percentage_ticks(plot)
+
     if alternative != "two-sided":
         raise ValueError("We need to better understand the one-sided Fisher's Exact test")
     sided_str = "two-sided"
