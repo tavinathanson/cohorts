@@ -19,6 +19,7 @@ from __future__ import print_function
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 import matplotlib.colors as colors
+from rounding import float_str
 
 def plot_kmf(df,
              condition_col,
@@ -67,7 +68,7 @@ def plot_kmf(df,
         is_median = threshold == "median"
         if is_median:
             threshold = df[condition_col].median()
-        label_suffix = "%.2f" % threshold
+        label_suffix = float_str(threshold)
         condition = df[condition_col] > threshold
         default_label_no_condition = "%s ≤ %s" % (condition_col, label_suffix)
         if is_median:
