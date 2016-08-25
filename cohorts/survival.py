@@ -19,7 +19,7 @@ from __future__ import print_function
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 import matplotlib.colors as colors
-from rounding import float_str
+from .rounding import float_str
 
 def plot_kmf(df,
              condition_col,
