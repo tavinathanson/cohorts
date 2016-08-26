@@ -360,6 +360,7 @@ class Cohort(Collection):
                 df_loader.load_dataframe(),
                 left_on="patient_id",
                 right_on=df_loader.join_on,
+                suffixes=["", "_" + df_loader.name],
                 how=join_how)
             print("%s join with %s: %d to %d rows" % (
                 join_how,
