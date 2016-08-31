@@ -239,6 +239,8 @@ class Cohort(Collection):
         Path to a Polyphen database dump.
     pageant_coverage_path : str
         Path to Pageant CoverageDepth output.
+    benefit_plot_name : str
+        What word to use for "benefit" when plotting.
     variant_type : {"snv", "indel"}, optional
         Load variants of a specific type, default "snv"
     merge_type : {"union", "intersection"}, optional
@@ -261,6 +263,7 @@ class Cohort(Collection):
                  print_provenance=True,
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
+                 benefit_plot_name="Benefit",
                  variant_type="snv",
                  merge_type="union"):
         Collection.__init__(
@@ -290,6 +293,7 @@ class Cohort(Collection):
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
+        self.benefit_plot_name = benefit_plot_name
         self.variant_type = variant_type
         self.merge_type = merge_type
 
@@ -1083,13 +1087,14 @@ class Cohort(Collection):
                      alternative="two-sided", **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
         """
+        no_benefit_plot_name = "No %s" % self.benefit_plot_name
         return self.plot_boolean(on=on,
                                  boolean_col=benefit_col,
                                  col=col,
                                  alternative=alternative,
                                  boolean_label=label,
-                                 boolean_value_map={True: "Benefit", False: "No Benefit"},
-                                 order=["No Benefit", "Benefit"],
+                                 boolean_value_map={True: self.benefit_plot_name, False: no_benefit_plot_name},
+                                 order=[no_benefit_plot_name, self.benefit_plot_name],
                                  ax=ax,
                                  **kwargs)
 
