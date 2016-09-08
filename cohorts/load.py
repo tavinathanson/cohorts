@@ -365,18 +365,16 @@ class Cohort(Collection):
         df_loader_dfs = {}
         col_counts = defaultdict(int)
         for df_loader in df_loaders:
-            loaded_df = df_loader.load_dataframe()
-            df_loader_dfs[df_loader] = loaded_df
-            for col in loaded_df.columns:
+            df_loader_dfs[df_loader] = df_loader.load_dataframe()
+            for col in df_loader_dfs[df_loader].columns:
                 col_counts[col] += 1
         for col, count in col_counts.items():
             # Don't rename columns that are not duplicated.
             if count > 1:
-                for df_loader in df_loader_dfs.keys():
-                    loaded_df = df_loader_dfs[df_loader]
+                for df_loader, loaded_df in df_loader_dfs.items():
                     # Don't rename a column that will be joined on.
                     if col != "patient_id" and col != df_loader.join_on:
-                        df_loader_dfs[df_loader] = loaded_df.rename(columns={col: "%s_%s" % (df_loader.name, col)})
+                        loaded_df.rename(columns={col: "%s_%s" % (df_loader.name, col)}, inplace=True)
 
         for df_loader, loaded_df in df_loader_dfs.items():
             old_len_df = len(df)
