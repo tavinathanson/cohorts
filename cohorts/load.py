@@ -374,7 +374,7 @@ class Cohort(Collection):
                 for df_loader, loaded_df in df_loader_dfs.items():
                     # Don't rename a column that will be joined on.
                     if col != "patient_id" and col != df_loader.join_on:
-                        loaded_df.rename(columns={col: "%s_%s" % (df_loader.name, col)}, inplace=True)
+                        loaded_df.rename(columns={col: "%s_%s" % (col, df_loader.name)}, inplace=True)
 
         for df_loader, loaded_df in df_loader_dfs.items():
             old_len_df = len(df)
