@@ -40,6 +40,7 @@ from topiary.sequence_helpers import contains_mutant_residues
 from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
 from scipy.stats import pearsonr
+from collections import defaultdict
 
 from .utils import strip_column_names as _strip_column_names
 from .survival import plot_kmf
@@ -358,10 +359,29 @@ class Cohort(Collection):
             patient_rows.append(row)
         df = pd.DataFrame.from_records(patient_rows)
 
+        # Are any columns duplicated in the DataFrame(s) to be joined?
+        # If so, rename those columns to be prefixed by the DataFrameLoader
+        # name.
+        df_loader_dfs = {}
+        col_counts = defaultdict(int)
         for df_loader in df_loaders:
+            loaded_df = df_loader.load_dataframe()
+            df_loader_dfs[df_loader] = loaded_df
+            for col in loaded_df.columns:
+                col_counts[col] += 1
+        for col, count in col_counts.items():
+            # Don't rename columns that are not duplicated.
+            if count > 1:
+                for df_loader in df_loader_dfs.keys():
+                    loaded_df = df_loader_dfs[df_loader]
+                    # Don't rename a column that will be joined on.
+                    if col != "patient_id" and col != df_loader.join_on:
+                        df_loader_dfs[df_loader] = loaded_df.rename(columns={col: "%s_%s" % (df_loader.name, col)})
+
+        for df_loader, loaded_df in df_loader_dfs.items():
             old_len_df = len(df)
             df = df.merge(
-                df_loader.load_dataframe(),
+                loaded_df,
                 left_on="patient_id",
                 right_on=df_loader.join_on,
                 how=join_how)
