@@ -360,7 +360,7 @@ class Cohort(Collection):
         df = pd.DataFrame.from_records(patient_rows)
 
         # Are any columns duplicated in the DataFrame(s) to be joined?
-        # If so, rename those columns to be prefixed by the DataFrameLoader
+        # If so, rename those columns to be suffixed by the DataFrameLoader
         # name.
         df_loader_dfs = {}
         col_counts = defaultdict(int)
