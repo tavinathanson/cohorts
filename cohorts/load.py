@@ -1266,7 +1266,7 @@ class Cohort(Collection):
         warnings.warn("plot_joint is deprecated; use plot_correlation.", Warning)
         return self.plot_correlation(*args, **kwargs)
 
-    def plot_correlation(self, on, on_two=None, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, jointplot_kwargs={}, **kwargs):
+    def plot_correlation(self, on, on_two=None, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, plot_kwargs={}, **kwargs):
         """Plot the correlation between two variables.
 
         Parameters
@@ -1283,8 +1283,8 @@ class Cohort(Collection):
             Specify which function to use for the statistical test.
         show_stat_func : bool, optional
             Whether or not to show the stat_func result in the plot itself.
-        jointplot_kwargs : dict, optional
-            kwargs to pass through to seaborn.jointplot.
+        plot_kwargs : dict, optional
+            kwargs to pass through to plotting functions.
         """
         if plot_type not in ["boxplot", "barplot", "jointplot"]:
             raise ValueError("Invalid plot_type %s" % plot_type)
@@ -1307,11 +1307,11 @@ class Cohort(Collection):
         if plot_type == "jointplot":
             plot = sb.jointplot(data=df, x=x_col, y=y_col,
                                 stat_func=stat_func if show_stat_func else None,
-                                **jointplot_kwargs)
+                                **plot_kwargs)
         elif plot_type == "boxplot":
-            plot = stripboxplot(data=df, x=x_col, y=y_col)
+            plot = stripboxplot(data=df, x=x_col, y=y_col, **plot_kwargs)
         else:
-            plot = sb.barplot(data=df, x=x_col, y=y_col)
+            plot = sb.barplot(data=df, x=x_col, y=y_col, **plot_kwargs)
         return CorrelationResults(coeff=coeff, p_value=p_value, stat_func=stat_func,
                                   series_x=series_x, series_y=series_y, plot=plot)
 
