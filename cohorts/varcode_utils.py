@@ -112,7 +112,6 @@ def filter_effects(effect_collection, variant_collection, patient, filter_fn):
         return effect_collection
 
 def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
-    import pdb; pdb.set_trace()
     if filter_fn:
         filter_mask = neoantigens_df.apply(
             lambda row: filter_fn(
