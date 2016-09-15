@@ -42,7 +42,10 @@ from pysam import AlignmentFile
 from scipy.stats import pearsonr
 from collections import defaultdict
 
-from .utils import strip_column_names as _strip_column_names
+from .patient import Patient
+from .sample import Sample
+from .dataframe_loader import DataFrameLoader
+from .utils import InvalidDataError, strip_column_names as _strip_column_names
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot, stripboxplot, CorrelationResults
 from .collection import Collection
@@ -51,154 +54,6 @@ from .varcode_utils import (filter_variants, filter_effects,
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
-
-class InvalidDataError(ValueError):
-    pass
-
-def require_id_str(id):
-    if type(id) != str:
-        raise ValueError("Expected ID string, but id = %s" % str(id))
-
-class Sample(object):
-    """
-    Represents a single tumor or normal sample. It can point to DNA and/or
-    RNA reads.
-
-    Parameters
-    __________
-    is_tumor : bool
-        Does this `Sample` represent a tumor sample?
-    bam_path_dna : str
-        Path to the DNA BAM file.
-    bam_path_rna : str
-        Path to the RNA BAM file.
-    cufflinks_path : str
-        Path to the Cufflinks output file.
-    """
-    def __init__(self,
-                 is_tumor,
-                 bam_path_dna=None,
-                 bam_path_rna=None,
-                 cufflinks_path=None,
-                 kallisto_path=None):
-        self.is_tumor = is_tumor
-        self.bam_path_dna = bam_path_dna
-        self.bam_path_rna = bam_path_rna
-        self.cufflinks_path = cufflinks_path
-        self.kallisto_path = kallisto_path
-
-class Patient(object):
-    """
-    Represents a patient, which contains zero or more of: normal `Sample`,
-    tumor `Sample`.
-
-    Parameters
-    __________
-    id : str
-        ID of the patient.
-    os : int
-        Overall survival in days.
-    pfs : int
-        Progression-free survival in days.
-    deceased : bool
-        Is the patient deceased?
-    progressed : bool
-        Has the patient progressed?
-    progressed_or_deceased : bool
-        Has the patient either progressed or passed away?
-    benefit : bool
-        Has the patient seen a durable clinical benefit?
-    snv_vcf_paths : list
-        List of paths to SNV VCFs or this patient; multple VCFs get merged.
-    indel_vcf_paths : list
-        List of paths to indel VCFs for this patient; multple VCFs get merged.
-    normal_sample : Sample
-        This patient's normal `Sample`.
-    tumor_sample: Sample
-        This patient's tumor `Sample`.
-    hla_alleles : list
-        A list of this patient's HLA class I alleles.
-    additional_data : dict
-        A dictionary of additional data: name of datum mapping to value.
-    """
-    def __init__(self,
-                 id,
-                 os,
-                 pfs,
-                 deceased,
-                 progressed=None,
-                 progressed_or_deceased=None,
-                 benefit=None,
-                 snv_vcf_paths=[],
-                 indel_vcf_paths=[],
-                 normal_sample=None,
-                 tumor_sample=None,
-                 hla_alleles=None,
-                 additional_data=None,
-                 cohort=None):
-        require_id_str(id)
-        self.id = id
-        self.os = os
-        self.pfs = pfs
-        self.deceased = deceased
-        self.progressed = progressed
-        self.progressed_or_deceased = progressed_or_deceased
-        self.benefit = benefit
-        self.snv_vcf_paths = snv_vcf_paths
-        self.indel_vcf_paths = indel_vcf_paths
-        self.normal_sample = normal_sample
-        self.tumor_sample = tumor_sample
-        self.hla_alleles = hla_alleles
-        self.additional_data = additional_data
-
-        # TODO: This can be removed once all patient-specific functions are
-        # removed from Cohort.
-        self.cohort = cohort
-
-        self.add_progressed_or_deceased()
-
-    def add_progressed_or_deceased(self):
-        assert self.progressed is not None or self.progressed_or_deceased is not None, (
-            "Need at least one of progressed and progressed_or_deceased")
-        if self.progressed_or_deceased is None:
-            self.progressed_or_deceased = self.progressed or self.deceased
-
-        # If we have both of these, ensure that they're in sync
-        if self.progressed_or_deceased is not None and self.progressed is not None:
-            assert self.progressed_or_deceased == self.progressed or self.deceased, (
-                    "progressed_or_deceased should equal progressed || deceased")
-
-    def __hash__(self):
-        return hash(self.id)
-
-    def __eq__(self, other):
-        if self is other:
-            return True
-        return (
-            self.__class__ == other.__class__ and
-            self.id == other.id)
-
-class DataFrameLoader(object):
-    """
-    Wraps a `DataFrame` with some information on how to join it.
-
-    Parameters
-    __________
-    name : str
-        The name of the dataframe, to easily reference it.
-    load_dataframe : function
-        A function that returns the `DataFrame` object.
-    join_on : str
-        The column of the `DataFrame` to join on (i.e. the patient
-        ID column name).
-    """
-    def __init__(self,
-                 name,
-                 load_dataframe,
-                 join_on="patient_id"):
-        self.name = name
-        self.load_dataframe = load_dataframe
-        self.join_on = join_on
 
 class Cohort(Collection):
     """
@@ -1496,7 +1351,7 @@ def compare_provenance(
     ## if either this or other items is null, return 0
     if (not this_provenance or not other_provenance):
         return 0
-    
+
     this_items = set(this_provenance.items())
     other_items = set(other_provenance.items())
 

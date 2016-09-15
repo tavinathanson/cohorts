@@ -15,6 +15,12 @@
 import re
 import warnings
 
+class InvalidDataError(ValueError):
+    pass
+
+def require_id_str(id):
+    if type(id) != str:
+        raise ValueError("Expected ID string, but id = %s" % str(id))
 
 def _strip_column_name(col_name, keep_paren_contents=True):
     """
@@ -75,7 +81,6 @@ def _strip_column_name(col_name, keep_paren_contents=True):
 
     # return lower-case version of column name
     return new_col_name.lower()
-
 
 def strip_column_names(cols, keep_paren_contents=True):
     """
