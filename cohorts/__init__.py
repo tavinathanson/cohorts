@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .load import *
+from .cohort import Cohort
+from .patient import Patient
+from .sample import Sample
 
 from ._version import get_versions
 __version__ = get_versions()['version']
