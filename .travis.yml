@@ -23,7 +23,7 @@ before_install:
 addons:
   apt:
     packages:
-    # install pandoc for use with pypandoc for converting the README
+    # Install pandoc for use with pypandoc for converting the README
     # from markdown to RST
     - pandoc
 install:
