@@ -27,7 +27,7 @@ addons:
     # from markdown to RST
     - pandoc
 install:
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy nose pandas matplotlib
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy nose pandas matplotlib seaborn
   - source activate test-environment
   - conda install -c bioconda pysam=0.9.0
   - pip install pypandoc
