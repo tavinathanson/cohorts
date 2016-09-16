@@ -12,9 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+
 import re
 import warnings
 
+class InvalidDataError(ValueError):
+    pass
+
+def first_not_none_param(params, default):
+    """
+    Given a list of `params`, use the first param in the list that is
+    not None. If all are None, fall back to `default`.
+    """
+    for param in params:
+        if param is not None:
+            return param
+    return default
+
+def filter_not_null(df, col):
+    original_len = len(df)
+    df = df[df[col].notnull()]
+    updated_len = len(df)
+    if updated_len < original_len:
+        print("Missing %s for %d patients: from %d to %d" % (col, original_len - updated_len, original_len, updated_len))
+    return df
+
+def require_id_str(id):
+    if type(id) != str:
+        raise ValueError("Expected ID string, but id = %s" % str(id))
 
 def _strip_column_name(col_name, keep_paren_contents=True):
     """
@@ -75,7 +101,6 @@ def _strip_column_name(col_name, keep_paren_contents=True):
 
     # return lower-case version of column name
     return new_col_name.lower()
-
 
 def strip_column_names(cols, keep_paren_contents=True):
     """

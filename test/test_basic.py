@@ -19,7 +19,7 @@ from .data_generate import generate_vcfs
 from .functions import *
 
 from cohorts import Cohort, Patient
-from cohorts.load import InvalidDataError
+from cohorts.utils import InvalidDataError
 
 import pandas as pd
 from nose.tools import raises, eq_, ok_

@@ -18,7 +18,7 @@ from . import data_path, generated_data_path
 from .data_generate import generate_vcfs
 from .functions import *
 
-from cohorts.load import filter_not_null
+from cohorts.cohort import filter_not_null
 
 import pandas as pd
 import numpy as np
