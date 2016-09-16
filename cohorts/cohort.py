@@ -45,7 +45,8 @@ from collections import defaultdict
 from .patient import Patient
 from .sample import Sample
 from .dataframe_loader import DataFrameLoader
-from .utils import InvalidDataError, strip_column_names as _strip_column_names
+from .utils import first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names
+from .provenance import compare_provenance
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot, stripboxplot, CorrelationResults
 from .collection import Collection
@@ -1304,72 +1305,3 @@ class Cohort(Collection):
             "dataframe_hash": dataframe_hash
         }
         return(results)
-
-def first_not_none_param(params, default):
-    """
-    Given a list of `params`, use the first param in the list that is
-    not None. If all are None, fall back to `default`.
-    """
-    for param in params:
-        if param is not None:
-            return param
-    return default
-
-def filter_not_null(df, col):
-    original_len = len(df)
-    df = df[df[col].notnull()]
-    updated_len = len(df)
-    if updated_len < original_len:
-        print("Missing %s for %d patients: from %d to %d" % (col, original_len - updated_len, original_len, updated_len))
-    return df
-
-def _provenance_str(provenance):
-    """Utility function used by compare_provenance to print diff
-    """
-    return ["%s==%s" % (key, value) for (key, value) in provenance]
-
-def compare_provenance(
-        this_provenance, other_provenance,
-        left_outer_diff = "In current but not comparison",
-        right_outer_diff = "In comparison but not current"):
-    """Utility function to compare two abritrary provenance dicts
-    returns number of discrepancies.
-
-    Parameters
-    ----------
-    this_provenance: provenance dict (to be compared to "other_provenance")
-    other_provenance: comparison provenance dict
-
-    (optional)
-    left_outer_diff: description/prefix used when printing items in this_provenance but not in other_provenance
-    right_outer_diff: description/prefix used when printing items in other_provenance but not in this_provenance
-
-    Returns
-    -----------
-    Number of discrepancies (0: None)
-    """
-    ## if either this or other items is null, return 0
-    if (not this_provenance or not other_provenance):
-        return 0
-
-    this_items = set(this_provenance.items())
-    other_items = set(other_provenance.items())
-
-    # Two-way diff: are any modules introduced, and are any modules lost?
-    new_diff = this_items.difference(other_items)
-    old_diff = other_items.difference(this_items)
-    warn_str = ""
-    if len(new_diff) > 0:
-        warn_str += "%s: %s" % (
-            left_outer_diff,
-            _provenance_str(new_diff))
-    if len(old_diff) > 0:
-        warn_str += "%s: %s" % (
-            right_outer_diff,
-            _provenance_str(old_diff))
-
-    if len(warn_str) > 0:
-        warnings.warn(warn_str, Warning)
-
-    return(len(new_diff)+len(old_diff))
-

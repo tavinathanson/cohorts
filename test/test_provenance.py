@@ -20,6 +20,7 @@ from os import path
 import os
 from shutil import rmtree
 import cohorts
+from cohorts.provenance import compare_provenance
 import warnings
 
 from .test_basic import make_simple_cohort
@@ -109,9 +110,9 @@ def test_summarize_provenance():
         cohort.save_provenance(patient_cache_dir, provenance)
         ## confirm provenance was updated
         new_provenance = cohort.load_provenance(patient_cache_dir)
-        ok_(cohorts.compare_provenance(provenance, new_provenance) == 0)
-        print(new_provenance) 
-        
+        ok_(compare_provenance(provenance, new_provenance) == 0)
+        print(new_provenance)
+
         ## should see a warning when loading provenance
         ## & provenance value should be None
         # But, when check_provenance is off, we shouldn't get a warning.
@@ -120,7 +121,7 @@ def test_summarize_provenance():
             ok_(not cohort.summarize_provenance_per_cache()[cache_name])
             ok_(len(w)>0)
 
-        ## now test whether deleting contents of cache_dir causes an error 
+        ## now test whether deleting contents of cache_dir causes an error
         dirlist = [f for f in os.listdir(cache_dir)]
         for dir in dirlist:
             rmtree(path.join(cache_dir, dir))

@@ -15,7 +15,7 @@
 from __future__ import print_function
 
 from .variant_filters import no_filter, effect_expressed_filter
-from .load import first_not_none_param
+from .utils import first_not_none_param
 
 import numpy as np
 from varcode.effects import Substitution
