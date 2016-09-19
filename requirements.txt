@@ -4,7 +4,7 @@ scipy>=0.17.0
 topiary>=0.0.20, <0.1.0
 mhctools>=0.2.3, <0.3.0
 varcode==0.4.15
-pyensembl>=0.8.12
+pyensembl>=0.8.12, <1.0.0
 six>=1.10.0
 lifelines>=0.9.1.0
 scikit-learn>=0.17.1
