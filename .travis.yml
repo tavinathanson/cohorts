@@ -3,7 +3,7 @@ language: python
 python:
   - "2.7"
   - "3.4"
-env:P
+env:
   # Use a non-interactive backend to avoid PyQt4 install issues, and because
   # we don't need interactivity in Travis.
   - MPLBACKEND='agg'
