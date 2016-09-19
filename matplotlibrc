@@ -1,2 +1,0 @@
-# Use Agg since we're not trying to display.
-backend : Agg
