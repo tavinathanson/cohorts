@@ -45,13 +45,36 @@ vary from cohort to cohort, but will also likely grow in variety over time. [Coh
 
 # Design philosophy
 
-A [Cohorts](http://github.com/hammerlab/cohorts) is, at its most basic level, a collection of Patients.
-
-## Minimal example
+A `Cohort` is, at its most basic level, a collection of Patients. 
 
 At a minimum, each Patient has the following data elements: 
 
+ * id: unique identifier
+ * deceased: boolean indicating if patient deceased
+ * progressed: boolean indicating if patient progressed
+ * os: time (usually days) to death or censor event
+ * pfs: time (days) to progression, death or censor event
+
+The two pairs of endopint data (`os`,`deceased`) and (`pfs`, `progressed`) are used to define the primary endpoint(s) of the study, namely: 
+
+ * Overall Survival, and
+ * Progression-Free Survival
+
+### Minimal example
+
+To illustrate this in practice, let's simulate data for a few sample patients.
+
 ## Example with genetic data
+
+We can also use [pygdc](http://github.com/hammerlab/pygdc)'s `build_cohort` function to easily create a cohort from TCGA data.
+
+```{python}
+import pygdc
+
+lung_cohort = pygdc.build_cohort(
+    primary_site='Lung', 
+    cohort_cache_dir='cache-dir')
+```
 
 # Concepts
 
