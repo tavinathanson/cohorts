@@ -2,10 +2,10 @@
 
 This document explains what do once your [Pull Request](https://www.atlassian.com/git/tutorials/making-a-pull-request/) has been reviewed and all final changes applied. Now you're ready merge your branch into master and release it to the world:
 
-1. Assign a version to the release you are preparing. Varcode uses [versioneer](https://github.com/warner/python-versioneer), so rather
-than explicitly editing `__version__` variable in the code you must instead tag the branch with your new version number (e.g. `git tag 1.2.3`).
+1. Assign a version to the release you are preparing. `cohorts` uses [versioneer](https://github.com/warner/python-versioneer), so rather
+than explicitly editing a `__version__` variable in the code you must instead tag the branch with your new version number (e.g. `git tag 1.2.3`).
 
-Warning: whether you should do `git tag v1.2.3` vs. `git tag 1.2.3` depends on versioneer settings, which can be found in `setup.cfg` and `_version.py` (because `_version.py` was generated via `setup.cfg` configuration, the two should match.) In `cohorts`, `git tag 1.2.3` (without the `v`) is what's expected.
+Warning: whether you should do `git tag v1.2.3` vs. `git tag 1.2.3` depends on versioneer settings, which can be found in `setup.cfg` and `_version.py` (because `_version.py` was generated from `setup.cfg` configuration, the two should match.) In `cohorts`, `git tag 1.2.3` (without the `v`) is what's expected.
 
 2. Once your candidate release branch is tagged you must then run `git push --tags` and merge the branch.
 
