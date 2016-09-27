@@ -16,7 +16,27 @@ You can install Cohorts using [pip](https://pip.pypa.io/en/latest/quickstart.htm
 pip install cohorts
 ```
 
-Usage Examples
+Features
+--------
+
+* Data management: construct a `Cohort` consisting of `Patient`s with `Sample`s.
+* Use `varcode` and `topiary` to generate and cache variant effects and predicted neoantigens.
+* Provenance: track the state of the world (package and data versions) for a given analysis.
+* Aggregation functions: built-in functions such as `missense_snv_count`, `neoantigen_count`, `expressed_neoantigen_count`; or create your own functions.
+* Plotting: survival curves via `lifelines`, response/no response plots (with Mann-Whitney and Fisher's Exact results), ROC curves. Example: `cohort.plot_survival(on=missense_snv_count, how="pfs")`.
+* Filtering: filter collections of variants/effects/neoantigens by, for example, variant statistics.
+* Pre-define data sets to work with. Example: `cohort.as_dataframe(join_with=["tcr", "pdl1"])`.
+
+In addition, several other libraries make use of `cohorts`:
+* [pygdc](http://github.com/hammerlab/pygdc)
+* [query_tcga](http://github.com/jburos/query_tcga)
+
+Worked Examples
+---------------
+
+* [Quick-start](http://nbviewer.jupyter.org/github/hammerlab/tcga-blca/blob/master/Quick-start%20-%20using%20Cohorts%20with%20TCGA%20data.ipynb) Example using cohorts with TCGA data
+
+Basic Usage
 --------------
 
 ```python
