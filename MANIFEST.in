@@ -1,2 +1,5 @@
 include versioneer.py
 include cohorts/_version.py
+include README.md
+include LICENSE
+include requirements.txt
