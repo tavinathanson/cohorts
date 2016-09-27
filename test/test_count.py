@@ -14,13 +14,13 @@
 
 from __future__ import print_function
 
-from varcode import ExonicSpliceSite, Substitution
+from varcode.effects.effect_classes import ExonicSpliceSite, Substitution
 from cohorts.variant_filters import no_filter
 
 from .data_generate import generate_vcfs
 from .functions import *
 
-from nose.tools import raises, eq_, ok_
+from nose.tools import eq_, ok_
 from mock import MagicMock
 from os import path
 from shutil import rmtree
@@ -129,8 +129,8 @@ def test_merge_two():
         cohort_variants = cohort.load_variants(filter_fn=None)
         for (sample, variants) in cohort_variants.items():
             for variant in variants:
-                metadata = variants.metadata[variant]
-                eq_(len(metadata), 2) # Each variant has two metadata entries
+                sources = variants.sources
+                eq_(len(sources), 2) # Each variant has two sources entries
 
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):

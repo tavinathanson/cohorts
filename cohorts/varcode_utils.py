@@ -1,4 +1,4 @@
-from varcode import EffectCollection, VariantCollection, Variant
+from varcode import EffectCollection, Variant
 
 def genome(variant_collection):
     return variant_collection[0].ensembl
@@ -11,7 +11,12 @@ class FilterableVariant(object):
 
     @property
     def variant_metadata(self):
-        return self.variant_collection.metadata[self.variant]
+        source_to_metadata = self.variant_collection.source_to_metadata_dict
+        return dict([
+                (source, source_to_metadata[source][self.variant])
+                for source in self.variant_collection.sources
+                if self.variant in source_to_metadata[source]
+            ])
 
     @property
     def genome(self):

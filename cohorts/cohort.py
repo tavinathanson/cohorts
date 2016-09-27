@@ -33,7 +33,7 @@ from sqlalchemy import create_engine
 from pyensembl import cached_release
 
 import varcode
-from varcode import VariantCollection, EffectCollection, Variant
+from varcode import EffectCollection
 from mhctools import NetMHCcons, EpitopeCollection
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
@@ -42,8 +42,6 @@ from pysam import AlignmentFile
 from scipy.stats import pearsonr
 from collections import defaultdict
 
-from .patient import Patient
-from .sample import Sample
 from .dataframe_loader import DataFrameLoader
 from .utils import first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names
 from .provenance import compare_provenance
@@ -411,6 +409,7 @@ class Cohort(Collection):
             obj.to_csv(cache_file, index=False)
         else:
             with open(cache_file, "wb") as f:
+                # Protocol=2 for compatability with Py 2 and 3 
                 pickle.dump(obj, f)
 
         provenance = self.generate_provenance()
@@ -463,7 +462,7 @@ class Cohort(Collection):
                                        filter_fn=filter_fn)
             vcf_paths = patient.snv_vcf_paths if self.variant_type == "snv" else patient.indel_vcf_paths
             variant_collections = [
-                (vcf_path, varcode.load_vcf_fast(vcf_path))
+                varcode.load_vcf_fast(vcf_path)
                 for vcf_path in vcf_paths
             ]
         except IOError:
@@ -478,32 +477,23 @@ class Cohort(Collection):
 
         if len(variant_collections) == 1:
             # There is nothing to merge
-            vcf_path, variants = variant_collections[0]
+            variants = variant_collections[0]
             merged_variants = variants
         else:
-            merged_variants = self._merge_variant_collections(dict(variant_collections), self.merge_type)
+            merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
 
         self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
         return filter_variants(variant_collection=merged_variants,
                                patient=patient,
                                filter_fn=filter_fn)
 
-    def _merge_variant_collections(self, vcf_to_variant_collections, merge_type):
+    def _merge_variant_collections(self, variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
-        combined_variants = [set(vc.elements) for (path, vc) in vcf_to_variant_collections.items()]
+        head = variant_collections[0]
         if merge_type == "union":
-            merged_variants = VariantCollection(set.union(*combined_variants))
+            merged_variants = head.union(*variant_collections[1:])
         elif merge_type == "intersection":
-            merged_variants = VariantCollection(set.intersection(*combined_variants))
-
-        for variant in merged_variants:
-            metadata = [
-                (vcf_path, vc.metadata[variant])
-                for (vcf_path, vc) in vcf_to_variant_collections.items()
-                if variant in vc.metadata
-            ]
-
-            merged_variants.metadata[variant] = dict(metadata)
+            merged_variants = head.intersection(*variant_collections[1:])
 
         return merged_variants
 
@@ -643,8 +633,9 @@ class Cohort(Collection):
         # Always take the top priority effect per variant so we end up with a single
         # effect per variant.
         nonsynonymous_effects = EffectCollection(
-            effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values())
-        effects = EffectCollection(effects.top_priority_effect_per_variant().values())
+            list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
+
+        effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
 
         self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)

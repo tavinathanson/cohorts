@@ -24,6 +24,7 @@ from .test_basic import make_simple_cohort
 from cohorts.variant_stats import (strelka_somatic_variant_stats, 
                                    mutect_somatic_variant_stats,
                                    variant_stats_from_variant)
+from cohorts.varcode_utils import FilterableVariant
 
 FILE_FORMAT_1 = "patient_format1_%s.mutect.vcf"
 FILE_FORMAT_2 = "patient_format2_%s.strelka.vcf"
@@ -69,7 +70,8 @@ def extraction(cohort, extractor):
     for (sample, sample_variants) in variants.items():
         ok_(len(sample_variants) > 0)
         for variant in sample_variants:
-            somatic_stats = extractor(variant, sample_variants.metadata[variant])
+            filterable_variant = FilterableVariant(variant, sample_variants, cohort.patient_from_id(sample))
+            somatic_stats = extractor(variant, filterable_variant.variant_metadata)
 
             ok_(somatic_stats.tumor_stats.depth > 10)
             ok_(somatic_stats.normal_stats.depth > 10)
@@ -98,7 +100,7 @@ def test_extract_strelka_stats():
     try:
         # Use Strelka VCF format
         vcf_dir, cohort = make_cohort([FILE_FORMAT_2])
-        extraction(cohort, extractor=strelka_somatic_variant_stats)
+        extraction(cohort, extractor=variant_stats_from_variant)
 
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
@@ -111,7 +113,7 @@ def test_extract_mutect_stats():
     try:
         # Use Mutect VCF format
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
-        extraction(cohort, extractor=mutect_somatic_variant_stats)
+        extraction(cohort, extractor=variant_stats_from_variant)
 
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
@@ -142,7 +144,8 @@ def test_extract_and_merge_strelka_mutect_stats():
 
         def test_stats(variant_index, expected_tumor_depth, expected_tumor_vaf):
             variant = patient_1_variants[variant_index]
-            stats = variant_stats_from_variant(variant, patient_1_variants.metadata[variant])
+            filterable_variant = FilterableVariant(variant, patient_1_variants, cohort.patient_from_id('1'))
+            stats = variant_stats_from_variant(variant, filterable_variant.variant_metadata)
             eq_(stats.tumor_stats.depth, expected_tumor_depth)
             assert_almost_equals(stats.tumor_stats.variant_allele_frequency, expected_tumor_vaf, places=3)
 

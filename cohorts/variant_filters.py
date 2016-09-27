@@ -14,10 +14,8 @@
 
 from .variant_stats import variant_stats_from_variant
 
-import numpy as np
-from varcode import Substitution, Variant
+from varcode import Variant
 from varcode.common import memoize
-import re
 import pandas as pd
 from os import path
 
