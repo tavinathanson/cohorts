@@ -31,10 +31,49 @@ In addition, several other libraries make use of `cohorts`:
 * [pygdc](http://github.com/hammerlab/pygdc)
 * [query_tcga](http://github.com/jburos/query_tcga)
 
-Worked Examples
+Quick start
 ---------------
 
-* [Quick-start](http://nbviewer.jupyter.org/github/hammerlab/tcga-blca/blob/master/Quick-start%20-%20using%20Cohorts%20with%20TCGA%20data.ipynb) Example using cohorts with TCGA data
+One way to get started using Cohorts is to use it to analyze TCGA data.
+
+As an example, we can create a cohort using [query_tcga](http://github.com/jburos/query_tcga):
+
+```python
+from query_tcga import cohort, config
+
+# provide authentication token
+config.load_config('config.ini')
+
+# load patient data
+blca_patients = cohort.prep_patients(project_name='TCGA-BLCA',
+                                     project_data_dir='data')
+
+# create cohort
+blca_cohort = cohort.prep_cohort(patients=blca_patients,
+                                 cache_dir='data-cache')
+```
+
+Then, use `plot_survival()` to summarize a potential biomarker (e.g. `snv_count`) by survival:.
+
+```python
+from cohorts.functions import snv_count
+blca_cohort.plot_survival(snv_count, how='os', threshold='median')
+```
+
+Which should produce a summary of results including this plot:
+
+![Survival plot example](/docs/survival_plot_example.jpg)
+
+We could alternatively use `plot_benefit()` to summarize OS>12mo instead of survival:
+
+```python
+blca_cohort.plot_benefit(snv_count)
+```
+
+![Benefit plot example](/docs/benefit_plot_example.jpg)
+
+
+See the full example in the [quick-start notebook](http://nbviewer.jupyter.org/github/hammerlab/tcga-blca/blob/master/Quick-start%20-%20using%20Cohorts%20with%20TCGA%20data.ipynb)
 
 Basic Usage
 --------------
