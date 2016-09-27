@@ -62,7 +62,7 @@ blca_cohort.plot_survival(snv_count, how='os', threshold='median')
 
 Which should produce a summary of results including this plot:
 
-![Survival plot example](/docs/survival_plot_example.jpg)
+![Survival plot example](/docs/survival_plot_example.png)
 
 We could alternatively use `plot_benefit()` to summarize OS>12mo instead of survival:
 
@@ -70,7 +70,7 @@ We could alternatively use `plot_benefit()` to summarize OS>12mo instead of surv
 blca_cohort.plot_benefit(snv_count)
 ```
 
-![Benefit plot example](/docs/benefit_plot_example.jpg)
+![Benefit plot example](/docs/benefit_plot_example.png)
 
 
 See the full example in the [quick-start notebook](http://nbviewer.jupyter.org/github/hammerlab/tcga-blca/blob/master/Quick-start%20-%20using%20Cohorts%20with%20TCGA%20data.ipynb)
