@@ -31,7 +31,7 @@ In addition, several other libraries make use of `cohorts`:
 * [pygdc](http://github.com/hammerlab/pygdc)
 * [query_tcga](http://github.com/jburos/query_tcga)
 
-Quick start
+Quick Start
 ---------------
 
 One way to get started using Cohorts is to use it to analyze TCGA data.
@@ -75,7 +75,7 @@ blca_cohort.plot_benefit(snv_count)
 
 See the full example in the [quick-start notebook](http://nbviewer.jupyter.org/github/hammerlab/tcga-blca/blob/master/Quick-start%20-%20using%20Cohorts%20with%20TCGA%20data.ipynb)
 
-Basic Usage
+Building from Scratch
 --------------
 
 ```python
@@ -127,10 +127,4 @@ cohort = Cohort(
     patients=[patient_1]
 )
 
-# Comparison plot of missense mutation counts between benefit and no-benefit patients
-cohort.plot_benefit(on=missense_snv_count)
-
-# Raw missense mutations counts
-missense_snv_col, dataframe = cohort.as_dataframe(missense_snv_count)
-(col_1, col_2), dataframe = cohort.as_dataframe([missense_snv_count, neoantigen_count])
 ```
