@@ -1,10 +1,10 @@
 pandas>=0.15
 seaborn>=0.7.0
 scipy>=0.17.0
-topiary==0.1.0
-mhctools>=0.3.0
-varcode==0.5.1
-pyensembl>=1.0.1
+topiary>=0.1.0, <0.2.0
+mhctools>=0.3.0, <0.4.0
+varcode>=0.5.1, <0.6.0
+pyensembl>=1.0.1, <1.1.0
 six>=1.10.0
 lifelines>=0.9.1.0
 scikit-learn>=0.17.1
