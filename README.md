@@ -16,7 +16,66 @@ You can install Cohorts using [pip](https://pip.pypa.io/en/latest/quickstart.htm
 pip install cohorts
 ```
 
-Usage Examples
+Features
+--------
+
+* Data management: construct a `Cohort` consisting of `Patient`s with `Sample`s.
+* Use `varcode` and `topiary` to generate and cache variant effects and predicted neoantigens.
+* Provenance: track the state of the world (package and data versions) for a given analysis.
+* Aggregation functions: built-in functions such as `missense_snv_count`, `neoantigen_count`, `expressed_neoantigen_count`; or create your own functions.
+* Plotting: survival curves via `lifelines`, response/no response plots (with Mann-Whitney and Fisher's Exact results), ROC curves. Example: `cohort.plot_survival(on=missense_snv_count, how="pfs")`.
+* Filtering: filter collections of variants/effects/neoantigens by, for example, variant statistics.
+* Pre-define data sets to work with. Example: `cohort.as_dataframe(join_with=["tcr", "pdl1"])`.
+
+In addition, several other libraries make use of `cohorts`:
+* [pygdc](http://github.com/hammerlab/pygdc)
+* [query_tcga](http://github.com/jburos/query_tcga)
+
+Quick Start
+---------------
+
+One way to get started using Cohorts is to use it to analyze TCGA data.
+
+As an example, we can create a cohort using [query_tcga](http://github.com/jburos/query_tcga):
+
+```python
+from query_tcga import cohort, config
+
+# provide authentication token
+config.load_config('config.ini')
+
+# load patient data
+blca_patients = cohort.prep_patients(project_name='TCGA-BLCA',
+                                     project_data_dir='data')
+
+# create cohort
+blca_cohort = cohort.prep_cohort(patients=blca_patients,
+                                 cache_dir='data-cache')
+```
+
+Then, use `plot_survival()` to summarize a potential biomarker (e.g. `snv_count`) by survival:.
+
+```python
+from cohorts.functions import snv_count
+blca_cohort.plot_survival(snv_count, how='os', threshold='median')
+```
+
+Which should produce a summary of results including this plot:
+
+![Survival plot example](/docs/survival_plot_example.png)
+
+We could alternatively use `plot_benefit()` to summarize OS>12mo instead of survival:
+
+```python
+blca_cohort.plot_benefit(snv_count)
+```
+
+![Benefit plot example](/docs/benefit_plot_example.png)
+
+
+See the full example in the [quick-start notebook](http://nbviewer.jupyter.org/github/hammerlab/tcga-blca/blob/master/Quick-start%20-%20using%20Cohorts%20with%20TCGA%20data.ipynb)
+
+Building from Scratch
 --------------
 
 ```python
@@ -68,10 +127,4 @@ cohort = Cohort(
     patients=[patient_1]
 )
 
-# Comparison plot of missense mutation counts between benefit and no-benefit patients
-cohort.plot_benefit(on=missense_snv_count)
-
-# Raw missense mutations counts
-missense_snv_col, dataframe = cohort.as_dataframe(missense_snv_count)
-(col_1, col_2), dataframe = cohort.as_dataframe([missense_snv_count, neoantigen_count])
 ```
