@@ -84,3 +84,61 @@ lung_cohort = pygdc.build_cohort(
 
 # Caching strategy
 
+For cohorts that include variants or Samples, the results can be summarized at various levels. 
+
+Many of these will save computed data for each patient in a pickled object, to be re-used on subsequent calls.
+
+Some examples of functions that cache results:
+
+   - `cohorts.load_effects()` -> computed variant effects are stored in `cached-effects`
+   - `cohorts.load_variants()` -> VariantCollection stored in `cached-variants`
+   - . etc.
+
+Cached objects are created when used. So, for example, if you only reference effects for a single patient, only those effects will be cached. 
+
+There is no automated checking of cached objects. To clear the cache, simply delete or rename the `cache-dir`.
+
+## Provenance files & Caching
+
+This leads to a possibility that cached objects of the same type but for different patients could have been generated in different environments.
+
+Consider, for example, the following scenario:
+   1. Initial analysis of cohort is performed on first 10 samples received. 
+      - results are cached under `variant-effects` for patients 1-10
+   2. *... several weeks go by while awaiting additional sample data ...*
+      - meanwhile, there have been updates to libraries such as `varcode` or `Cohorts`
+   3. Data for samples from patients 11-20 are recieved, plus updated sample calls for patients 1-10
+      - the analysis is re-run, with intention of updating data
+      - data for patients 1-10 are retreived from cache; data for patients 11-20 are generated & cached
+   4. The analysis loads data from the Cohort, which prints a summary of data sources
+      - the data frame hash will have been updated since the data summaries include sample data for addt'l 10 patients
+      - provenance_summary checks which versions of packages were used to generated cached object
+         - if inconsistent among patients within a data-type, reports an error. 
+         - otherwise, if inconsistent only between data-types, reports a warning
+         - if consistent across all patients & data-types, prints a summary for comparison to other analyses
+
+# Best Practices
+
+In general, we recommend creating a repository for each Cohort that is analyzed.
+
+Each Cohort should have several elements:
+
+   - source data files, or links to files (clinical data & samples)
+   - dedicated cache-dir
+   - an `init_cohort` script, to ensure consistent cohort settings across analyses
+   - accompanying analysis files
+
+Here are some examples of repositories using Cohorts:
+
+   - [tcga-blca](http://github.com/jburos/tcga-blca) repo, containing mock-analysis of TCGA-BLCA data & samples
+
+We have additionally created a [cookiecutter](https://github.com/audreyr/cookiecutter) template to set up a recommended directory structure for an analysis project using Cohorts.
+
+To use this, first install Cookiecutter. 
+
+Then :
+    
+    $ cookiecutter https://github.com/jburos/cookiecutter-cohort.git
+   
+And follow the prompts to create your project template.
+
