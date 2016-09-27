@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/hammerlab/cohorts.svg?branch=master)](https://travis-ci.org/hammerlab/cohorts) [![Coverage Status](https://coveralls.io/repos/hammerlab/cohorts/badge.svg?branch=master&service=github)](https://coveralls.io/github/hammerlab/cohorts?branch=master)
+[![PyPI version](https://badge.fury.io/py/cohorts.svg)](https://badge.fury.io/py/cohorts) [![Build Status](https://travis-ci.org/hammerlab/cohorts.svg?branch=master)](https://travis-ci.org/hammerlab/cohorts) [![Coverage Status](https://coveralls.io/repos/hammerlab/cohorts/badge.svg?branch=master&service=github)](https://coveralls.io/github/hammerlab/cohorts?branch=master)
 
 Cohorts
 =======
