@@ -1126,6 +1126,8 @@ class Cohort(Collection):
         if plot_type not in ["boxplot", "barplot", "jointplot"]:
             raise ValueError("Invalid plot_type %s" % plot_type)
         plot_cols, df = self.as_dataframe(on, return_cols=True, **kwargs)
+        if len(plot_cols) != 2:
+            raise ValueError("Must be comparing two columns, but there are %d columns" % len(plot_cols))
         for plot_col in plot_cols:
             df = filter_not_null(df, plot_col)
         if x_col is None:
