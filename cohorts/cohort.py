@@ -294,8 +294,6 @@ class Cohort(Collection):
             so it can be sent to `DataFrame.apply`. We hackishly pass `cohort`
             (as `self`) along if the function accepts a `cohort` argument.
             """
-            if col is None:
-                col = func_name(on)
             on_argnames = on.__code__.co_varnames
             if "cohort" not in on_argnames:
                 func = lambda row: on(row=row, **kwargs)
@@ -305,7 +303,7 @@ class Cohort(Collection):
             return DataFrameHolder(col, df)
 
         def func_name(func, num=0):
-            return func.__name__ if not is_lambda(func) else "column_%d" % i
+            return func.__name__ if not is_lambda(func) else "column_%d" % num
 
         def is_lambda(func):
             return func.__name__ == (lambda: None).__name__
@@ -327,6 +325,8 @@ class Cohort(Collection):
                     col = key
                 elif type(value) == FunctionType:
                     col, df = apply_func(on=value, col=key, df=df)
+                else:
+                    raise ValueError("A value of `on`, %s, is not a str or function" % str(value))
                 cols.append(col)
         if type(on) == list:
             cols = []
@@ -927,12 +927,33 @@ class Cohort(Collection):
         column_types = [cohort_dataframe[col].dtype for col in cohort_dataframe.columns]
         return dict(zip(list(cohort_dataframe.columns), column_types))
 
+    def plot_col_from_cols(self, cols, only_allow_one=True, plot_col=None):
+        if type(cols) == str:
+            if plot_col is not None:
+                raise ValueError("plot_col is specified when it isn't ndeeded because there is only one col.")
+            plot_col = cols
+        elif type(cols) == list:
+            # If e.g. an `on` dictionary is provided, that'll result in a list of cols.
+            # But if there is just one col, we can use it as the plot_col.
+            if len(cols) == 0:
+                raise ValueError("Empty list of `on` cols: %s" % str(cols))
+            elif len(cols) == 1:
+                plot_col = cols[0]
+            else:
+                if only_allow_one:
+                    raise ValueError("`on` has multiple columns, which is not allowed here.")
+                if plot_col is None:
+                    raise ValueError("plot_col must be specified when multiple `on`s are present.")
+        else:
+            raise ValueError("cols need to be a str or a list, but cols are %s" % str(cols))
+        return plot_col
+
     def plot_roc_curve(self, on, bootstrap_samples=100, ax=None, **kwargs):
         """Plot an ROC curve for benefit and a given variable
 
         Parameters
         ----------
-        on : str or function
+        on : str or function or list or dict
             See `cohort.load.as_dataframe`
         bootstrap_samples : int, optional
             Number of boostrap samples to use to compute the AUC
@@ -1014,14 +1035,7 @@ class Cohort(Collection):
 
         """
         cols, df = self.as_dataframe(on, return_cols=True, **kwargs)
-        if type(cols) == str:
-            if plot_col is not None:
-                raise ValueError("plot_col is specified when it isn't ndeeded.")
-            plot_col = cols
-        elif type(cols) == list:
-            if plot_col is None:
-                raise ValueError("plot_col must be specified when multiple `on`s are present.")
-
+        plot_col = self.plot_col_from_cols(cols=cols, plot_col=plot_col)
         df = filter_not_null(df, boolean_col)
         df = filter_not_null(df, plot_col)
 
@@ -1082,7 +1096,8 @@ class Cohort(Collection):
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
-        plot_col, df = self.as_dataframe(on, return_cols=True, **kwargs)
+        cols, df = self.as_dataframe(on, return_cols=True, **kwargs)
+        plot_col = self.plot_col_from_cols(cols=cols, only_allow_one=True)
         df = filter_not_null(df, plot_col)
         if df[plot_col].dtype == "bool":
             default_threshold = None
