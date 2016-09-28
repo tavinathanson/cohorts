@@ -58,13 +58,13 @@ def test_broken_vcf_path():
             patient_ids_with_missing_paths=["1"],
             missing_paths=["nonexistant_path"])
 
-        count_col, df = cohort.as_dataframe(snv_count)
+        df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
-        ok_(np.isnan(list(df[count_col])[0]))
+        ok_(np.isnan(list(df["snv_count"])[0]))
 
-        count_col, df = cohort.as_dataframe(missense_snv_count)
+        df = cohort.as_dataframe(missense_snv_count)
         eq_(len(df), 3)
-        ok_(np.isnan(list(df[count_col])[0]))
+        ok_(np.isnan(list(df["missense_snv_count"])[0]))
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
@@ -82,13 +82,13 @@ def test_missing_vcf_path():
             patient_ids_with_missing_paths=["1"],
             missing_paths=[])
 
-        count_col, df = cohort.as_dataframe(snv_count)
+        df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
-        ok_(np.isnan(list(df[count_col])[0]))
+        ok_(np.isnan(list(df["snv_count"])[0]))
 
-        count_col, df = cohort.as_dataframe(missense_snv_count)
+        df = cohort.as_dataframe(missense_snv_count)
         eq_(len(df), 3)
-        ok_(np.isnan(list(df[count_col])[0]))
+        ok_(np.isnan(list(df["missense_snv_count"])[0]))
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
@@ -110,12 +110,12 @@ def test_no_neoantigens():
                                    patient_ids_with_zero_neoantigens=["4", "5"],
                                    patient_ids_with_empty_neoantigens=["1"])
 
-        count_col, df = cohort.as_dataframe(neoantigen_count)
+        df = cohort.as_dataframe(neoantigen_count)
         eq_(len(df), 3)
 
         # This is used internally by plotting functions.
         # Ensure it filters NaN but not 0.
-        eq_(len(filter_not_null(df, count_col)), 2)
+        eq_(len(filter_not_null(df, "neoantigen_count")), 2)
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)

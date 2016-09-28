@@ -64,13 +64,13 @@ def test_snv_counts():
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
 
         # The SNV count should be exactly what we generated
-        count_col, df = cohort.as_dataframe(snv_count)
+        df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
-        eq_(list(df[count_col]), [3, 3, 6])
+        eq_(list(df["snv_count"]), [3, 3, 6])
 
-        count_col, df = cohort.as_dataframe(missense_snv_count)
+        df = cohort.as_dataframe(missense_snv_count)
         eq_(len(df), 3)
-        eq_(list(df[count_col]), [2, 2, 4])
+        eq_(list(df["missense_snv_count"]), [2, 2, 4])
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
@@ -89,15 +89,15 @@ def test_merge_three():
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
         # [5, 2, 3] uses a separate template, resulting in a union of [4, 3, 6] + [5, 2, 3] = [9, 5, 9] unique variants
-        count_col, df = cohort.as_dataframe(snv_count)
+        df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
-        eq_(list(df[count_col]), [9, 5, 9])
+        eq_(list(df["snv_count"]), [9, 5, 9])
 
         # For intersection, variants need to appear in *all*, here. None of them do.
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2, FILE_FORMAT_3],
                                       merge_type="intersection")
-        count_col, df = cohort.as_dataframe(snv_count)
-        eq_(list(df[count_col]), [0, 0, 0])
+        df = cohort.as_dataframe(snv_count)
+        eq_(list(df["snv_count"]), [0, 0, 0])
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
@@ -115,16 +115,16 @@ def test_merge_two():
                                       merge_type="union")
 
         # [3, 3, 6] and [4, 1, 5] use the same template, resulting in a union of [4, 3, 6] unique variants
-        count_col, df = cohort.as_dataframe(snv_count)
+        df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
-        eq_(list(df[count_col]), [4, 3, 6])
+        eq_(list(df["snv_count"]), [4, 3, 6])
 
         # For intersection, some variants do appear in both.
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1, FILE_FORMAT_2],
                                       merge_type="intersection")
-        count_col, df = cohort.as_dataframe(snv_count)
+        df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
-        eq_(list(df[count_col]), [3, 1, 5])
+        eq_(list(df["snv_count"]), [3, 1, 5])
 
         cohort_variants = cohort.load_variants(filter_fn=None)
         for (sample, variants) in cohort_variants.items():
@@ -243,25 +243,27 @@ def test_cohort_default():
 
         # Especially need to include expressed_missense_snv_count, which works a little differently.
         for count_func in [snv_count, missense_snv_count, expressed_missense_snv_count]:
+            count_col = count_func.__name__
+
             # No Cohort default
             cohort.filter_fn = None
-            count_col_no_arg, df_no_arg  = cohort.as_dataframe(count_func)
-            count_col_default_arg, df_default_arg = cohort.as_dataframe(count_func, filter_fn=default_filter_fn)
-            count_col_none_arg, df_none_arg = cohort.as_dataframe(count_func, filter_fn=None)
-            count_col_no_filter_arg, df_no_filter_arg = cohort.as_dataframe(count_func, filter_fn=no_filter)
-            ok_((df_no_arg[count_col_no_arg] == df_none_arg[count_col_none_arg]).all())
-            ok_((df_default_arg[count_col_default_arg] != df_no_arg[count_col_no_arg]).any())
-            ok_((df_no_filter_arg[count_col_no_filter_arg] == df_no_arg[count_col_no_arg]).all())
+            df_no_arg  = cohort.as_dataframe(count_func)
+            df_default_arg = cohort.as_dataframe(count_func, filter_fn=default_filter_fn)
+            df_none_arg = cohort.as_dataframe(count_func, filter_fn=None)
+            df_no_filter_arg = cohort.as_dataframe(count_func, filter_fn=no_filter)
+            ok_((df_no_arg[count_col] == df_none_arg[count_col]).all())
+            ok_((df_default_arg[count_col] != df_no_arg[count_col]).any())
+            ok_((df_no_filter_arg[count_col] == df_no_arg[count_col]).all())
 
             # With a Cohort default
             cohort.filter_fn = default_filter_fn
-            count_col_no_arg, df_no_arg  = cohort.as_dataframe(count_func)
-            count_col_default_arg, df_default_arg = cohort.as_dataframe(count_func, filter_fn=default_filter_fn)
-            count_col_none_arg, df_none_arg = cohort.as_dataframe(count_func, filter_fn=None)
-            count_col_no_filter_arg, df_no_filter_arg = cohort.as_dataframe(count_func, filter_fn=no_filter)
-            ok_((df_no_arg[count_col_no_arg] == df_none_arg[count_col_none_arg]).all())
-            ok_((df_default_arg[count_col_default_arg] == df_no_arg[count_col_no_arg]).all())
-            ok_((df_no_filter_arg[count_col_no_filter_arg] != df_no_arg[count_col_no_arg]).any())
+            df_no_arg  = cohort.as_dataframe(count_func)
+            df_default_arg = cohort.as_dataframe(count_func, filter_fn=default_filter_fn)
+            df_none_arg = cohort.as_dataframe(count_func, filter_fn=None)
+            df_no_filter_arg = cohort.as_dataframe(count_func, filter_fn=no_filter)
+            ok_((df_no_arg[count_col] == df_none_arg[count_col]).all())
+            ok_((df_default_arg[count_col] == df_no_arg[count_col]).all())
+            ok_((df_no_filter_arg[count_col] != df_no_arg[count_col]).any())
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)

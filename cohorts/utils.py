@@ -16,6 +16,22 @@ from __future__ import print_function
 
 import re
 import warnings
+from collections import namedtuple
+
+class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
+    """Holds a DataFrame along with associated columns of interest."""
+    def return_self(self, return_cols):
+        """Either return the DataFrame or the DataFrameHolder."""
+        if return_cols:
+            return self
+        else:
+            return self.df
+
+    @staticmethod
+    def return_obj(cols, df, return_cols=False):
+        """Construct a DataFrameHolder and then return either that or the DataFrame."""
+        df_holder = DataFrameHolder(cols=cols, df=df)
+        return df_holder.return_self(return_cols=return_cols)
 
 class InvalidDataError(ValueError):
     pass

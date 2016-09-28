@@ -43,7 +43,7 @@ from scipy.stats import pearsonr
 from collections import defaultdict
 
 from .dataframe_loader import DataFrameLoader
-from .utils import first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names
+from .utils import DataFrameHolder, first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names
 from .provenance import compare_provenance
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot, stripboxplot, CorrelationResults
@@ -245,52 +245,46 @@ class Cohort(Collection):
         self.dataframe_hash = hash(str(df.sort_values("patient_id")))
         return df
 
-    def as_dataframe(self, on=None, col=None, join_with=None, join_how=None,
-                     rename_cols=False, keep_paren_contents=True, **kwargs):
+    def as_dataframe(self, on=None, join_with=None, join_how=None,
+                     return_cols=False, rename_cols=False,
+                     keep_paren_contents=True, **kwargs):
         """
         Return this Cohort as a DataFrame, and optionally include additional columns
         using `on`.
 
-        on : function or list or dict or str, optional
-            - A function that creates a new column for comparison, e.g. count.snv_count.
-            - Or a list of column-generating functions.
-            - Or a map of new column names to their column-generating functions.
-            - A column name that gets returned with the original dataframe as (col, df).
-        col : str, optional
-            If `on` is a function generating a column, col is the name of that column.
-            If `on` is a str specifying a column, col is the name of a copy of that column.
-            If None, defaults to the name of the function.
+        on : str or function or list or dict, optional
+            - A column name.
+            - Or a function that creates a new column for comparison, e.g. count.snv_count.
+            - Or a list of column-generating functions or column names.
+            - Or a map of new column names to their column-generating functions or column names.
 
         If `on` is a function or functions, kwargs is passed to those functions.
         Otherwise kwargs is ignored.
 
         Other parameters
         ----------------
+        `return_cols`: (bool)
+            If True, return column names generated via `on` along with the `DataFrame`
+            as a `DataFrameHolder` tuple.
         `rename_cols`: (bool)
-            if True, then return columns using "stripped" column names
+            If True, then return columns using "stripped" column names
             ("stripped" means lower-case names without punctuation other than `_`)
             See `utils.strip_column_names` for more details
             defaults to False
         `keep_paren_contents`: (bool)
-            if True, then contents of column names within parens are kept.
-            if False, contents of column names within-parens are dropped.
+            If True, then contents of column names within parens are kept.
+            If False, contents of column names within-parens are dropped.
             Defaults to True
         ----------
 
-        Return : tuple or DataFrame
-            <dataframe>
-            or (<name of new column>, <dataframe with that new column>)
-            or (<list of names of new columns>, <dataframe with those new columns>)
+        Return : `DataFrame` (or `DataFrameHolder` if `return_cols` is True)
         """
         df = self._as_dataframe_unmodified(join_with=join_with, join_how=join_how)
         if on is None:
-            return df
+            return DataFrameHolder.return_obj(None, df, return_cols)
 
         if type(on) == str:
-            if col is not None:
-                df[col] = df[on]
-                return (col, df)
-            return (on, df)
+            return DataFrameHolder.return_obj(on, df, return_cols)
 
         def apply_func(on, col, df):
             """
@@ -300,22 +294,23 @@ class Cohort(Collection):
             (as `self`) along if the function accepts a `cohort` argument.
             """
             if col is None:
-                # Use the function name, or "column" for lambdas, if no
-                # name is provided for the newly created column.
-                col = on.__name__ if not is_lambda(on) else "column"
+                col = func_name(on)
             on_argnames = on.__code__.co_varnames
             if "cohort" not in on_argnames:
                 func = lambda row: on(row=row, **kwargs)
             else:
                 func = lambda row: on(row=row, cohort=self, **kwargs)
             df[col] = df.apply(func, axis=1)
-            return (col, df)
+            return DataFrameHolder(col, df)
+
+        def func_name(func, num=0):
+            return func.__name__ if not is_lambda(func) else "column_%d" % i
 
         def is_lambda(func):
             return func.__name__ == (lambda: None).__name__
 
         if type(on) == FunctionType:
-            return apply_func(on, col, df)
+            return apply_func(on, func_name(on), df).return_self(return_cols)
 
         # For multiple functions, don't allow kwargs since we won't know which functions
         # they apply to.
@@ -326,20 +321,27 @@ class Cohort(Collection):
         if type(on) == dict:
             cols = []
             for key, value in on.iteritems():
-                col, df = apply_func(on=value, col=key, df=df)
+                if type(value) == str:
+                    df[key] = df[value]
+                    col = key
+                elif type(value) == FunctionType:
+                    col, df = apply_func(on=value, col=key, df=df)
                 cols.append(col)
         if type(on) == list:
             cols = []
             for i, elem in enumerate(on):
-                col = elem.__name__ if not is_lambda(elem) else "column_%d" % i
-                col, df = apply_func(on=elem, col=col, df=df)
+                if type(elem) == str:
+                    col = elem
+                elif type(elem) == FunctionType:
+                    col = func_name(elem, i)
+                    col, df = apply_func(on=elem, col=col, df=df)
                 cols.append(col)
 
         if rename_cols:
             rename_dict = _strip_column_names(df.columns, keep_paren_contents=keep_paren_contents)
             df.rename(columns=rename_dict, inplace=True)
             cols = [rename_dict[col] for col in cols]
-        return (cols, df)
+        return DataFrameHolder(cols, df).return_self(return_cols)
 
     def load_dataframe(self, df_loader_name):
         """
@@ -382,7 +384,7 @@ class Cohort(Collection):
 
         if self.check_provenance:
             num_discrepant = compare_provenance(
-                this_provenance = self.generate_provenance(), 
+                this_provenance = self.generate_provenance(),
                 other_provenance = self.load_provenance(patient_cache_dir),
                 left_outer_diff = "In current environment but not cached in %s for patient %s" % (cache_name, patient_id),
                 right_outer_diff = "In cached %s for patient %s but not current" % (cache_name, patient_id)
@@ -409,7 +411,7 @@ class Cohort(Collection):
             obj.to_csv(cache_file, index=False)
         else:
             with open(cache_file, "wb") as f:
-                # Protocol=2 for compatability with Py 2 and 3 
+                # Protocol=2 for compatability with Py 2 and 3
                 pickle.dump(obj, f)
 
         provenance = self.generate_provenance()
@@ -924,7 +926,7 @@ class Cohort(Collection):
         column_types = [cohort_dataframe[col].dtype for col in cohort_dataframe.columns]
         return dict(zip(list(cohort_dataframe.columns), column_types))
 
-    def plot_roc_curve(self, on, bootstrap_samples=100, col=None, ax=None, **kwargs):
+    def plot_roc_curve(self, on, bootstrap_samples=100, ax=None, **kwargs):
         """Plot an ROC curve for benefit and a given variable
 
         Parameters
@@ -942,13 +944,13 @@ class Cohort(Collection):
             Returns the average AUC for the given predictor over `bootstrap_samples`
             and the associated ROC curve
         """
-        plot_col, df = self.as_dataframe(on, col=col, **kwargs)
+        plot_col, df = self.as_dataframe(on, return_cols=True, **kwargs)
         df = filter_not_null(df, "benefit")
         df = filter_not_null(df, plot_col)
         df.benefit = df.benefit.astype(bool)
         return roc_curve_plot(df, plot_col, "benefit", bootstrap_samples, ax=ax)
 
-    def plot_benefit(self, on, col=None, benefit_col="benefit", label="Response", ax=None,
+    def plot_benefit(self, on, benefit_col="benefit", label="Response", ax=None,
                      alternative="two-sided", boolean_value_map={},
                      order=None, **kwargs):
         """Plot a comparison of benefit/response in the cohort on a given variable
@@ -959,7 +961,6 @@ class Cohort(Collection):
 
         return self.plot_boolean(on=on,
                                  boolean_col=benefit_col,
-                                 col=col,
                                  alternative=alternative,
                                  boolean_label=label,
                                  boolean_value_map=boolean_value_map,
@@ -973,7 +974,6 @@ class Cohort(Collection):
                      plot_col=None,
                      boolean_label=None,
                      boolean_value_map={},
-                     col=None,
                      order=None,
                      ax=None,
                      alternative="two-sided",
@@ -1000,8 +1000,6 @@ class Cohort(Collection):
             Label to give boolean column in the plot
         boolean_value_map : dict, optional
             Map of conversions for values in the boolean column, i.e. {True: 'High', False: 'Low'}
-        col : str, optional
-            If specified, store the result of `on`. See `cohort.load.as_dataframe`
         order : None, optional
             Order of the labels on the x-axis
         ax : None, optional
@@ -1014,7 +1012,7 @@ class Cohort(Collection):
         (Test statistic, p-value): (float, float)
 
         """
-        cols, df = self.as_dataframe(on, col, **kwargs)
+        cols, df = self.as_dataframe(on, return_cols=True, **kwargs)
         if type(cols) == str:
             if plot_col is not None:
                 raise ValueError("plot_col is specified when it isn't ndeeded.")
@@ -1057,12 +1055,11 @@ class Cohort(Collection):
                 ax=ax)
         return results
 
-    def plot_survival(self, 
-                      on, 
-                      col=None, 
-                      how="os", 
-                      survival_units="Days", 
-                      ax=None, 
+    def plot_survival(self,
+                      on,
+                      how="os",
+                      survival_units="Days",
+                      ax=None,
                       ci_show=False,
                       with_condition_color="#B38600",
                       no_condition_color="#A941AC",
@@ -1072,10 +1069,8 @@ class Cohort(Collection):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
         Parameters
         ----------
-        on : str or function
+        on : str or function or list or dict
             See `cohort.load.as_dataframe`
-        col : str, optional
-            If specified, store the result of `on`. See `cohort.load.as_dataframe`
         how : {"os", "pfs"}, optional
             Whether to plot OS (overall survival) or PFS (progression free survival)
         survival_units : str
@@ -1086,7 +1081,7 @@ class Cohort(Collection):
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
-        plot_col, df = self.as_dataframe(on, col, **kwargs)
+        plot_col, df = self.as_dataframe(on, return_cols=True, **kwargs)
         df = filter_not_null(df, plot_col)
         if df[plot_col].dtype == "bool":
             default_threshold = None
