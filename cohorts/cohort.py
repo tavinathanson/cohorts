@@ -930,7 +930,7 @@ class Cohort(Collection):
     def plot_col_from_cols(self, cols, only_allow_one=True, plot_col=None):
         if type(cols) == str:
             if plot_col is not None:
-                raise ValueError("plot_col is specified when it isn't ndeeded because there is only one col.")
+                raise ValueError("plot_col is specified when it isn't needed because there is only one col.")
             plot_col = cols
         elif type(cols) == list:
             # If e.g. an `on` dictionary is provided, that'll result in a list of cols.
@@ -1016,6 +1016,8 @@ class Cohort(Collection):
         plot_col : str, optional
             If on has many columns, this is the one whose values we are plotting.
             If on has a single column, this is unnecessary.
+            We might want many columns if, e.g. we're generating boolean_col from a
+            function as well.
         boolean_col : str
             Column name of boolean column to plot or compare against.
         boolean_label : None, optional
