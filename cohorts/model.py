@@ -57,15 +57,15 @@ def bootstrap_auc(df, col, pred_col, n_bootstrap=1000):
         scores[i] = roc_auc_score(sampled_pred, sampled_counts)
     return scores
 
-def cohort_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
-    col, df = cohort.as_dataframe(func, **kwargs)
+def cohort_bootstrap_auc(cohort, on, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
+    col, df = cohort.as_dataframe(on, return_cols=True, **kwargs)
     return bootstrap_auc(df=df,
                          col=col,
                          pred_col=pred_col,
                          n_bootstrap=n_bootstrap)
 
-def cohort_mean_bootstrap_auc(cohort, func, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
-    return cohort_bootstrap_auc(cohort, func, pred_col, n_bootstrap, **kwargs).mean()
+def cohort_mean_bootstrap_auc(cohort, on, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
+    return cohort_bootstrap_auc(cohort, on, pred_col, n_bootstrap, **kwargs).mean()
 
 def coxph_model(formula, data, time_col, event_col, **kwargs):
     # pylint: disable=no-member
@@ -84,18 +84,15 @@ def coxph_model(formula, data, time_col, event_col, **kwargs):
     cf.print_summary()
     return cf
 
-def cohort_coxph(cohort, func, formula=None, how="pfs"):
-    # If not specified, the formula is just the name of the function
+def cohort_coxph(cohort, on, formula=None, how="pfs"):
+    # If not specified, the formula is just the names of the functions
+    cols, df = cohort.as_dataframe(on=on, return_cols=True)
     if formula is None:
-        if type(func) == FunctionType:
-            formula = func.__name__
-        elif type(func) == list:
-            formula = " + ".join([f.__name__ for f in func])
-        elif type(func) == dict:
-            formula = " + ".join([f.__name__ for _, f in func.items()])
-        else:
-            raise ValueError("This function does not accept a func of type %s" % type(func))
-    col, df = cohort.as_dataframe(on=func)
+        # Single col
+        if type(cols) == str:
+            formula = cols
+        elif type(cols) == list:
+            formula = " + ".join(cols)
     if how == "pfs":
         event_col = "is_progressed_or_deceased"
         time_col = "pfs"

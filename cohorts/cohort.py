@@ -47,6 +47,7 @@ from .utils import DataFrameHolder, first_not_none_param, filter_not_null, Inval
 from .provenance import compare_provenance
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot, stripboxplot, CorrelationResults
+from .model import cohort_coxph, cohort_bootstrap_auc, cohort_mean_bootstrap_auc
 from .collection import Collection
 from .varcode_utils import (filter_variants, filter_effects,
                             filter_neoantigens, filter_polyphen)
@@ -1104,19 +1105,13 @@ class Cohort(Collection):
         )
         return results
 
-    def plot_joint(self, *args, **kwargs):
-        warnings.warn("plot_joint is deprecated; use plot_correlation.", Warning)
-        return self.plot_correlation(*args, **kwargs)
-
-    def plot_correlation(self, on, on_two=None, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, plot_kwargs={}, **kwargs):
+    def plot_correlation(self, on, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, plot_kwargs={}, **kwargs):
         """Plot the correlation between two variables.
 
         Parameters
         ----------
-        on : function or list or dict of functions
+        on : list or dict of functions or strings
             See `cohort.load.as_dataframe`
-        on_two : function, optional
-            Can specify the second function here rather than creating a list.
         x_col : str, optional
             If `on` is a dict, this guarantees we have the expected ordering.
         plot_type : str, optional
@@ -1130,9 +1125,7 @@ class Cohort(Collection):
         """
         if plot_type not in ["boxplot", "barplot", "jointplot"]:
             raise ValueError("Invalid plot_type %s" % plot_type)
-        if on_two is not None:
-            on = [on, on_two]
-        plot_cols, df = self.as_dataframe(on, **kwargs)
+        plot_cols, df = self.as_dataframe(on, return_cols=True, **kwargs)
         for plot_col in plot_cols:
             df = filter_not_null(df, plot_col)
         if x_col is None:
@@ -1156,6 +1149,15 @@ class Cohort(Collection):
             plot = sb.barplot(data=df, x=x_col, y=y_col, **plot_kwargs)
         return CorrelationResults(coeff=coeff, p_value=p_value, stat_func=stat_func,
                                   series_x=series_x, series_y=series_y, plot=plot)
+
+    def coxph(self, on, formula=None, how="pfs"):
+        return cohort_coxph(self, on, formula=formula, how=how)
+
+    def bootstrap_auc(self, on, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
+        return cohort_bootstrap_auc(self, on, pred_col=pred_col, n_bootstrap=n_bootstrap)
+
+    def mean_bootstrap_auc(self, on, pred_col="is_benefit", n_bootstrap=1000, **kwargs):
+        return cohort_mean_bootstrap_auc(self, on, pred_col=pred_col, n_bootstrap=n_bootstrap)
 
     def _list_patient_ids(self):
         """ Utility function to return a list of patient ids in the Cohort
