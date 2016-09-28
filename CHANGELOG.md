@@ -1,5 +1,23 @@
 # Change Log
 
+## [0.4.0](https://github.com/hammerlab/cohorts/tree/0.4.0) (2016-09-28)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.3.0...0.4.0)
+
+**Implemented enhancements:**
+
+- Make API more consistent [\#150](https://github.com/hammerlab/cohorts/pull/150) ([tavinathanson](https://github.com/tavinathanson))
+
+**Closed issues:**
+
+- Update README w/ Tavi's bullet list of features and Jacki's TCGA demo [\#147](https://github.com/hammerlab/cohorts/issues/147)
+- Show plots in README's usage examples [\#141](https://github.com/hammerlab/cohorts/issues/141)
+
+**Merged pull requests:**
+
+- Update pypi badge every 4 hours [\#151](https://github.com/hammerlab/cohorts/pull/151) ([arahuja](https://github.com/arahuja))
+- Use conda to install pypandoc [\#149](https://github.com/hammerlab/cohorts/pull/149) ([arahuja](https://github.com/arahuja))
+- Update README.md [\#148](https://github.com/hammerlab/cohorts/pull/148) ([jburos](https://github.com/jburos))
+
 ## [0.3.0](https://github.com/hammerlab/cohorts/tree/0.3.0) (2016-09-27)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.2.0...0.3.0)
 
