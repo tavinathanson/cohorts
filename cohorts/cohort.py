@@ -927,7 +927,7 @@ class Cohort(Collection):
         column_types = [cohort_dataframe[col].dtype for col in cohort_dataframe.columns]
         return dict(zip(list(cohort_dataframe.columns), column_types))
 
-    def plot_col_from_cols(self, cols, only_allow_one=True, plot_col=None):
+    def plot_col_from_cols(self, cols, only_allow_one=False, plot_col=None):
         if type(cols) == str:
             if plot_col is not None:
                 raise ValueError("plot_col is specified when it isn't needed because there is only one col.")
