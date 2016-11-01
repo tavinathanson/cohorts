@@ -18,7 +18,6 @@ from cohorts import DataFrameLoader, Cohort, Patient
 import warnings
 
 from . import generated_data_path
-from .functions import *
 
 from nose.tools import eq_, ok_
 from .test_basic import make_simple_cohort

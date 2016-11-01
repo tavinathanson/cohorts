@@ -16,7 +16,6 @@ from __future__ import print_function
 
 from . import data_path, generated_data_path, DATA_DIR
 from .data_generate import generate_vcfs
-from .functions import *
 
 from cohorts import Cohort, Patient
 from cohorts.utils import InvalidDataError
@@ -36,7 +35,8 @@ def make_simple_clinical_dataframe(
                          "deceased": [True, False, False] if deceased_list is None else deceased_list,
                          "progressed_or_deceased": [True, True, False] if progressed_or_deceased_list is None else progressed_or_deceased_list})
 
-def make_simple_cohort(merge_type="union", **kwargs):
+def make_simple_cohort(merge_type="union",
+                       **kwargs):
     clinical_dataframe = make_simple_clinical_dataframe(**kwargs)
     patients = []
     for i, row in clinical_dataframe.iterrows():
@@ -49,11 +49,13 @@ def make_simple_cohort(merge_type="union", **kwargs):
                           )
         patients.append(patient)
 
-    return Cohort(
+    Cohort.normalized_per_mb = False
+    cohort = Cohort(
         patients=patients,
         responder_pfs_equals_os=True,
         merge_type=merge_type,
         cache_dir=generated_data_path("cache"))
+    return cohort
 
 def test_pfs_equal_to_os():
     # Should not error

@@ -16,9 +16,9 @@ from __future__ import print_function
 
 from varcode.effects.effect_classes import ExonicSpliceSite, Substitution
 from cohorts.variant_filters import no_filter
+from cohorts.functions import *
 
 from .data_generate import generate_vcfs
-from .functions import *
 
 from nose.tools import eq_, ok_
 from mock import MagicMock
@@ -33,8 +33,8 @@ FILE_FORMAT_1 = "patient_format1_%s.vcf"
 FILE_FORMAT_2 = "patient_format2_%s.vcf"
 FILE_FORMAT_3 = "patient_format3_%s.vcf"
 
-def make_cohort(file_formats, merge_type="union"):
-    cohort = make_simple_cohort(merge_type=merge_type)
+def make_cohort(file_formats, merge_type="union", **kwargs):
+    cohort = make_simple_cohort(merge_type=merge_type, **kwargs)
     patient_ids = [patient.id for patient in cohort]
     vcf_dir = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [3, 3, 6])),
                             file_format=FILE_FORMAT_1,
