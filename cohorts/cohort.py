@@ -1132,7 +1132,7 @@ class Cohort(Collection):
         x_col : str, optional
             If `on` is a dict, this guarantees we have the expected ordering.
         plot_type : str, optional
-            Specify "jointplot" or "boxplot".
+            Specify "jointplot", "regplot", "boxplot", or "barplot".
         stat_func : function, optional.
             Specify which function to use for the statistical test.
         show_stat_func : bool, optional
@@ -1140,7 +1140,7 @@ class Cohort(Collection):
         plot_kwargs : dict, optional
             kwargs to pass through to plotting functions.
         """
-        if plot_type not in ["boxplot", "barplot", "jointplot"]:
+        if plot_type not in ["boxplot", "barplot", "jointplot", "regplot"]:
             raise ValueError("Invalid plot_type %s" % plot_type)
         plot_cols, df = self.as_dataframe(on, return_cols=True, **kwargs)
         if len(plot_cols) != 2:
@@ -1162,6 +1162,9 @@ class Cohort(Collection):
             plot = sb.jointplot(data=df, x=x_col, y=y_col,
                                 stat_func=stat_func if show_stat_func else None,
                                 **plot_kwargs)
+        elif plot_type == "regplot":
+            plot = sb.regplot(data=df, x=x_col, y=y_col,
+                              **plot_kwargs)
         elif plot_type == "boxplot":
             plot = stripboxplot(data=df, x=x_col, y=y_col, **plot_kwargs)
         else:
