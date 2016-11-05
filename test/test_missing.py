@@ -16,9 +16,9 @@ from __future__ import print_function
 
 from . import data_path, generated_data_path
 from .data_generate import generate_vcfs
-from .functions import *
 
 from cohorts.cohort import filter_not_null
+from cohorts.functions import *
 
 import pandas as pd
 import numpy as np

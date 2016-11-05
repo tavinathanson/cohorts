@@ -17,97 +17,107 @@ from __future__ import print_function
 from .variant_filters import no_filter, effect_expressed_filter
 from .utils import first_not_none_param
 
+from functools import wraps
 import numpy as np
 from varcode.effects import Substitution
 from varcode.common import memoize
 
-def snv_count(row, cohort, filter_fn=None,
-              normalized_per_mb=None, **kwargs):
-    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
-    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
-    patient_id = row["patient_id"]
-    patient_variants = cohort.load_variants(
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=filter_fn,
-        **kwargs)
-    if patient_id in patient_variants:
-        count = len(patient_variants[patient_id])
-        if normalized_per_mb:
-            count /= float(get_patient_to_mb(cohort)[patient_id])
-        return count
-    return np.nan
+def use_defaults(func):
+    """
+    Decorator for functions that should automatically fall back to the Cohort-default filter_fn and
+    normalized_per_mb if not specified.
+    """
+    @wraps(func)
+    def wrapper(row, cohort, filter_fn=None, normalized_per_mb=None, **kwargs):
+        filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
+        normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
+        return func(row=row,
+                    cohort=cohort,
+                    filter_fn=filter_fn,
+                    normalized_per_mb=normalized_per_mb,
+                    **kwargs)
+    return wrapper
 
-def nonsynonymous_snv_count(row, cohort, filter_fn=None,
-                            normalized_per_mb=None, **kwargs):
-    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
-    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
-    patient_id = row["patient_id"]
-    # This only loads one effect per variant.
-    patient_nonsynonymous_effects = cohort.load_effects(
-        only_nonsynonymous=True,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=filter_fn,
-        **kwargs)
-    if patient_id in patient_nonsynonymous_effects:
-        count = len(patient_nonsynonymous_effects[patient_id])
-        if normalized_per_mb:
-            count /= float(get_patient_to_mb(cohort)[patient_id])
-        return count
-    return np.nan
-
-def missense_snv_count(row, cohort, filter_fn=None,
-                       normalized_per_mb=None, **kwargs):
-    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
-    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
-    patient_id = row["patient_id"]
-    def missense_filter_fn(filterable_effect):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (type(filterable_effect.effect) == Substitution and
-                filter_fn(filterable_effect))
-    # This only loads one effect per variant.
-    patient_missense_effects = cohort.load_effects(
-        only_nonsynonymous=True,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=missense_filter_fn,
-        **kwargs)
-    if patient_id in patient_missense_effects:
-        count = len(patient_missense_effects[patient_id])
-        if normalized_per_mb:
-            count /= float(get_patient_to_mb(cohort)[patient_id])
-        return count
-    return np.nan
-
-def neoantigen_count(row, cohort, filter_fn=None,
-                     normalized_per_mb=None, **kwargs):
-    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
-    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
-    patient_id = row["patient_id"]
-    patient = cohort.patient_from_id(row["patient_id"])
-    patient_neoantigens = cohort.load_neoantigens(patients=[patient],
-                                                  filter_fn=filter_fn,
-                                                  **kwargs)
-    if patient_id in patient_neoantigens:
-        patient_neoantigens_df = patient_neoantigens[patient_id]
-        count = len(patient_neoantigens_df)
-        if normalized_per_mb:
-            count /= float(get_patient_to_mb(cohort)[patient_id])
-        return count
-    return np.nan
-
-def expressed_missense_snv_count(row, cohort, filter_fn=None,
-                                 normalized_per_mb=None):
-    filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
-    normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
-    def expressed_filter_fn(filterable_effect):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return missense_snv_count(row, cohort, filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb)
-
-def expressed_neoantigen_count(row, cohort, **kwargs):
-    return neoantigen_count(row, cohort, only_expressed=True, **kwargs)
+def count_function(func):
+    """
+    Decorator for functions that return a collection (technically a dict of collections) that should be
+    counted up. Also automatically falls back to the Cohort-default filter_fn and normalized_per_mb if
+    not specified.
+    """
+    # Fall back to Cohort-level defaults.
+    @use_defaults
+    @wraps(func)
+    def wrapper(row, cohort, filter_fn=None, normalized_per_mb=None, **kwargs):
+        per_patient_data = func(row=row,
+                                cohort=cohort,
+                                filter_fn=filter_fn,
+                                normalized_per_mb=normalized_per_mb,
+                                **kwargs)
+        patient_id = row["patient_id"]
+        if patient_id in per_patient_data:
+            count = len(per_patient_data[patient_id])
+            if normalized_per_mb:
+                count /= float(get_patient_to_mb(cohort)[patient_id])
+            return count
+        return np.nan
+    return wrapper
 
 @memoize
 def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
+
+@count_function
+def snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    patient_id = row["patient_id"]
+    return cohort.load_variants(
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=filter_fn,
+        **kwargs)
+
+@count_function
+def nonsynonymous_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    # This only loads one effect per variant.
+    patient_id = row["patient_id"]
+    return cohort.load_effects(
+        only_nonsynonymous=True,
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=filter_fn,
+        **kwargs)
+
+@count_function
+def missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def missense_filter_fn(filterable_effect):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (type(filterable_effect.effect) == Substitution and
+                filter_fn(filterable_effect))
+    # This only loads one effect per variant.
+    patient_id = row["patient_id"]
+    return cohort.load_effects(
+        only_nonsynonymous=True,
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=missense_filter_fn,
+        **kwargs)
+
+@count_function
+def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    patient = cohort.patient_from_id(row["patient_id"])
+    return cohort.load_neoantigens(patients=[patient],
+                                   filter_fn=filter_fn,
+                                   **kwargs)
+
+@use_defaults
+def expressed_missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return missense_snv_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb)
+
+@use_defaults
+def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    return neoantigen_count(row=row,
+                            cohort=cohort,
+                            only_expressed=True, **kwargs)

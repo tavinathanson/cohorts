@@ -16,9 +16,9 @@ from __future__ import print_function
 
 from varcode.effects.effect_classes import ExonicSpliceSite, Substitution
 from cohorts.variant_filters import no_filter
+from cohorts.functions import *
 
 from .data_generate import generate_vcfs
-from .functions import *
 
 from nose.tools import eq_, ok_
 from mock import MagicMock
@@ -33,8 +33,8 @@ FILE_FORMAT_1 = "patient_format1_%s.vcf"
 FILE_FORMAT_2 = "patient_format2_%s.vcf"
 FILE_FORMAT_3 = "patient_format3_%s.vcf"
 
-def make_cohort(file_formats, merge_type="union"):
-    cohort = make_simple_cohort(merge_type=merge_type)
+def make_cohort(file_formats, merge_type="union", **kwargs):
+    cohort = make_simple_cohort(merge_type=merge_type, **kwargs)
     patient_ids = [patient.id for patient in cohort]
     vcf_dir = generate_vcfs(id_to_mutation_count=dict(zip(patient_ids, [3, 3, 6])),
                             file_format=FILE_FORMAT_1,
@@ -198,72 +198,6 @@ def test_multiple_effects():
                 eq_(len(effect_set), 1,
                     "Variant %s should only have 1 effect but it has %s"
                     % (variant, len(effect_set)))
-    finally:
-        if vcf_dir is not None and path.exists(vcf_dir):
-            rmtree(vcf_dir)
-        if cohort is not None:
-            cohort.clear_caches()
-
-def test_cohort_default():
-    """
-    Checks that the Cohort default is used when intended, and not used when overridden.
-    """
-    vcf_dir, cohort = None, None
-    try:
-        vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
-
-        def default_filter_fn(filterable_variant):
-            return filterable_variant.variant.ref == "A"
-
-        # Mock out load_single_patient_isovar since we don't actually have that data,
-        # yet it's needed for expressed_missense_snv_count.
-        variants = cohort.load_variants()
-        isovar_mocked = {}
-        for patient in cohort:
-            chr_list = []
-            pos_list = []
-            ref_list = []
-            alt_list = []
-            patient_variants = variants[patient.id]
-            for variant in patient_variants:
-                chr_list.append(variant.contig)
-                pos_list.append(variant.start)
-                ref_list.append(variant.ref)
-                alt_list.append(variant.alt)
-            df_isovar_mocked = pd.DataFrame({"chr": chr_list,
-                                             "pos": pos_list,
-                                             "ref": ref_list,
-                                             "alt": alt_list})
-            isovar_mocked[patient.id] = df_isovar_mocked
-
-        def mock_function(patient, **kwargs):
-            return isovar_mocked[patient.id]
-
-        cohort.load_single_patient_isovar = MagicMock(side_effect=mock_function)
-
-        # Especially need to include expressed_missense_snv_count, which works a little differently.
-        for count_func in [snv_count, missense_snv_count, expressed_missense_snv_count]:
-            count_col = count_func.__name__
-
-            # No Cohort default
-            cohort.filter_fn = None
-            df_no_arg  = cohort.as_dataframe(count_func)
-            df_default_arg = cohort.as_dataframe(count_func, filter_fn=default_filter_fn)
-            df_none_arg = cohort.as_dataframe(count_func, filter_fn=None)
-            df_no_filter_arg = cohort.as_dataframe(count_func, filter_fn=no_filter)
-            ok_((df_no_arg[count_col] == df_none_arg[count_col]).all())
-            ok_((df_default_arg[count_col] != df_no_arg[count_col]).any())
-            ok_((df_no_filter_arg[count_col] == df_no_arg[count_col]).all())
-
-            # With a Cohort default
-            cohort.filter_fn = default_filter_fn
-            df_no_arg  = cohort.as_dataframe(count_func)
-            df_default_arg = cohort.as_dataframe(count_func, filter_fn=default_filter_fn)
-            df_none_arg = cohort.as_dataframe(count_func, filter_fn=None)
-            df_no_filter_arg = cohort.as_dataframe(count_func, filter_fn=no_filter)
-            ok_((df_no_arg[count_col] == df_none_arg[count_col]).all())
-            ok_((df_default_arg[count_col] == df_no_arg[count_col]).all())
-            ok_((df_no_filter_arg[count_col] != df_no_arg[count_col]).any())
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
