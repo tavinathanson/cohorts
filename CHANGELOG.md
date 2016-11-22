@@ -1,5 +1,18 @@
 # Change Log
 
+## [0.4.1](https://github.com/hammerlab/cohorts/tree/0.4.1) (2016-11-05)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.4.0...0.4.1)
+
+**Fixed bugs:**
+
+- Single variant collections do not allow for metadata extraction [\#81](https://github.com/hammerlab/cohorts/issues/81)
+- Default to not requiring a single-value on dict [\#153](https://github.com/hammerlab/cohorts/pull/153) ([tavinathanson](https://github.com/tavinathanson))
+
+**Merged pull requests:**
+
+- Add regplot as a plot\_correlation option [\#159](https://github.com/hammerlab/cohorts/pull/159) ([tavinathanson](https://github.com/tavinathanson))
+- Simplify functions with decorators [\#158](https://github.com/hammerlab/cohorts/pull/158) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.4.0](https://github.com/hammerlab/cohorts/tree/0.4.0) (2016-09-28)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.3.0...0.4.0)
 
