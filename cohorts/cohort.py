@@ -78,6 +78,8 @@ class Cohort(Collection):
     filter_fn : Function
         Specify a default filter function for `load_variants`, `load_effects`,
         `functions.missense_snv_count`, etc.
+    mhc_class : mhctools.BaseCommandlinePredictor, defaults to NetMHCcons
+        What MHC binding predictor to use for neoantigen calling.
     normalized_per_mb : bool
         Whether or not to normalize by number of loci.
     min_coverage_depth_normal : int
@@ -111,6 +113,7 @@ class Cohort(Collection):
                  join_with=None,
                  join_how="inner",
                  filter_fn=None,
+                 mhc_class=NetMHCcons,
                  normalized_per_mb=False,
                  min_coverage_normal_depth=0,
                  min_coverage_tumor_depth=0,
@@ -142,6 +145,7 @@ class Cohort(Collection):
         self.join_with = join_with
         self.join_how = join_how
         self.filter_fn = filter_fn
+        self.mhc_class = mhc_class
         self.normalized_per_mb = normalized_per_mb
         self.min_coverage_normal_depth = min_coverage_normal_depth
         self.min_coverage_tumor_depth = min_coverage_tumor_depth
@@ -789,11 +793,18 @@ class Cohort(Collection):
                                       patient=patient,
                                       filter_fn=filter_fn)
 
-        mhc_model = NetMHCcons(
-            alleles=patient.hla_alleles,
-            epitope_lengths=epitope_lengths,
-            max_file_records=max_file_records,
-            process_limit=process_limit)
+        try:
+            mhc_model = self.mhc_class(
+                alleles=patient.hla_alleles,
+                epitope_lengths=epitope_lengths,
+                max_file_records=max_file_records,
+                process_limit=process_limit)
+        except TypeError:
+            # The class may not support max_file_records and process_limit.
+            mhc_model = self.mhc_class(
+                alleles=patient.hla_alleles,
+                epitope_lengths=epitope_lengths)
+
         if only_expressed:
             df_isovar = self.load_single_patient_isovar(patient=patient,
                                                          variants=variants,

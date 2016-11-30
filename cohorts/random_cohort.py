@@ -19,6 +19,7 @@ from os import path
 from numpy.random import choice, randint, seed
 from varcode import Variant, VariantCollection
 from varcode.effects import Substitution
+from mhctools.random_predictor import RandomBindingPredictor
 
 from . import Cohort, Patient
 
@@ -72,7 +73,8 @@ def random_cohort(size, cache_dir, data_dir=None,
         patients.append(patient)
     return Cohort(
         patients=patients,
-        cache_dir=cache_dir)
+        cache_dir=cache_dir,
+        mhc_class=RandomBindingPredictor)
 
 def generate_random_missense_variants(num_variants=10, max_search=100000, reference="GRCh37"):
     """
