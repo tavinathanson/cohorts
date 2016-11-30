@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.4.2](https://github.com/hammerlab/cohorts/tree/0.4.2) (2016-11-30)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.4.1...0.4.2)
+
+**Merged pull requests:**
+
+- Random MHC prediction for random cohort [\#164](https://github.com/hammerlab/cohorts/pull/164) ([tavinathanson](https://github.com/tavinathanson))
+- Add variant generation to random\_cohorts and more [\#161](https://github.com/hammerlab/cohorts/pull/161) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.4.1](https://github.com/hammerlab/cohorts/tree/0.4.1) (2016-11-05)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.4.0...0.4.1)
 
