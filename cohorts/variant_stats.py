@@ -68,7 +68,7 @@ def mutect_somatic_variant_stats(variant, variant_metadata):
     -------
     SomaticVariantStats
     """
-  
+
     sample_info = variant_metadata["sample_info"]
     # Ensure there are exactly two samples in the VCF, a tumor and normal
     assert len(sample_info) == 2, "More than two samples found in the somatic VCF"

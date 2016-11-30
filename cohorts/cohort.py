@@ -319,7 +319,7 @@ class Cohort(Collection):
 
         if type(on) == dict:
             cols = []
-            for key, value in on.iteritems():
+            for key, value in on.items():
                 if type(value) == str:
                     df[key] = df[value]
                     col = key
