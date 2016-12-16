@@ -1,5 +1,5 @@
 from collections import namedtuple
-
+import numpy as np
 
 VariantStats = namedtuple("VariantStats",
                           ["depth", "alt_depth", "variant_allele_frequency"])
@@ -27,7 +27,9 @@ def strelka_somatic_variant_stats(variant, variant_metadata):
     sample_info = variant_metadata["sample_info"]
     # Ensure there are exactly two samples in the VCF, a tumor and normal
     assert len(sample_info) == 2, "More than two samples found in the somatic VCF"
+    
 
+    
     tumor_stats = _strelka_variant_stats(variant, sample_info["TUMOR"])
     normal_stats = _strelka_variant_stats(variant, sample_info["NORMAL"])
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
@@ -45,12 +47,26 @@ def _strelka_variant_stats(variant, sample_info):
     -------
     VariantStats
     """
-
-    # Retrieve the Tier 1 counts from Strelka
-    ref_depth = int(sample_info[variant.ref+"U"][0])
-    alt_depth = int(sample_info[variant.alt+"U"][0])
-    depth = alt_depth + ref_depth
-    vaf = float(alt_depth) / depth
+    
+    try:
+        if variant.is_deletion or variant.is_insertion:
+            # ref: https://sites.google.com/site/strelkasomaticvariantcaller/home/somatic-variant-output
+            #depth = int(sample_info['DP']) # read depth for tier 1
+            ref_depth = int(sample_info['TAR'][0]) # number of reads supporting ref allele (non-deletion)
+            alt_depth = int(sample_info['TIR'][0]) # number of reads supporting alt allele (deletion)
+            depth = ref_depth + alt_depth
+        else:
+            # Retrieve the Tier 1 counts from Strelka
+            ref_depth = int(sample_info[variant.ref+"U"][0])
+            alt_depth = int(sample_info[variant.alt+"U"][0])
+            depth = alt_depth + ref_depth
+        if depth > 0:
+            vaf = float(alt_depth) / depth
+        else:
+            vaf = None
+    except:
+        import pdb
+        pdb.set_trace()
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
 
