@@ -62,7 +62,7 @@ def make_cohort(file_formats):
             vcf_filename = (file_format % patient.id)
             vcf_path = path.join(vcf_dir, vcf_filename)
             vcf_paths.append(vcf_path)
-        patient.snv_vcf_paths = vcf_paths
+        patient.variants = {"snv": vcf_paths}
     return vcf_dir, cohort
 
 def extraction(cohort, extractor):

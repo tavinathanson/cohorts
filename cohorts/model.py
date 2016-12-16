@@ -21,6 +21,10 @@ from sklearn.metrics import roc_auc_score
 import lifelines as ll
 import patsy
 
+from .utils import get_logger
+
+logger = get_logger(__name__)
+
 def is_single_class(arr, col):
     if type(arr) == pd.DataFrame:
         arr_positive_indices = list(arr[arr[col] == 1][col])
@@ -49,6 +53,11 @@ def bootstrap_auc(df, col, pred_col, n_bootstrap=1000):
     list : AUCs for each sampling
     """
     scores = np.zeros(n_bootstrap)
+    old_len = len(df)
+    df.dropna(subset=[col], inplace=True)
+    new_len = len(df)
+    if new_len < old_len:
+        logger.info("Dropping NaN values in %s to go from %d to %d rows" % (col, old_len, new_len))
     preds = df[pred_col].astype(int)
     for i in range(n_bootstrap):
         sampled_counts, sampled_pred = resample(df[col], preds)
