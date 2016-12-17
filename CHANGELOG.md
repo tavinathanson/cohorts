@@ -1,5 +1,16 @@
 # Change Log
 
+## [0.5.0](https://github.com/hammerlab/cohorts/tree/0.5.0) (2016-12-17)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.4.2...0.5.0)
+
+**Implemented enhancements:**
+
+- Create public-facing usage template [\#114](https://github.com/hammerlab/cohorts/issues/114)
+
+**Merged pull requests:**
+
+- Add more granular variant specification and other minor changes [\#165](https://github.com/hammerlab/cohorts/pull/165) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.4.2](https://github.com/hammerlab/cohorts/tree/0.4.2) (2016-11-30)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.4.1...0.4.2)
 
