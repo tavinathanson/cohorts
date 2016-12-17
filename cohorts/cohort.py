@@ -100,8 +100,6 @@ class Cohort(Collection):
         Path to Pageant CoverageDepth output.
     benefit_plot_name : str
         What word to use for "benefit" when plotting.
-    variant_type : {"snv", "indel", "any"}, optional
-        Load variants of a specific type, default "snv"
     merge_type : {"union", "intersection"}, optional
         Use this method to merge multiple variant sets for a single patient, default "union"
     """
@@ -124,7 +122,6 @@ class Cohort(Collection):
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
                  benefit_plot_name="Benefit",
-                 variant_type="snv",
                  merge_type="union"):
         Collection.__init__(
             self,
@@ -155,11 +152,8 @@ class Cohort(Collection):
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
         self.benefit_plot_name = benefit_plot_name
-        self.variant_type = variant_type
         self.merge_type = merge_type
         self._genome = None
-
-        assert variant_type in ["snv", "indel", "any"], "Unknown variant type: %s" % variant_type
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -483,16 +477,14 @@ class Cohort(Collection):
     def _load_single_patient_variants(self, patient, filter_fn):
         failed_io = False
         try:
-            cached_file_name = "%s-%s-variants.pkl" % (self.variant_type, self.merge_type)
+            cached_file_name = "%s-variants.pkl" % self.merge_type
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
                 return filter_variants(variant_collection=cached,
                                        patient=patient,
                                        filter_fn=filter_fn)
-            patient_variants_list = patient.variants[self.variant_type]
-            assert type(patient_variants_list) == list, "Expected a list but got a %s" % type(patient_variants_list)
             variant_collections = []
-            for patient_variants in patient_variants_list:
+            for patient_variants in patient.variants_list:
                 if type(patient_variants) == str:
                     if patient_variants.endswith(".vcf"):
                         variant_collections.append(varcode.load_vcf_fast(patient_variants))
@@ -651,7 +643,7 @@ class Cohort(Collection):
         return patient_effects
 
     def _load_single_patient_effects(self, patient, only_nonsynonymous, all_effects, filter_fn):
-        cached_file_name = "%s-%s-effects.pkl" % (self.variant_type, self.merge_type)
+        cached_file_name = "%s-effects.pkl" % self.merge_type
 
         # Don't filter here, as these variants are used to generate the
         # effects cache; and cached items are never filtered.
@@ -812,7 +804,7 @@ class Cohort(Collection):
     def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
-        cached_file_name = "%s-%s-neoantigens.csv" % (self.variant_type, self.merge_type)
+        cached_file_name = "%s-neoantigens.csv" % self.merge_type
 
         # Don't filter here, as these variants are used to generate the
         # neoantigen cache; and cached items are never filtered.
@@ -920,7 +912,7 @@ class Cohort(Collection):
     def load_single_patient_isovar(self, patient, variants, epitope_lengths):
         # TODO: different epitope lengths, and other parameters, should result in
         # different caches
-        isovar_cached_file_name = "%s-%s-isovar.csv" % (self.variant_type, self.merge_type)
+        isovar_cached_file_name = "%s-isovar.csv" % self.merge_type
         df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         if df_isovar is not None:
             return df_isovar

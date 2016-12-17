@@ -51,7 +51,7 @@ def make_cohort(file_formats, merge_type="union", **kwargs):
             vcf_filename = (file_format % patient.id)
             vcf_path = path.join(vcf_dir, vcf_filename)
             vcf_paths.append(vcf_path)
-        patient.variants = {"snv": vcf_paths}
+        patient.variants = vcf_paths
     return vcf_dir, cohort
 
 def test_snv_counts():

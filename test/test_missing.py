@@ -41,9 +41,9 @@ def make_missing_vcf_cohort(patient_ids_with_missing_paths, missing_paths):
         vcf_path = path.join(vcf_dir, vcf_filename)
         vcf_paths.append(vcf_path)
         if patient.id in patient_ids_with_missing_paths:
-            patient.variants = {"snv": missing_paths}
+            patient.variants = missing_paths
         else:
-            patient.variants = {"snv": vcf_paths}
+            patient.variants = vcf_paths
         patient.hla_alleles = ["HLA-A02:01"]
     return vcf_dir, cohort
 

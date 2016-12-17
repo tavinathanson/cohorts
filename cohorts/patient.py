@@ -37,9 +37,8 @@ class Patient(object):
         Has the patient either progressed or passed away?
     benefit : bool
         Has the patient seen a durable clinical benefit?
-    variants : dict
-        Map from variant type ("snv" or "indel" or "any") to either a list of
-        VCF paths, a list of MAFs or a list of `VariantCollection`s.
+    variants : str or VariantCollection or list
+        VCF or MAF path, VariantCollection, or list of some combination of those.
     indel_vcf_paths : list
         List of paths to indel VCFs for this patient; multple VCFs get merged.
     normal_sample : Sample
@@ -59,7 +58,7 @@ class Patient(object):
                  progressed=None,
                  progressed_or_deceased=None,
                  benefit=None,
-                 variants={},
+                 variants=[],
                  normal_sample=None,
                  tumor_sample=None,
                  hla_alleles=None,
@@ -84,6 +83,10 @@ class Patient(object):
         self.cohort = cohort
 
         self.add_progressed_or_deceased()
+
+    @property
+    def variants_list(self):
+        return self.variants if type(self.variants) == list else [self.variants]
 
     def add_progressed_or_deceased(self):
         assert self.progressed is not None or self.progressed_or_deceased is not None, (
