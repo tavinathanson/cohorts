@@ -401,6 +401,10 @@ class Cohort(Collection):
         cache_file = path.join(patient_cache_dir, file_name)
 
         if not path.exists(cache_file):
+            # We removed variant_type from the cache name. Eventually remove this notification.
+            if (path.exists(path.join(patient_cache_dir, "snv-" + file_name)) or
+                path.exists(path.join(patient_cache_dir, "indel-" + file_name))):
+                raise ValueError("Cache is in an older format (with variant_type). Please re-generate it.")
             return None
 
         if self.check_provenance:
