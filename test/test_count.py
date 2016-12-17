@@ -15,10 +15,12 @@
 from __future__ import print_function
 
 from varcode.effects.effect_classes import ExonicSpliceSite, Substitution
+from varcode import Variant, VariantCollection
 from cohorts.variant_filters import no_filter
 from cohorts.functions import *
 
 from .data_generate import generate_vcfs
+from . import data_path
 
 from nose.tools import eq_, ok_
 from mock import MagicMock
@@ -32,6 +34,8 @@ from .test_basic import make_simple_cohort
 FILE_FORMAT_1 = "patient_format1_%s.vcf"
 FILE_FORMAT_2 = "patient_format2_%s.vcf"
 FILE_FORMAT_3 = "patient_format3_%s.vcf"
+
+MAF_FILE = "test_maf.maf"
 
 def make_cohort(file_formats, merge_type="union", **kwargs):
     cohort = make_simple_cohort(merge_type=merge_type, **kwargs)
@@ -51,7 +55,7 @@ def make_cohort(file_formats, merge_type="union", **kwargs):
             vcf_filename = (file_format % patient.id)
             vcf_path = path.join(vcf_dir, vcf_filename)
             vcf_paths.append(vcf_path)
-        patient.snv_vcf_paths = vcf_paths
+        patient.variants = vcf_paths
     return vcf_dir, cohort
 
 def test_snv_counts():
@@ -198,6 +202,39 @@ def test_multiple_effects():
                 eq_(len(effect_set), 1,
                     "Variant %s should only have 1 effect but it has %s"
                     % (variant, len(effect_set)))
+    finally:
+        if vcf_dir is not None and path.exists(vcf_dir):
+            rmtree(vcf_dir)
+        if cohort is not None:
+            cohort.clear_caches()
+
+def test_multiple_variant_forms():
+    """
+    Load VCF, MAF and VariantCollection together.
+    """
+    vcf_dir, cohort = None, None
+    try:
+        vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
+        patient = cohort[0]
+        patient.variants.append(data_path(MAF_FILE))
+        # Make sure listing the file twice has no effect.
+        patient.variants.append(data_path(MAF_FILE))
+        variant = Variant(start=1000000, ref="A", alt="T", contig=1, ensembl=75)
+        patient.variants.append(VariantCollection([variant]))
+
+        cohort_variants = cohort.load_variants(patients=[patient])
+
+        # Make sure the VariantCollection was included.
+        eq_(len(cohort_variants[patient.id].filter(lambda v: v.start == 1000000)), 1)
+
+        # Make sure the VCF was included.
+        eq_(len(cohort_variants[patient.id].filter(lambda v: v.start == 53513530)), 1)
+
+        # Make sure the MAF was included.
+        eq_(len(cohort_variants[patient.id].filter(lambda v: v.start == 1650797)), 1)
+
+        # Make sure a non-existant variant is not included.
+        eq_(len(cohort_variants[patient.id].filter(lambda v: v.start == 1650798)), 0)
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)

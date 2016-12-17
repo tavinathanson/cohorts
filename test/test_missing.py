@@ -41,9 +41,9 @@ def make_missing_vcf_cohort(patient_ids_with_missing_paths, missing_paths):
         vcf_path = path.join(vcf_dir, vcf_filename)
         vcf_paths.append(vcf_path)
         if patient.id in patient_ids_with_missing_paths:
-            patient.snv_vcf_paths = missing_paths
+            patient.variants = missing_paths
         else:
-            patient.snv_vcf_paths = vcf_paths
+            patient.variants = vcf_paths
         patient.hla_alleles = ["HLA-A02:01"]
     return vcf_dir, cohort
 
@@ -56,7 +56,7 @@ def test_broken_vcf_path():
     try:
         vcf_dir, cohort = make_missing_vcf_cohort(
             patient_ids_with_missing_paths=["1"],
-            missing_paths=["nonexistant_path"])
+            missing_paths=["nonexistant_path.vcf"])
 
         df = cohort.as_dataframe(snv_count)
         eq_(len(df), 3)
@@ -131,7 +131,7 @@ def generate_empty_neoantigens(cohort,
         elif patient.id in patient_ids_with_zero_neoantigens:
             neoantigen_path = generated_data_path(
                 path.join("cache", "cached-neoantigens",
-                          patient.id, "snv-union-neoantigens.csv"))
+                          patient.id, "union-neoantigens.csv"))
             if not path.exists(path.dirname(neoantigen_path)):
                 makedirs(path.dirname(neoantigen_path))
                 with open(neoantigen_path, "w") as f:

@@ -17,6 +17,8 @@ from __future__ import print_function
 import re
 import warnings
 from collections import namedtuple
+import sys
+import logging
 
 class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
     """Holds a DataFrame along with associated columns of interest."""
@@ -176,3 +178,12 @@ def strip_column_names(cols, keep_paren_contents=True):
         return dict(zip(cols, cols))
 
     return dict(zip(cols, new_cols))
+
+def get_logger(name):
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        logger.handlers = []
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(stdout_handler)
+    logger.setLevel(logging.INFO)
+    return logger

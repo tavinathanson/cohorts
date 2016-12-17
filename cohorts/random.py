@@ -68,7 +68,7 @@ def random_cohort(size, cache_dir, data_dir=None,
             deceased=row["deceased"],
             progressed_or_deceased=row["progressed_or_deceased"],
             hla_alleles=["HLA-A02:01"],
-            snv_vcf_paths=snv_vcf_paths,
+            variants={"snv": snv_vcf_paths},
             additional_data=row)
         patients.append(patient)
     return Cohort(

@@ -21,6 +21,7 @@ import seaborn as sb
 import json
 import warnings
 import pprint
+from copy import copy
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -33,7 +34,7 @@ from sqlalchemy import create_engine
 from pyensembl import cached_release
 
 import varcode
-from varcode import EffectCollection
+from varcode import EffectCollection, VariantCollection
 from mhctools import NetMHCcons, EpitopeCollection
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
@@ -99,8 +100,6 @@ class Cohort(Collection):
         Path to Pageant CoverageDepth output.
     benefit_plot_name : str
         What word to use for "benefit" when plotting.
-    variant_type : {"snv", "indel"}, optional
-        Load variants of a specific type, default "snv"
     merge_type : {"union", "intersection"}, optional
         Use this method to merge multiple variant sets for a single patient, default "union"
     """
@@ -123,7 +122,6 @@ class Cohort(Collection):
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
                  benefit_plot_name="Benefit",
-                 variant_type="snv",
                  merge_type="union"):
         Collection.__init__(
             self,
@@ -154,10 +152,8 @@ class Cohort(Collection):
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
         self.benefit_plot_name = benefit_plot_name
-        self.variant_type = variant_type
         self.merge_type = merge_type
-
-        assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
+        self._genome = None
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -165,15 +161,35 @@ class Cohort(Collection):
 
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
+                            "all_effect": "cached-all-effects",
                             "nonsynonymous_effect": "cached-nonsynonymous-effects",
                             "neoantigen": "cached-neoantigens",
                             "expressed_neoantigen": "cached-expressed-neoantigens",
                             "polyphen": "cached-polyphen-annotations",
                             "isovar": "cached-isovar-output"}
+
         if print_provenance:
             pprint.pprint(self.summarize_data_sources())
 
         set_styling()
+
+    def filter(self, filter_fn):
+        new_cohort = copy(self)
+        new_cohort.elements = [patient for patient in self if filter_fn(patient)]
+        return new_cohort
+
+    @property
+    def genome(self):
+        if self._genome is None:
+            self._genome = self.get_genome()
+        return self._genome
+
+    def get_genome(self):
+        variants = self.load_variants()
+        for patient_id, variant_collection in variants.items():
+            if len(variant_collection) > 0:
+                return variant_collection[0].ensembl
+        raise ValueError("No variants to derive genome from")
 
     def verify_id_uniqueness(self):
         patient_ids = set([patient.id for patient in self])
@@ -385,6 +401,10 @@ class Cohort(Collection):
         cache_file = path.join(patient_cache_dir, file_name)
 
         if not path.exists(cache_file):
+            # We removed variant_type from the cache name. Eventually remove this notification.
+            if (path.exists(path.join(patient_cache_dir, "snv-" + file_name)) or
+                path.exists(path.join(patient_cache_dir, "indel-" + file_name))):
+                raise ValueError("Cache is in an older format (with variant_type). Please re-generate it.")
             return None
 
         if self.check_provenance:
@@ -461,17 +481,25 @@ class Cohort(Collection):
     def _load_single_patient_variants(self, patient, filter_fn):
         failed_io = False
         try:
-            cached_file_name = "%s-%s-variants.pkl" % (self.variant_type, self.merge_type)
+            cached_file_name = "%s-variants.pkl" % self.merge_type
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
             if cached is not None:
                 return filter_variants(variant_collection=cached,
                                        patient=patient,
                                        filter_fn=filter_fn)
-            vcf_paths = patient.snv_vcf_paths if self.variant_type == "snv" else patient.indel_vcf_paths
-            variant_collections = [
-                varcode.load_vcf_fast(vcf_path)
-                for vcf_path in vcf_paths
-            ]
+            variant_collections = []
+            for patient_variants in patient.variants_list:
+                if type(patient_variants) == str:
+                    if ".vcf" in patient_variants:
+                        variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                    elif ".maf" in patient_variants:
+                        variant_collections.append(varcode.load_maf(patient_variants))
+                    else:
+                        raise ValueError("Don't know how to read %s" % patient_variants)
+                elif type(patient_variants) == VariantCollection:
+                    variant_collections.append(patient_variants)
+                else:
+                    raise ValueError("Don't know how to read %s" % patient_variants)
         except IOError:
             failed_io = True
 
@@ -587,7 +615,7 @@ class Cohort(Collection):
                                filter_fn=filter_fn)
 
     def load_effects(self, patients=None, only_nonsynonymous=False,
-                     filter_fn=None):
+                     all_effects=False, filter_fn=None):
         """Load a dictionary of patient_id to varcode.EffectCollection
 
         Note that this only loads one effect per variant.
@@ -598,6 +626,8 @@ class Cohort(Collection):
             Filter to a subset of patients
         only_nonsynonymous : bool, optional
             If true, load only nonsynonymous effects, default False
+        all_effects : bool, optional
+            If true, return all effects rather than only the top-priority effect per variant
         filter_fn : function
             Takes a FilterableEffect and returns a boolean. Only effects returning True are preserved.
             Overrides default self.filter_fn. `None` passes through to self.filter_fn.
@@ -611,13 +641,13 @@ class Cohort(Collection):
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, filter_fn)
+                patient, only_nonsynonymous, all_effects, filter_fn)
             if effects is not None:
                 patient_effects[patient.id] = effects
         return patient_effects
 
-    def _load_single_patient_effects(self, patient, only_nonsynonymous, filter_fn):
-        cached_file_name = "%s-%s-effects.pkl" % (self.variant_type, self.merge_type)
+    def _load_single_patient_effects(self, patient, only_nonsynonymous, all_effects, filter_fn):
+        cached_file_name = "%s-effects.pkl" % self.merge_type
 
         # Don't filter here, as these variants are used to generate the
         # effects cache; and cached items are never filtered.
@@ -626,9 +656,14 @@ class Cohort(Collection):
             return None
 
         if only_nonsynonymous:
+            if all_effects:
+                raise ValueError("Cannot ask for all effects and only nonsynonymous effects at the same time")
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
-            cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
+            if all_effects:
+                cached = self.load_from_cache(self.cache_names["all_effect"], patient.id, cached_file_name)
+            else:
+                cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
             return filter_effects(effect_collection=cached,
                                   variant_collection=variants,
@@ -637,15 +672,17 @@ class Cohort(Collection):
 
         effects = variants.effects()
 
+        self.save_to_cache(effects, self.cache_names["all_effect"], patient.id, cached_file_name)
+
+        effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
+        self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
+
         # Always take the top priority effect per variant so we end up with a single
         # effect per variant.
         nonsynonymous_effects = EffectCollection(
             list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
-
-        effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
-
-        self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
+
         return filter_effects(
             effect_collection=(
                 nonsynonymous_effects if only_nonsynonymous else effects),
@@ -771,7 +808,7 @@ class Cohort(Collection):
     def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
-        cached_file_name = "%s-%s-neoantigens.csv" % (self.variant_type, self.merge_type)
+        cached_file_name = "%s-neoantigens.csv" % self.merge_type
 
         # Don't filter here, as these variants are used to generate the
         # neoantigen cache; and cached items are never filtered.
@@ -879,7 +916,7 @@ class Cohort(Collection):
     def load_single_patient_isovar(self, patient, variants, epitope_lengths):
         # TODO: different epitope lengths, and other parameters, should result in
         # different caches
-        isovar_cached_file_name = "%s-%s-isovar.csv" % (self.variant_type, self.merge_type)
+        isovar_cached_file_name = "%s-isovar.csv" % self.merge_type
         df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         if df_isovar is not None:
             return df_isovar
