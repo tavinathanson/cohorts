@@ -490,9 +490,9 @@ class Cohort(Collection):
             variant_collections = []
             for patient_variants in patient.variants_list:
                 if type(patient_variants) == str:
-                    if patient_variants.endswith(".vcf"):
+                    if ".vcf" in patient_variants:
                         variant_collections.append(varcode.load_vcf_fast(patient_variants))
-                    elif patient_variants.endswith(".maf"):
+                    elif ".maf" in patient_variants:
                         variant_collections.append(varcode.load_maf(patient_variants))
                     else:
                         raise ValueError("Don't know how to read %s" % patient_variants)
