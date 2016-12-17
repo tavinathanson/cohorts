@@ -131,7 +131,7 @@ def generate_empty_neoantigens(cohort,
         elif patient.id in patient_ids_with_zero_neoantigens:
             neoantigen_path = generated_data_path(
                 path.join("cache", "cached-neoantigens",
-                          patient.id, "snv-union-neoantigens.csv"))
+                          patient.id, "union-neoantigens.csv"))
             if not path.exists(path.dirname(neoantigen_path)):
                 makedirs(path.dirname(neoantigen_path))
                 with open(neoantigen_path, "w") as f:
