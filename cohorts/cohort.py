@@ -26,6 +26,7 @@ import dill
 import hashlib
 import inspect
 import sys
+import logging
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -59,6 +60,8 @@ from .varcode_utils import (filter_variants, filter_effects,
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
+
+logger = logging.getLogger(__name__)
 
 class Cohort(Collection):
     """
