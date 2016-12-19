@@ -484,7 +484,7 @@ class Cohort(Collection):
             merged_variants = self.load_from_cache(self.cache_names["variant"], patient.id, variant_cache_file_name)
             variant_collections = list()
             if merged_variants is None:
-                vcf_paths = patient.vcf_paths
+                vcf_paths = patient.snv_vcf_paths
                 variant_collections = [
                     varcode.load_vcf_fast(vcf_path)
                     for vcf_path in vcf_paths

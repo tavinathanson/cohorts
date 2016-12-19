@@ -67,12 +67,37 @@ def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
 
+
 @count_function
-def snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+def variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     patient_id = row["patient_id"]
     return cohort.load_variants(
         patients=[cohort.patient_from_id(patient_id)],
         filter_fn=filter_fn,
+        **kwargs)
+
+@count_function
+def snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    patient_id = row["patient_id"]
+    def snv_filter_fn(filterable_variant, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (filterable_variant.variant.is_snv and
+                filter_fn(filterable_variant=filterable_variant, **kwargs))
+    return cohort.load_variants(
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=snv_filter_fn,
+        **kwargs)
+
+@count_function
+def indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    patient_id = row["patient_id"]
+    def indel_filter_fn(filterable_variant, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (filterable_variant.variant.is_indel and
+                filter_fn(filterable_variant=filterable_variant, **kwargs))
+    return cohort.load_variants(
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=indel_filter_fn,
         **kwargs)
 
 @count_function
