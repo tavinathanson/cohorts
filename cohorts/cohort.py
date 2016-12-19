@@ -21,6 +21,8 @@ import seaborn as sb
 import json
 import warnings
 import pprint
+import dill
+import hashlib
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -99,8 +101,6 @@ class Cohort(Collection):
         Path to Pageant CoverageDepth output.
     benefit_plot_name : str
         What word to use for "benefit" when plotting.
-    variant_type : {"snv", "indel"}, optional
-        Load variants of a specific type, default "snv"
     merge_type : {"union", "intersection"}, optional
         Use this method to merge multiple variant sets for a single patient, default "union"
     """
@@ -123,7 +123,6 @@ class Cohort(Collection):
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
                  benefit_plot_name="Benefit",
-                 variant_type="snv",
                  merge_type="union"):
         Collection.__init__(
             self,
@@ -154,10 +153,8 @@ class Cohort(Collection):
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
         self.benefit_plot_name = benefit_plot_name
-        self.variant_type = variant_type
+        self.variant_type = 'variant' ## legacy; used to name cache files
         self.merge_type = merge_type
-
-        assert variant_type in ["snv", "indel"], "Unknown variant type: %s" % variant_type
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -433,7 +430,7 @@ class Cohort(Collection):
                 return patient
         raise ValueError("No patient with ID %s found" % id)
 
-    def load_variants(self, patients=None, filter_fn=None):
+    def load_variants(self, patients=None, filter_fn=None, **kwargs):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
         Parameters
@@ -453,46 +450,72 @@ class Cohort(Collection):
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
-            variants = self._load_single_patient_variants(patient, filter_fn)
+            variants = self._load_single_patient_variants(patient, filter_fn, **kwargs)
             if variants is not None:
                 patient_variants[patient.id] = variants
         return patient_variants
-
-    def _load_single_patient_variants(self, patient, filter_fn):
+    
+    def _hash_filter_fn(self, filter_fn, **kwargs):
+        fn_source = str(dill.source.getsource(filter_fn))
+        hashed_fn_source = pickle.dumps(fn_source)
+        kw_dict = dict(**kwargs)
+        kw_hash = list()
+        if not kw_dict:
+            kw_hash = ['default']
+        else:
+            [kw_hash.append('{}-{}'.format(key, h)) for (key, h) in kw_dict.items()]
+        hashed_fn = '{}.{}'.format(int(hashlib.sha1(hashed_fn_source).hexdigest(), 16) % (10 ** 11),
+                              '.'.join(kw_hash)
+                             )
+        return hashed_fn
+            
+        
+    def _load_single_patient_variants(self, patient, filter_fn, **kwargs):
         failed_io = False
         try:
-            cached_file_name = "%s-%s-variants.pkl" % (self.variant_type, self.merge_type)
-            cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
+            ## try to load filtered variants from cache
+            filtered_cache_file_name = "%s-%s-variants.filter-%s.pkl" % (self.variant_type, self.merge_type,
+                                                                 self._hash_filter_fn(filter_fn, **kwargs))
+            cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
             if cached is not None:
-                return filter_variants(variant_collection=cached,
-                                       patient=patient,
-                                       filter_fn=filter_fn)
-            vcf_paths = patient.snv_vcf_paths if self.variant_type == "snv" else patient.indel_vcf_paths
-            variant_collections = [
-                varcode.load_vcf_fast(vcf_path)
-                for vcf_path in vcf_paths
-            ]
+                return cached
+            ## try to load unfiltered variants from cache
+            variant_cache_file_name = "%s-%s-variants.pkl" % (self.variant_type, self.merge_type)
+            merged_variants = self.load_from_cache(self.cache_names["variant"], patient.id, variant_cache_file_name)
+            variant_collections = list()
+            if merged_variants is None:
+                vcf_paths = patient.vcf_paths
+                variant_collections = [
+                    varcode.load_vcf_fast(vcf_path)
+                    for vcf_path in vcf_paths
+                ]
+                if len(variant_collections) == 0:
+                    failed_io = True
         except IOError:
             failed_io = True
 
         # Note that this is the number of variant collections and not the number of
         # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
         # collections will lead to NaN variants and neoantigens.
-        if failed_io or len(variant_collections) == 0:
+        if failed_io:
             print("Variants did not exist for patient %s" % patient.id)
             return None
+        
+        if merged_variants is None:
+            if len(variant_collections) == 1:
+                # There is nothing to merge
+                variants = variant_collections[0]
+                merged_variants = variants
+            else:
+                merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
 
-        if len(variant_collections) == 1:
-            # There is nothing to merge
-            variants = variant_collections[0]
-            merged_variants = variants
-        else:
-            merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
-
-        self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
-        return filter_variants(variant_collection=merged_variants,
-                               patient=patient,
-                               filter_fn=filter_fn)
+        self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, variant_cache_file_name)
+        filtered_variants = filter_variants(variant_collection=merged_variants,
+                                            patient=patient,
+                                            filter_fn=filter_fn,
+                                            **kwargs)
+        self.save_to_cache(filtered_variants, self.cache_names["variant"], patient.id, filtered_cache_file_name)
+        return filtered_variants
 
     def _merge_variant_collections(self, variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
