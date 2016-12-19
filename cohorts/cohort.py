@@ -24,6 +24,8 @@ import pprint
 from copy import copy
 import dill
 import hashlib
+import inspect
+import sys
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -480,57 +482,101 @@ class Cohort(Collection):
                 patient_variants[patient.id] = variants
         return patient_variants
     
+    
     def _hash_filter_fn(self, filter_fn, **kwargs):
+        if filter_fn is None:
+            return 'none'
+        # function source code
         fn_source = str(dill.source.getsource(filter_fn))
         hashed_fn_source = pickle.dumps(fn_source)
+        # kwarg values
         kw_dict = dict(**kwargs)
         kw_hash = list()
         if not kw_dict:
             kw_hash = ['default']
         else:
             [kw_hash.append('{}-{}'.format(key, h)) for (key, h) in kw_dict.items()]
-        hashed_fn = '{}.{}'.format(int(hashlib.sha1(hashed_fn_source).hexdigest(), 16) % (10 ** 11),
-                              '.'.join(kw_hash)
-                             )
+            
+        # closure vars
+        closure = ''
+        nonlocals = inspect.getclosurevars(filter_fn).nonlocals
+        for (key, val) in nonlocals.items():
+            if inspect.isfunction(val):
+                closure = '{}-{}'.format(key, self._hash_filter_fn(val))
+        hashed_fn = '{}.{}{}'.format(int(hashlib.sha1(hashed_fn_source).hexdigest(), 16) % (10 ** 11),
+                                     '.'.join(kw_hash), closure
+                                    )
         return hashed_fn
             
         
-    def _load_single_patient_variants(self, patient, filter_fn, **kwargs):
+    
+    def _load_single_patient_variants(self, patient, filter_fn, use_cache=True, **kwargs):
+        use_filtered_cache = use_cache
+        if sys.version_info < (3, 3):
+            logger.debug('Disabling filtered cache due to python version')
+            use_filtered_cache = False
         failed_io = False
         try:
-            ## try to load filtered variants from cache
-            filtered_cache_file_name = "%s-variants.filter-%s.pkl" % (self.merge_type,
-                                                                 self._hash_filter_fn(filter_fn, **kwargs))
-            cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
-            if cached is not None:
-                return cached
-            
-            ## load unfiltered variants into list of collections
-            variant_cache_file_name = "%s-variants.pkl" % (self.merge_type)
-            merged_variants = self.load_from_cache(self.cache_names["variant"], patient.id, variant_cache_file_name)
+            if use_filtered_cache:
+                ## try to load filtered variants from cache
+                filtered_cache_file_name = "%s-variants.filter-%s.pkl" % (self.merge_type,
+                                                                     self._hash_filter_fn(filter_fn, **kwargs))
+                cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
+                if cached is not None:
+                    return cached
+            merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
+        except IOError:
+            failed_io = True
+
+        # Note that this is the number of variant collections and not the number of
+        # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
+        # collections will lead to NaN variants and neoantigens.
+        if merged_variants is None:
+            print("Variants did not exist for patient %s" % patient.id)
+            return None
+        
+        filtered_variants = filter_variants(variant_collection=merged_variants,
+                                            patient=patient,
+                                            filter_fn=filter_fn,
+                                            **kwargs)
+        if use_filtered_cache:
+            self.save_to_cache(filtered_variants, self.cache_names["variant"], patient.id, filtered_cache_file_name)
+        return filtered_variants
+
+    
+    def _load_single_patient_merged_variants(self, patient, use_cache=True):
+        failed_io = False
+        try:
+            # get merged-variants from cache
+            if use_cache:
+                ## load unfiltered variants into list of collections
+                variant_cache_file_name = "%s-variants.pkl" % (self.merge_type)
+                merged_variants = self.load_from_cache(self.cache_names["variant"], patient.id, variant_cache_file_name)
+                if merged_variants is not None:
+                    return merged_variants
+            # get variant collections from file
             variant_collections = []
-            if merged_variants is None:
-                for patient_variants in patient.variants_list:
-                    if type(patient_variants) == str:
-                        if ".vcf" in patient_variants:
-                            variant_collections.append(varcode.load_vcf_fast(patient_variants))
-                        elif ".maf" in patient_variants:
-                            variant_collections.append(varcode.load_maf(patient_variants))
-                        else:
-                            raise ValueError("Don't know how to read %s" % patient_variants)
-                    elif type(patient_variants) == VariantCollection:
-                        variant_collections.append(patient_variants)
+            for patient_variants in patient.variants_list:
+                if type(patient_variants) == str:
+                    if ".vcf" in patient_variants:
+                        variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                    elif ".maf" in patient_variants:
+                        variant_collections.append(varcode.load_maf(patient_variants))
                     else:
                         raise ValueError("Don't know how to read %s" % patient_variants)
-                if len(variant_collections) == 0:
-                    failed_io = True
-                elif len(variant_collections) == 1:
-                    # There is nothing to merge
-                    variants = variant_collections[0]
-                    merged_variants = variants
+                elif type(patient_variants) == VariantCollection:
+                    variant_collections.append(patient_variants)
                 else:
-                    merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
-                    
+                    raise ValueError("Don't know how to read %s" % patient_variants)
+            # merge variant-collections
+            if len(variant_collections) == 0:
+                failed_io = True
+            elif len(variant_collections) == 1:
+                # There is nothing to merge
+                variants = variant_collections[0]
+                merged_variants = variants
+            else:
+                merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
         except IOError:
             failed_io = True
 
@@ -542,14 +588,11 @@ class Cohort(Collection):
             return None
         
         # save merged & filtered variants to file
-        self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, variant_cache_file_name)
-        filtered_variants = filter_variants(variant_collection=merged_variants,
-                                            patient=patient,
-                                            filter_fn=filter_fn,
-                                            **kwargs)
-        self.save_to_cache(filtered_variants, self.cache_names["variant"], patient.id, filtered_cache_file_name)
-        return filtered_variants
-
+        if use_cache:
+            self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, variant_cache_file_name)
+        return merged_variants
+    
+    
     def _merge_variant_collections(self, variant_collections, merge_type):
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
         head = variant_collections[0]
