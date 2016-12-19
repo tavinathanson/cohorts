@@ -499,14 +499,14 @@ class Cohort(Collection):
         failed_io = False
         try:
             ## try to load filtered variants from cache
-            filtered_cache_file_name = "%s-%s-variants.filter-%s.pkl" % (self.variant_type, self.merge_type,
+            filtered_cache_file_name = "%s-variants.filter-%s.pkl" % (self.merge_type,
                                                                  self._hash_filter_fn(filter_fn, **kwargs))
             cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
             if cached is not None:
                 return cached
             
             ## load unfiltered variants into list of collections
-            variant_cache_file_name = "%s-%s-variants.pkl" % (self.variant_type, self.merge_type)
+            variant_cache_file_name = "%s-variants.pkl" % (self.merge_type)
             merged_variants = self.load_from_cache(self.cache_names["variant"], patient.id, variant_cache_file_name)
             variant_collections = []
             if merged_variants is None:
