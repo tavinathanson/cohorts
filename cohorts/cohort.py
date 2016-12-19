@@ -402,7 +402,7 @@ class Cohort(Collection):
     def load_from_cache(self, cache_name, patient_id, file_name):
         if not self.cache_results:
             return None
-
+        
         cache_dir = path.join(self.cache_dir, cache_name)
         patient_cache_dir = path.join(cache_dir, str(patient_id))
         cache_file = path.join(patient_cache_dir, file_name)
@@ -421,12 +421,14 @@ class Cohort(Collection):
                 left_outer_diff = "In current environment but not cached in %s for patient %s" % (cache_name, patient_id),
                 right_outer_diff = "In cached %s for patient %s but not current" % (cache_name, patient_id)
                 )
-
-        if path.splitext(cache_file)[1] == ".csv":
-            return pd.read_csv(cache_file, dtype={"patient_id": object})
-        else:
-            with open(cache_file, "rb") as f:
-                return pickle.load(f)
+        try:
+            if path.splitext(cache_file)[1] == ".csv":
+                return pd.read_csv(cache_file, dtype={"patient_id": object})
+            else:
+                with open(cache_file, "rb") as f:
+                    return pickle.load(f)
+        except:
+            return None
 
     def save_to_cache(self, obj, cache_name, patient_id, file_name):
         if not self.cache_results:
