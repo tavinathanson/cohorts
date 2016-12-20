@@ -341,8 +341,7 @@ class Cohort(Collection):
         # For multiple functions, don't allow kwargs since we won't know which functions
         # they apply to.
         if len(kwargs) > 0:
-            raise ValueError("kwargs are not supported when collecting multiple functions "
-                             "as we don't know which function they apply to.")
+            logger.warning("Note: kwargs used with multiple functions; passing them to all functions")
 
         if type(on) == dict:
             cols = []
@@ -520,18 +519,28 @@ class Cohort(Collection):
         if sys.version_info < (3, 3):
             logger.debug('Disabling filtered cache due to python version')
             use_filtered_cache = False
-        failed_io = False
-        try:
-            if use_filtered_cache:
+            
+        ## get cache name, if possible
+        if use_filtered_cache:
+            try:
                 ## try to load filtered variants from cache
                 filtered_cache_file_name = "%s-variants.filter-%s.pkl" % (self.merge_type,
-                                                                     self._hash_filter_fn(filter_fn, **kwargs))
+                                                                          self._hash_filter_fn(filter_fn, **kwargs))
+            except:
+                use_filtered_cache = False
+        
+        ## read from cache, if possible
+        if use_filtered_cache:
+            try:
                 cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
                 if cached is not None:
                     return cached
-            merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
-        except IOError:
-            failed_io = True
+            except:
+                logger.warn('Error loading variants from cache for patient: {}'.format(patient.id))
+                pass
+        
+        ## get merged variants
+        merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
 
         # Note that this is the number of variant collections and not the number of
         # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
