@@ -729,7 +729,7 @@ class Cohort(Collection):
                                filter_fn=filter_fn)
 
     def load_effects(self, patients=None, only_nonsynonymous=False,
-                     all_effects=False, filter_fn=None):
+                     all_effects=False, filter_fn=None, **kwargs):
         """Load a dictionary of patient_id to varcode.EffectCollection
 
         Note that this only loads one effect per variant.
@@ -761,12 +761,12 @@ class Cohort(Collection):
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, all_effects, filter_fn)
+                patient, only_nonsynonymous, all_effects, filter_fn, **kwargs)
             if effects is not None:
                 patient_effects[patient.id] = effects
         return patient_effects
 
-    def _load_single_patient_effects(self, patient, only_nonsynonymous, all_effects, filter_fn):
+    def _load_single_patient_effects(self, patient, only_nonsynonymous, all_effects, filter_fn, **kwargs):
         cached_file_name = "%s-effects.pkl" % self.merge_type
         if filter_fn is None:
             filter_fn_name = 'None'
@@ -793,7 +793,8 @@ class Cohort(Collection):
             return filter_effects(effect_collection=cached,
                                   variant_collection=variants,
                                   patient=patient,
-                                  filter_fn=filter_fn)
+                                  filter_fn=filter_fn,
+                                 **kwargs)
 
         effects = variants.effects()
 
@@ -813,7 +814,8 @@ class Cohort(Collection):
                 nonsynonymous_effects if only_nonsynonymous else effects),
             variant_collection=variants,
             patient=patient,
-            filter_fn=filter_fn)
+            filter_fn=filter_fn,
+            **kwargs)
 
     def load_kallisto(self):
         """
