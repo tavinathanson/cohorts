@@ -47,6 +47,7 @@ from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
 from scipy.stats import pearsonr
 from collections import defaultdict
+from tqdm import tqdm
 
 from .dataframe_loader import DataFrameLoader
 from .utils import DataFrameHolder, first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names, get_logger
@@ -326,7 +327,8 @@ class Cohort(Collection):
                 func = lambda row: on(row=row, **kwargs)
             else:
                 func = lambda row: on(row=row, cohort=self, **kwargs)
-            df[col] = df.apply(func, axis=1)
+            tqdm.pandas(desc=col)
+            df[col] = df.progress_apply(func, axis=1)
             return DataFrameHolder(col, df)
 
         def func_name(func, num=0):
