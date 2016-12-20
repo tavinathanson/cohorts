@@ -183,7 +183,7 @@ def get_logger(name, level=logging.INFO):
     logger = logging.getLogger(name)
     if logger.handlers:
         logger.handlers = []
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    logger.addHandler(stdout_handler)
+    #stdout_handler = logging.StreamHandler(sys.stdout)
+    #logger.addHandler(stdout_handler)
     logger.setLevel(level)
     return logger
