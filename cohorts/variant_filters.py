@@ -13,15 +13,14 @@
 # limitations under the License.
 
 from .variant_stats import variant_stats_from_variant
+from .utils import get_logger
 
 from varcode import Variant
 from varcode.common import memoize
 import pandas as pd
 from os import path
-import logging
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 def no_filter(filterable_variant):
     return True
