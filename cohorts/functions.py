@@ -79,10 +79,10 @@ def variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
 
 @count_function
 def exonic_variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_filter_fn(filterable_effect):
+    def exonic_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (isinstance(filterable_effect.effect, Exonic) and
-                filter_fn(filterable_effect))
+                filter_fn(filterable_effect, **kwargs))
     # This only loads one effect per variant.
     patient_id = row["patient_id"]
     return cohort.load_effects(
@@ -118,10 +118,10 @@ def indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
 
 @count_function
 def missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def missense_filter_fn(filterable_effect):
+    def missense_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (type(filterable_effect.effect) == Substitution and
-                filter_fn(filterable_effect))
+                filter_fn(filterable_effect, **kwargs))
     # This only loads one effect per variant.
     patient_id = row["patient_id"]
     return cohort.load_effects(
@@ -153,11 +153,11 @@ def nonsynonymous_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs)
 
 @count_function
 def missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def missense_filter_fn(filterable_effect):
+    def missense_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (type(filterable_effect.effect) == Substitution and
                 filterable_effect.variant.is_snv and
-                filter_fn(filterable_effect))
+                filter_fn(filterable_effect, **kwargs))
     # This only loads one effect per variant.
     patient_id = row["patient_id"]
     return cohort.load_effects(
@@ -168,11 +168,11 @@ def missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
 
 @count_function
 def exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_filter_fn(filterable_effect):
+    def exonic_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (isinstance(filterable_effect.effect, Exonic) and
                 filterable_effect.variant.is_snv and
-                filter_fn(filterable_effect))
+                filter_fn(filterable_effect, **kwargs))
     # This only loads one effect per variant.
     patient_id = row["patient_id"]
     return cohort.load_effects(
@@ -190,13 +190,13 @@ def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
 
 @use_defaults
 def expressed_missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect):
+    def expressed_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
     return missense_snv_count(row=row,
                               cohort=cohort,
                               filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb)
+                              normalized_per_mb=normalized_per_mb, **kwargs)
 
 @use_defaults
 def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
