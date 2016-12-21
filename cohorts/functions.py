@@ -224,7 +224,7 @@ def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
 def expressed_missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     def expressed_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+        return filter_fn(filterable_effect, **kwargs) and effect_expressed_filter(filterable_effect)
     return missense_snv_count(row=row,
                               cohort=cohort,
                               filter_fn=expressed_filter_fn,
@@ -234,7 +234,7 @@ def expressed_missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kw
 def expressed_exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     def expressed_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+        return filter_fn(filterable_effect, **kwargs) and effect_expressed_filter(filterable_effect)
     return exonic_snv_count(row=row,
                               cohort=cohort,
                               filter_fn=expressed_filter_fn,
