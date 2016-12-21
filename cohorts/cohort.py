@@ -506,6 +506,7 @@ class Cohort(Collection):
     def _hash_filter_fn(self, filter_fn, **kwargs):
         if filter_fn is None:
             return 'filter-none'
+        filter_fn_name = filter_fn.__name__
         logger.debug('Computing hash for filter_fn: {} with kwargs {}'.format(filter_fn_name, str(dict(**kwargs))))
         # function source code
         fn_source = str(dill.source.getsource(filter_fn))
