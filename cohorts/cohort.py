@@ -505,7 +505,7 @@ class Cohort(Collection):
     
     def _hash_filter_fn(self, filter_fn, **kwargs):
         if filter_fn is None:
-            return 'none'
+            return 'filter-none'
         logger.debug('Computing hash for filter_fn: {} with kwargs {}'.format(filter_fn_name, str(dict(**kwargs))))
         # function source code
         fn_source = str(dill.source.getsource(filter_fn))
@@ -517,16 +517,18 @@ class Cohort(Collection):
             kw_hash = ['default']
         else:
             [kw_hash.append('{}-{}'.format(key, h)) for (key, h) in sorted(kw_dict.items())]
-            
         # closure vars
-        closure = ''
+        closure = 'null'
         nonlocals = inspect.getclosurevars(filter_fn).nonlocals
         for (key, val) in nonlocals.items():
             if inspect.isfunction(val):
-                closure = '{}-{}'.format(key, self._hash_filter_fn(val))
-        hashed_fn = '{}.{}{}'.format(int(hashlib.sha1(hashed_fn_source).hexdigest(), 16) % (10 ** 11),
-                                     '.'.join(kw_hash), closure
-                                    )
+                closure = '{}-{}'.format(self._hash_filter_fn(val).__name__, self._hash_filter_fn(val))
+        # construct final hashed_fn
+        hashed_fn = '.'.join(['-'.join([filter_fn.__name__,
+                                        int(hashlib.sha1(hashed_fn_source).hexdigest(), 16) % (10 ** 11)]),
+                              '.'.join(kw_hash),
+                              closure]
+                            )
         return hashed_fn
             
         
@@ -547,7 +549,7 @@ class Cohort(Collection):
             logger.debug('... identifying filtered-cache file name')
             try:
                 ## try to load filtered variants from cache
-                filtered_cache_file_name = "%s-variants.filter-%s.pkl" % (self.merge_type,
+                filtered_cache_file_name = "%s-variants.%s.pkl" % (self.merge_type,
                                                                           self._hash_filter_fn(filter_fn, **kwargs))
             except:
                 use_filtered_cache = False
