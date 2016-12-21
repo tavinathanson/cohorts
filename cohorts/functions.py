@@ -182,6 +182,51 @@ def exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         **kwargs)
 
 @count_function
+def exonic_silent_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def exonic_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (isinstance(filterable_effect.effect, Exonic) and
+                filterable_effect.variant.is_snv and
+                filter_fn(filterable_effect, **kwargs))
+    # This only loads one effect per variant.
+    patient_id = row["patient_id"]
+    return cohort.load_effects(
+        only_nonsynonymous=False,
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=exonic_filter_fn,
+        **kwargs)
+
+@count_function
+def exonic_indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def exonic_indel_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (isinstance(filterable_effect.effect, Exonic) and
+                filterable_effect.variant.is_deletion and
+                filter_fn(filterable_effect, **kwargs))
+    # This only loads one effect per variant.
+    patient_id = row["patient_id"]
+    return cohort.load_effects(
+        only_nonsynonymous=True,
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=exonic_indel_filter_fn,
+        **kwargs)
+
+@count_function
+def exonic_insert_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def exonic_insert_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (isinstance(filterable_effect.effect, Exonic) and
+                filterable_effect.variant.is_insertion and
+                filter_fn(filterable_effect, **kwargs))
+    # This only loads one effect per variant.
+    patient_id = row["patient_id"]
+    return cohort.load_effects(
+        only_nonsynonymous=True,
+        patients=[cohort.patient_from_id(patient_id)],
+        filter_fn=exonic_insert_filter_fn,
+        **kwargs)
+
+@count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     patient = cohort.patient_from_id(row["patient_id"])
     return cohort.load_neoantigens(patients=[patient],
@@ -194,6 +239,16 @@ def expressed_missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kw
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
     return missense_snv_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_snv_count(row=row,
                               cohort=cohort,
                               filter_fn=expressed_filter_fn,
                               normalized_per_mb=normalized_per_mb, **kwargs)
