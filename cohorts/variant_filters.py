@@ -13,11 +13,14 @@
 # limitations under the License.
 
 from .variant_stats import variant_stats_from_variant
+from .utils import get_logger
 
 from varcode import Variant
 from varcode.common import memoize
 import pandas as pd
 from os import path
+
+logger = get_logger(__name__)
 
 def no_filter(filterable_variant):
     return True
@@ -28,6 +31,9 @@ def variant_qc_filter(filterable_variant,
                       min_tumor_vaf,
                       max_normal_vaf,
                       min_tumor_alt_depth):
+    
+    logger.debug('Applying variant_qc_filter with params: min_tumor_depth={}, min_normal_depth={}, min_tumor_vaf={}, max_normal_vaf={}, min_tumor_alt_depth={}'.format(min_tumor_depth, min_normal_depth, min_tumor_vaf, max_normal_vaf, min_tumor_alt_depth))
+    
     somatic_stats = variant_stats_from_variant(filterable_variant.variant,
                                                filterable_variant.variant_metadata)
 

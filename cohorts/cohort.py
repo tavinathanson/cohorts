@@ -22,6 +22,11 @@ import json
 import warnings
 import pprint
 from copy import copy
+import dill
+import hashlib
+import inspect
+import sys
+import logging
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -42,9 +47,10 @@ from isovar.protein_sequence import variants_to_protein_sequences_dataframe
 from pysam import AlignmentFile
 from scipy.stats import pearsonr
 from collections import defaultdict
+from tqdm import tqdm
 
 from .dataframe_loader import DataFrameLoader
-from .utils import DataFrameHolder, first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names
+from .utils import DataFrameHolder, first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names, get_logger
 from .provenance import compare_provenance
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot, stripboxplot, CorrelationResults
@@ -55,6 +61,8 @@ from .varcode_utils import (filter_variants, filter_effects,
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
+
+logger = get_logger(__name__, level=logging.INFO)
 
 class Cohort(Collection):
     """
@@ -319,7 +327,8 @@ class Cohort(Collection):
                 func = lambda row: on(row=row, **kwargs)
             else:
                 func = lambda row: on(row=row, cohort=self, **kwargs)
-            df[col] = df.apply(func, axis=1)
+            tqdm.pandas(desc=col)
+            df[col] = df.progress_apply(func, axis=1)
             return DataFrameHolder(col, df)
 
         def func_name(func, num=0):
@@ -334,8 +343,7 @@ class Cohort(Collection):
         # For multiple functions, don't allow kwargs since we won't know which functions
         # they apply to.
         if len(kwargs) > 0:
-            raise ValueError("kwargs are not supported when collecting multiple functions "
-                             "as we don't know which function they apply to.")
+            logger.warning("Note: kwargs used with multiple functions; passing them to all functions")
 
         if type(on) == dict:
             cols = []
@@ -369,6 +377,7 @@ class Cohort(Collection):
         Instead of joining a DataFrameJoiner with the Cohort in `as_dataframe`, sometimes
         we may want to just directly load a particular DataFrame.
         """
+        logger.debug('loading dataframe: {}'.format(df_loader_name))
         # Get the DataFrameLoader object corresponding to this name.
         df_loaders = [df_loader for df_loader in self.df_loaders if df_loader.name == df_loader_name]
 
@@ -395,12 +404,15 @@ class Cohort(Collection):
     def load_from_cache(self, cache_name, patient_id, file_name):
         if not self.cache_results:
             return None
+        
+        logger.debug('loading patient {} data from {} cache: {}'.format(patient_id, cache_name, file_name))
 
         cache_dir = path.join(self.cache_dir, cache_name)
         patient_cache_dir = path.join(cache_dir, str(patient_id))
         cache_file = path.join(patient_cache_dir, file_name)
 
         if not path.exists(cache_file):
+            logger.debug('... file does not exist. Checking for older format.')
             # We removed variant_type from the cache name. Eventually remove this notification.
             if (path.exists(path.join(patient_cache_dir, "snv-" + file_name)) or
                 path.exists(path.join(patient_cache_dir, "indel-" + file_name))):
@@ -408,22 +420,29 @@ class Cohort(Collection):
             return None
 
         if self.check_provenance:
+            logger.debug('... Checking cache provenance')
             num_discrepant = compare_provenance(
                 this_provenance = self.generate_provenance(),
                 other_provenance = self.load_provenance(patient_cache_dir),
                 left_outer_diff = "In current environment but not cached in %s for patient %s" % (cache_name, patient_id),
                 right_outer_diff = "In cached %s for patient %s but not current" % (cache_name, patient_id)
                 )
-
-        if path.splitext(cache_file)[1] == ".csv":
-            return pd.read_csv(cache_file, dtype={"patient_id": object})
-        else:
-            with open(cache_file, "rb") as f:
-                return pickle.load(f)
+        try:
+            if path.splitext(cache_file)[1] == ".csv":
+                logger.debug('... Loading cache as csv file')
+                return pd.read_csv(cache_file, dtype={"patient_id": object})
+            else:
+                logger.debug('... Loading cache as pickled file')
+                with open(cache_file, "rb") as f:
+                    return pickle.load(f)
+        except:
+            return None
 
     def save_to_cache(self, obj, cache_name, patient_id, file_name):
         if not self.cache_results:
             return
+        
+        logger.debug('saving patient {} data to {} cache: {}'.format(patient_id, cache_name, file_name))
 
         cache_dir = path.join(self.cache_dir, cache_name)
         patient_cache_dir = path.join(cache_dir, str(patient_id))
@@ -453,7 +472,7 @@ class Cohort(Collection):
                 return patient
         raise ValueError("No patient with ID %s found" % id)
 
-    def load_variants(self, patients=None, filter_fn=None):
+    def load_variants(self, patients=None, filter_fn=None, **kwargs):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
         Parameters
@@ -470,23 +489,117 @@ class Cohort(Collection):
             Dictionary of patient_id to VariantCollection
         """
         filter_fn = first_not_none_param([filter_fn, self.filter_fn], no_filter)
+        if filter_fn is None:
+            filter_fn_name = 'None'
+        else:
+            filter_fn_name = filter_fn.__name__
+        logger.debug('loading variants with filter_fn: {}'.format(filter_fn_name))
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
-            variants = self._load_single_patient_variants(patient, filter_fn)
+            variants = self._load_single_patient_variants(patient, filter_fn, **kwargs)
             if variants is not None:
                 patient_variants[patient.id] = variants
         return patient_variants
+    
+    
+    def _hash_filter_fn(self, filter_fn, **kwargs):
+        if filter_fn is None:
+            return 'filter-none'
+        filter_fn_name = filter_fn.__name__
+        logger.debug('Computing hash for filter_fn: {} with kwargs {}'.format(filter_fn_name, str(dict(**kwargs))))
+        # function source code
+        fn_source = str(dill.source.getsource(filter_fn))
+        hashed_fn_source = pickle.dumps(fn_source)
+        # kwarg values
+        kw_dict = dict(**kwargs)
+        kw_hash = list()
+        if not kw_dict:
+            kw_hash = ['default']
+        else:
+            [kw_hash.append('{}-{}'.format(key, h)) for (key, h) in sorted(kw_dict.items())]
+        # closure vars
+        closure = 'null'
+        nonlocals = inspect.getclosurevars(filter_fn).nonlocals
+        for (key, val) in nonlocals.items():
+            if inspect.isfunction(val):
+                closure = '{}-{}'.format(self._hash_filter_fn(val).__name__, self._hash_filter_fn(val))
+        # construct final hashed_fn
+        hashed_fn = '.'.join(['-'.join([filter_fn.__name__,
+                                        int(hashlib.sha1(hashed_fn_source).hexdigest(), 16) % (10 ** 11)]),
+                              '.'.join(kw_hash),
+                              closure]
+                            )
+        return hashed_fn
+            
+        
+    
+    def _load_single_patient_variants(self, patient, filter_fn, use_cache=True, **kwargs):
+        if filter_fn is None:
+            filter_fn_name = 'None'
+        else:
+            filter_fn_name = filter_fn.__name__
+        logger.debug('loading variants for patient {} with filter_fn {}'.format(patient.id, filter_fn_name))
+        use_filtered_cache = use_cache
+        if sys.version_info < (3, 3):
+            logger.debug('... disabling filtered cache due to python version')
+            use_filtered_cache = False
+            
+        ## get cache name, if possible
+        if use_filtered_cache:
+            logger.debug('... identifying filtered-cache file name')
+            try:
+                ## try to load filtered variants from cache
+                filtered_cache_file_name = "%s-variants.%s.pkl" % (self.merge_type,
+                                                                          self._hash_filter_fn(filter_fn, **kwargs))
+            except:
+                use_filtered_cache = False
+        
+        ## read from cache, if possible
+        if use_filtered_cache:
+            logger.debug('... trying to load filtered variants from cache: {}'.format(filtered_cache_file_name))
+            try:
+                cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
+                if cached is not None:
+                    return cached
+            except:
+                logger.warn('Error loading variants from cache for patient: {}'.format(patient.id))
+                pass
+        
+        ## get merged variants
+        logger.debug('... getting merged variants for: {}'.format(patient.id))
+        merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
 
-    def _load_single_patient_variants(self, patient, filter_fn):
+        # Note that this is the number of variant collections and not the number of
+        # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
+        # collections will lead to NaN variants and neoantigens.
+        if merged_variants is None:
+            logger.info("Variants did not exist for patient %s" % patient.id)
+            return None
+        
+        logger.debug('... applying filters to variants for: {}'.format(patient.id))
+        filtered_variants = filter_variants(variant_collection=merged_variants,
+                                            patient=patient,
+                                            filter_fn=filter_fn,
+                                            **kwargs)
+        if use_filtered_cache:
+            logger.debug('... saving filtered variants to cache: {}'.format(filtered_cache_file_name))
+            self.save_to_cache(filtered_variants, self.cache_names["variant"], patient.id, filtered_cache_file_name)
+        return filtered_variants
+
+    
+    def _load_single_patient_merged_variants(self, patient, use_cache=True):
+        logger.debug('loading merged variants for patient {}'.format(patient.id))
         failed_io = False
         try:
-            cached_file_name = "%s-variants.pkl" % self.merge_type
-            cached = self.load_from_cache(self.cache_names["variant"], patient.id, cached_file_name)
-            if cached is not None:
-                return filter_variants(variant_collection=cached,
-                                       patient=patient,
-                                       filter_fn=filter_fn)
+            # get merged-variants from cache
+            if use_cache:
+                ## load unfiltered variants into list of collections
+                variant_cache_file_name = "%s-variants.pkl" % (self.merge_type)
+                merged_variants = self.load_from_cache(self.cache_names["variant"], patient.id, variant_cache_file_name)
+                if merged_variants is not None:
+                    return merged_variants
+            # get variant collections from file
             variant_collections = []
             for patient_variants in patient.variants_list:
                 if type(patient_variants) == str:
@@ -500,29 +613,33 @@ class Cohort(Collection):
                     variant_collections.append(patient_variants)
                 else:
                     raise ValueError("Don't know how to read %s" % patient_variants)
+            # merge variant-collections
+            if len(variant_collections) == 0:
+                failed_io = True
+            elif len(variant_collections) == 1:
+                # There is nothing to merge
+                variants = variant_collections[0]
+                merged_variants = variants
+            else:
+                merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
         except IOError:
             failed_io = True
 
         # Note that this is the number of variant collections and not the number of
         # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
         # collections will lead to NaN variants and neoantigens.
-        if failed_io or len(variant_collections) == 0:
+        if failed_io:
             print("Variants did not exist for patient %s" % patient.id)
             return None
-
-        if len(variant_collections) == 1:
-            # There is nothing to merge
-            variants = variant_collections[0]
-            merged_variants = variants
-        else:
-            merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
-
-        self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, cached_file_name)
-        return filter_variants(variant_collection=merged_variants,
-                               patient=patient,
-                               filter_fn=filter_fn)
-
+        
+        # save merged & filtered variants to file
+        if use_cache:
+            self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, variant_cache_file_name)
+        return merged_variants
+    
+    
     def _merge_variant_collections(self, variant_collections, merge_type):
+        logger.debug('Merging variants using merge type: {}'.format(merge_type))
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
         head = variant_collections[0]
         if merge_type == "union":
@@ -615,7 +732,7 @@ class Cohort(Collection):
                                filter_fn=filter_fn)
 
     def load_effects(self, patients=None, only_nonsynonymous=False,
-                     all_effects=False, filter_fn=None):
+                     all_effects=False, filter_fn=None, **kwargs):
         """Load a dictionary of patient_id to varcode.EffectCollection
 
         Note that this only loads one effect per variant.
@@ -638,16 +755,27 @@ class Cohort(Collection):
              Dictionary of patient_id to varcode.EffectCollection
         """
         filter_fn = first_not_none_param([filter_fn, self.filter_fn], no_filter)
+        if filter_fn is None:
+            logger.warn('Loading patient effects with filter_fn: None')
+            filter_fn_name = 'None'
+        else:
+            filter_fn_name = filter_fn.__name__
+        logger.debug('loading effects with filter_fn {}'.format(filter_fn_name))
         patient_effects = {}
         for patient in self.iter_patients(patients):
             effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, all_effects, filter_fn)
+                patient, only_nonsynonymous, all_effects, filter_fn, **kwargs)
             if effects is not None:
                 patient_effects[patient.id] = effects
         return patient_effects
 
-    def _load_single_patient_effects(self, patient, only_nonsynonymous, all_effects, filter_fn):
+    def _load_single_patient_effects(self, patient, only_nonsynonymous, all_effects, filter_fn, **kwargs):
         cached_file_name = "%s-effects.pkl" % self.merge_type
+        if filter_fn is None:
+            filter_fn_name = 'None'
+        else:
+            filter_fn_name = filter_fn.__name__
+        logger.debug('loading effects for patient {} with filter_fn {}'.format(patient.id, filter_fn_name))
 
         # Don't filter here, as these variants are used to generate the
         # effects cache; and cached items are never filtered.
@@ -668,7 +796,8 @@ class Cohort(Collection):
             return filter_effects(effect_collection=cached,
                                   variant_collection=variants,
                                   patient=patient,
-                                  filter_fn=filter_fn)
+                                  filter_fn=filter_fn,
+                                 **kwargs)
 
         effects = variants.effects()
 
@@ -688,7 +817,8 @@ class Cohort(Collection):
                 nonsynonymous_effects if only_nonsynonymous else effects),
             variant_collection=variants,
             patient=patient,
-            filter_fn=filter_fn)
+            filter_fn=filter_fn,
+            **kwargs)
 
     def load_kallisto(self):
         """
