@@ -63,6 +63,8 @@ def expressed_variant_set(patient, variant_collection):
         patient=patient,
         variants=variant_collection,
         epitope_lengths=[8, 9, 10, 11])
+    if df_isovar is None:
+        return None
     expressed_variant_set = set()
     for _, row in df_isovar.iterrows():
         expressed_variant = Variant(contig=row["chr"],
@@ -77,6 +79,8 @@ def variant_expressed_filter(filterable_variant, **kwargs):
     expressed_variants = expressed_variant_set(
         patient=filterable_variant.patient,
         variant_collection=filterable_variant.variant_collection)
+    if expressed_variants is None:
+        return None
     return filterable_variant.variant in expressed_variants
 
 def effect_expressed_filter(filterable_effect, **kwargs):

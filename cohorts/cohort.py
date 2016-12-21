@@ -1051,13 +1051,22 @@ class Cohort(Collection):
         if df_isovar is not None:
             return df_isovar
 
-        import logging
-        logging.disable(logging.INFO)
         if patient.tumor_sample is None:
-            raise ValueError("Patient %s has no tumor sample" % patient.id)
+            logger.debug("Patient %s has no tumor sample" % patient.id)
+            return None
         if patient.tumor_sample.bam_path_rna is None:
-            raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
-        rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
+            logger.debug("Patient %s has no tumor RNA BAM path" % patient.id)
+            return None
+        
+        #import logging
+        #logging.disable(logging.INFO)
+        try:
+            rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
+        except ValueError as e:
+            logger.warning('Error loading RNA bam file for patient {}: {}'\
+                           .format(patient.id, patient.tumor_sample.bam_path_rna))
+            print(str(e))
+            return None
         from isovar.default_parameters import (
             MIN_TRANSCRIPT_PREFIX_LENGTH,
             MAX_REFERENCE_TRANSCRIPT_MISMATCHES
