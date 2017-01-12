@@ -17,4 +17,4 @@ patsy>=0.4.1
 mock>=2.0.0
 serializable>=0.0.8
 dill>=0.2.5
-tqdm
+tqdm>=4.10.0
