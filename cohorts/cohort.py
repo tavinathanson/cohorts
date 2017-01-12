@@ -510,7 +510,7 @@ class Cohort(Collection):
         logger.debug('Computing hash for filter_fn: {} with kwargs {}'.format(filter_fn_name, str(dict(**kwargs))))
         # function source code
         fn_source = str(dill.source.getsource(filter_fn))
-        hashed_fn_source = pickle.dumps(fn_source)
+        pickled_fn_source = pickle.dumps(fn_source)
         # kwarg values
         kw_dict = dict(**kwargs)
         kw_hash = list()
@@ -526,7 +526,7 @@ class Cohort(Collection):
                 closure = '{}-{}'.format(self._hash_filter_fn(val).__name__, self._hash_filter_fn(val))
         # construct final hashed_fn
         hashed_fn = '.'.join(['-'.join([filter_fn.__name__,
-                                        int(hashlib.sha1(hashed_fn_source).hexdigest(), 16) % (10 ** 11)]),
+                                        int(hashlib.sha1(pickled_fn_source).hexdigest(), 16) % (10 ** 11)]),
                               '.'.join(kw_hash),
                               closure]
                             )
