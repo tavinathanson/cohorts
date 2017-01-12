@@ -48,25 +48,22 @@ def _strelka_variant_stats(variant, sample_info):
     VariantStats
     """
     
-    try:
-        if variant.is_deletion or variant.is_insertion:
-            # ref: https://sites.google.com/site/strelkasomaticvariantcaller/home/somatic-variant-output
-            #depth = int(sample_info['DP']) # read depth for tier 1
-            ref_depth = int(sample_info['TAR'][0]) # number of reads supporting ref allele (non-deletion)
-            alt_depth = int(sample_info['TIR'][0]) # number of reads supporting alt allele (deletion)
-            depth = ref_depth + alt_depth
-        else:
-            # Retrieve the Tier 1 counts from Strelka
-            ref_depth = int(sample_info[variant.ref+"U"][0])
-            alt_depth = int(sample_info[variant.alt+"U"][0])
-            depth = alt_depth + ref_depth
-        if depth > 0:
-            vaf = float(alt_depth) / depth
-        else:
-            vaf = None
-    except:
-        import pdb
-        pdb.set_trace()
+    if variant.is_deletion or variant.is_insertion:
+        # ref: https://sites.google.com/site/strelkasomaticvariantcaller/home/somatic-variant-output
+        #depth = int(sample_info['DP']) # read depth for tier 1
+        # not sure why this depth is different from the sum of ref + alt
+        ref_depth = int(sample_info['TAR'][0]) # number of reads supporting ref allele (non-deletion)
+        alt_depth = int(sample_info['TIR'][0]) # number of reads supporting alt allele (deletion)
+        depth = ref_depth + alt_depth
+    else:
+        # Retrieve the Tier 1 counts from Strelka
+        ref_depth = int(sample_info[variant.ref+"U"][0])
+        alt_depth = int(sample_info[variant.alt+"U"][0])
+        depth = alt_depth + ref_depth
+    if depth > 0:
+        vaf = float(alt_depth) / depth
+    else:
+        vaf = None
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
 
