@@ -39,8 +39,6 @@ class Patient(object):
         Has the patient seen a durable clinical benefit?
     variants : str or VariantCollection or list
         VCF or MAF path, VariantCollection, or list of some combination of those.
-    indel_vcf_paths : list
-        List of paths to indel VCFs for this patient; multple VCFs get merged.
     normal_sample : Sample
         This patient's normal `Sample`.
     tumor_sample: Sample

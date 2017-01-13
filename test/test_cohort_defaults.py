@@ -32,7 +32,7 @@ from .test_count import make_cohort
 
 FILE_FORMAT_1 = "patient_format1_%s.vcf"
 
-def test_default_filter_fn():
+def test_default_filter_fn(summary_fn=variant_count):
     """
     Test that filter_fn falls back to the Cohort default but can be overridden.
     """
@@ -43,31 +43,39 @@ def test_default_filter_fn():
 
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
 
-        df = cohort.as_dataframe(snv_count)
+        cols, df = cohort.as_dataframe(summary_fn, return_cols=True)
         eq_(len(df), 3)
-        eq_(list(df["snv_count"]), [3, 3, 6])
+        eq_(list(df[cols[1]]), [3, 3, 6])
 
         cohort.filter_fn = default_filter_fn
-        df = cohort.as_dataframe(snv_count)
+        cols, df = cohort.as_dataframe(summary_fn, return_cols=True)
         eq_(len(df), 3)
-        eq_(list(df["snv_count"]), [2, 2, 5])
+        eq_(list(df[cols[1]]), [2, 2, 5])
 
-        df = cohort.as_dataframe(snv_count, filter_fn=None)
-        eq_(list(df["snv_count"]), [2, 2, 5])
+        cols, df = cohort.as_dataframe(summary_fn, filter_fn=None, return_cols=True)
+        eq_(list(df[cols[1]]), [2, 2, 5])
 
-        df = cohort.as_dataframe(snv_count, filter_fn=no_filter)
-        eq_(list(df["snv_count"]), [3, 3, 6])
+        cols, df = cohort.as_dataframe(summary_fn, filter_fn=no_filter, return_cols=True)
+        eq_(list(df[cols[1]]), [3, 3, 6])
 
         def another_filter_fn(filterable_variant):
             return default_filter_fn(filterable_variant) and filterable_variant.variant.start != 49658590
-        df = cohort.as_dataframe(snv_count, filter_fn=another_filter_fn)
-        eq_(list(df["snv_count"]), [1, 1, 4])
+        cols, df = cohort.as_dataframe(summary_fn, filter_fn=another_filter_fn, return_cols=True)
+        eq_(list(df[cols[1]]), [1, 1, 4])
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
         if cohort is not None:
             cohort.clear_caches()
 
+            
+def test_default_filter_fn_with_snv_count():
+    """
+    Test that filter_fn falls back to the Cohort default but can be overridden.
+    """
+    test_default_filter_fn(snv_count)
+
+            
 def test_default_normalized_per_mb():
     """
     Test that normalized_per_mb falls back to the Cohort default but can be overridden.
@@ -142,7 +150,7 @@ def test_default_filter_fn_multiple_functions():
         cohort.load_single_patient_isovar = MagicMock(side_effect=mock_function)
 
         # Especially need to include expressed_missense_snv_count, which works a little differently.
-        for count_func in [snv_count, missense_snv_count, expressed_missense_snv_count]:
+        for count_func in [variant_count, snv_count, missense_snv_count, expressed_missense_snv_count]:
             count_col = count_func.__name__
 
             # No Cohort default

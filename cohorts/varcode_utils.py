@@ -62,7 +62,7 @@ class FilterablePolyphen(FilterableVariant):
                                    variant_collection=variant_collection,
                                    patient=patient)
 
-def filter_variants(variant_collection, patient, filter_fn):
+def filter_variants(variant_collection, patient, filter_fn, **kwargs):
     """Filter variants from the Variant Collection
 
     Parameters
@@ -82,14 +82,15 @@ def filter_variants(variant_collection, patient, filter_fn):
             variant
             for variant in variant_collection
             if filter_fn(FilterableVariant(
-                    variant=variant,
-                    variant_collection=variant_collection,
-                    patient=patient))
+                        variant=variant,
+                        variant_collection=variant_collection,
+                        patient=patient,
+                        ), **kwargs)
         ])
     else:
         return variant_collection
 
-def filter_effects(effect_collection, variant_collection, patient, filter_fn):
+def filter_effects(effect_collection, variant_collection, patient, filter_fn, **kwargs):
     """Filter variants from the Effect Collection
 
     Parameters
@@ -112,7 +113,7 @@ def filter_effects(effect_collection, variant_collection, patient, filter_fn):
             if filter_fn(FilterableEffect(
                     effect=effect,
                     variant_collection=variant_collection,
-                    patient=patient))])
+                    patient=patient), **kwargs)])
     else:
         return effect_collection
 
