@@ -4,10 +4,8 @@ import numpy as np
 VariantStats = namedtuple("VariantStats",
                           ["depth", "alt_depth", "variant_allele_frequency"])
 
-
 SomaticVariantStats = namedtuple("SomaticVariantStats",
                           ["tumor_stats", "normal_stats"])
-
 
 def strelka_somatic_variant_stats(variant, variant_metadata):
     """Parse out the variant calling statistics for a given variant from a Strelka VCF
@@ -27,9 +25,6 @@ def strelka_somatic_variant_stats(variant, variant_metadata):
     sample_info = variant_metadata["sample_info"]
     # Ensure there are exactly two samples in the VCF, a tumor and normal
     assert len(sample_info) == 2, "More than two samples found in the somatic VCF"
-    
-
-    
     tumor_stats = _strelka_variant_stats(variant, sample_info["TUMOR"])
     normal_stats = _strelka_variant_stats(variant, sample_info["NORMAL"])
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
@@ -50,8 +45,6 @@ def _strelka_variant_stats(variant, sample_info):
     
     if variant.is_deletion or variant.is_insertion:
         # ref: https://sites.google.com/site/strelkasomaticvariantcaller/home/somatic-variant-output
-        #depth = int(sample_info['DP']) # read depth for tier 1
-        # not sure why this depth is different from the sum of ref + alt
         ref_depth = int(sample_info['TAR'][0]) # number of reads supporting ref allele (non-deletion)
         alt_depth = int(sample_info['TIR'][0]) # number of reads supporting alt allele (deletion)
         depth = ref_depth + alt_depth
@@ -63,6 +56,8 @@ def _strelka_variant_stats(variant, sample_info):
     if depth > 0:
         vaf = float(alt_depth) / depth
     else:
+        # unclear how to define vaf if no reads support variant
+        # up to user to interpret this (hopefully filtered out in QC settings)
         vaf = None
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
@@ -119,7 +114,6 @@ def _mutect_variant_stats(variant, sample_info):
     vaf = float(alt_depth) / depth
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
-
 
 def variant_stats_from_variant(variant,
                                metadata,

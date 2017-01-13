@@ -68,7 +68,6 @@ def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
 
-
 @count_function
 def variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     patient_id = row["patient_id"]
@@ -104,18 +103,16 @@ def snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         **kwargs)
 
 @count_function
-def indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+def deletion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     patient_id = row["patient_id"]
-    def indel_filter_fn(filterable_variant, **kwargs):
+    def deletion_filter_fn(filterable_variant, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (filterable_variant.variant.is_indel and
                 filter_fn(filterable_variant=filterable_variant, **kwargs))
     return cohort.load_variants(
         patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=indel_filter_fn,
+        filter_fn=deletion_filter_fn,
         **kwargs)
-
-
 
 @count_function
 def effect_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
@@ -126,7 +123,6 @@ def effect_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         patients=[cohort.patient_from_id(patient_id)],
         filter_fn=filter_fn,
         **kwargs)
-    
 
 @count_function
 def nonsynonymous_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
@@ -155,7 +151,7 @@ def missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
 
 @count_function
 def exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_filter_fn(filterable_effect, **kwargs):
+    def exonic_snv_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (isinstance(filterable_effect.effect, Exonic) and
                 filterable_effect.variant.is_snv and
@@ -165,7 +161,7 @@ def exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     return cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_filter_fn,
+        filter_fn=exonic_snv_filter_fn,
         **kwargs)
 
 @count_function
@@ -184,8 +180,8 @@ def exonic_silent_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs)
         **kwargs)
 
 @count_function
-def exonic_indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_indel_filter_fn(filterable_effect, **kwargs):
+def exonic_deletion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def exonic_deletion_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (isinstance(filterable_effect.effect, Exonic) and
                 filterable_effect.variant.is_deletion and
@@ -195,12 +191,12 @@ def exonic_indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     return cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_indel_filter_fn,
+        filter_fn=exonic_deletion_filter_fn,
         **kwargs)
 
 @count_function
-def exonic_insert_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_insert_filter_fn(filterable_effect, **kwargs):
+def exonic_insertion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def exonic_insertion_filter_fn(filterable_effect, **kwargs):
         assert filter_fn is not None, "filter_fn should never be None, but it is."
         return (isinstance(filterable_effect.effect, Exonic) and
                 filterable_effect.variant.is_insertion and
@@ -210,7 +206,7 @@ def exonic_insert_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     return cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_insert_filter_fn,
+        filter_fn=exonic_insertion_filter_fn,
         **kwargs)
 
 @count_function
