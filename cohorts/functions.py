@@ -120,4 +120,7 @@ def expressed_missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kw
 def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     return neoantigen_count(row=row,
                             cohort=cohort,
-                            only_expressed=True, **kwargs)
+                            filter_fn=filter_fn,
+                            normalized_per_mb=normalized_per_mb,
+                            only_expressed=True,
+                            **kwargs)

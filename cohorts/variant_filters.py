@@ -49,7 +49,9 @@ def variant_qc_filter(filterable_variant,
     return True
 
 @memoize
-def expressed_variant_set(patient, variant_collection):
+def expressed_variant_set(cohort, patient, variant_collection):
+    # Warning: we previously had an issue where we used the same
+    # memoized set across different cohorts.
     # TODO: we're currently using the same isovar cache that we use for expressed
     # neoantigen prediction; so we pass in the same epitope lengths.
     # This is hacky and should be addressed.
@@ -69,6 +71,7 @@ def expressed_variant_set(patient, variant_collection):
 
 def variant_expressed_filter(filterable_variant, **kwargs):
     expressed_variants = expressed_variant_set(
+        cohort=filterable_variant.patient.cohort,
         patient=filterable_variant.patient,
         variant_collection=filterable_variant.variant_collection)
     return filterable_variant.variant in expressed_variants
