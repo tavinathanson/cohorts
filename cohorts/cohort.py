@@ -38,7 +38,8 @@ from varcode import EffectCollection, VariantCollection
 from mhctools import NetMHCcons, EpitopeCollection
 from topiary import predict_epitopes_from_variants, epitopes_to_dataframe
 from topiary.sequence_helpers import contains_mutant_residues
-from isovar.protein_sequence import variants_to_protein_sequences_dataframe
+from isovar.allele_reads import reads_overlapping_variants
+from isovar.protein_sequences import reads_generator_to_protein_sequences_generator, protein_sequences_generator_to_dataframe
 from pysam import AlignmentFile
 from scipy.stats import pearsonr
 from collections import defaultdict
@@ -928,10 +929,6 @@ class Cohort(Collection):
         if patient.tumor_sample.bam_path_rna is None:
             raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
         rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
-        from isovar.default_parameters import (
-            MIN_TRANSCRIPT_PREFIX_LENGTH,
-            MAX_REFERENCE_TRANSCRIPT_MISMATCHES
-        )
 
         # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
         # sequence length: (max peptide length * 2) - 1
@@ -940,15 +937,18 @@ class Cohort(Collection):
         #           123456789AB
         # AAAAAAAAAAVAAAAAAAAAA
         protein_sequence_length = (max(epitope_lengths) * 2) - 1
-        df_isovar = variants_to_protein_sequences_dataframe(
+        allele_reads_generator = reads_overlapping_variants(
             variants=variants,
             samfile=rna_bam_file,
-            protein_sequence_length=protein_sequence_length,
-            min_reads_supporting_rna_sequence=3, # Per Alex R.'s suggestion
-            min_transcript_prefix_length=MIN_TRANSCRIPT_PREFIX_LENGTH,
-            max_transcript_mismatches=MAX_REFERENCE_TRANSCRIPT_MISMATCHES,
-            max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
             min_mapping_quality=1)
+        protein_sequences_generator = reads_generator_to_protein_sequences_generator(
+            allele_reads_generator,
+            protein_sequence_length=protein_sequence_length,
+            # Per Alex R.'s suggestion; equivalent to min_reads_supporting_rna_sequence previously
+            min_variant_sequence_coverage=3,
+            max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
+            variant_sequence_assembly=False)
+        df_isovar = protein_sequences_generator_to_dataframe(protein_sequences_generator)
         self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         return df_isovar
 
