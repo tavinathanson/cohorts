@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.5.1](https://github.com/hammerlab/cohorts/tree/0.5.1) (2017-01-17)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.0...0.5.1)
+
+**Merged pull requests:**
+
+- Upgrade isovar to the latest version in cohorts [\#177](https://github.com/hammerlab/cohorts/pull/177) ([tavinathanson](https://github.com/tavinathanson))
+- Pre-merge exonic counts into develop [\#172](https://github.com/hammerlab/cohorts/pull/172) ([jburos](https://github.com/jburos))
+
 ## [0.5.0](https://github.com/hammerlab/cohorts/tree/0.5.0) (2016-12-17)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.4.2...0.5.0)
 
