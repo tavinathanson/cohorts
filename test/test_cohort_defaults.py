@@ -34,7 +34,7 @@ FILE_FORMAT_1 = "patient_format1_%s.vcf"
 
 def test_default_filter_fn(summary_fn=variant_count):
     """
-    Test that filter_fn falls back to the Cohort default but can be overridden.
+    Test that variant_count filter_fn falls back to the Cohort default but can be overridden.
     """
     vcf_dir, cohort = None, None
     try:
@@ -43,25 +43,25 @@ def test_default_filter_fn(summary_fn=variant_count):
 
         vcf_dir, cohort = make_cohort([FILE_FORMAT_1])
 
-        cols, df = cohort.as_dataframe(summary_fn, return_cols=True)
+        col, df = cohort.as_dataframe(summary_fn, return_cols=True)
         eq_(len(df), 3)
-        eq_(list(df[cols[1]]), [3, 3, 6])
+        eq_(list(df[col]), [3, 3, 6])
 
         cohort.filter_fn = default_filter_fn
-        cols, df = cohort.as_dataframe(summary_fn, return_cols=True)
+        col, df = cohort.as_dataframe(summary_fn, return_cols=True)
         eq_(len(df), 3)
-        eq_(list(df[cols[1]]), [2, 2, 5])
+        eq_(list(df[col]), [2, 2, 5])
 
-        cols, df = cohort.as_dataframe(summary_fn, filter_fn=None, return_cols=True)
-        eq_(list(df[cols[1]]), [2, 2, 5])
+        col, df = cohort.as_dataframe(summary_fn, filter_fn=None, return_cols=True)
+        eq_(list(df[col]), [2, 2, 5])
 
-        cols, df = cohort.as_dataframe(summary_fn, filter_fn=no_filter, return_cols=True)
-        eq_(list(df[cols[1]]), [3, 3, 6])
+        col, df = cohort.as_dataframe(summary_fn, filter_fn=no_filter, return_cols=True)
+        eq_(list(df[col]), [3, 3, 6])
 
         def another_filter_fn(filterable_variant):
             return default_filter_fn(filterable_variant) and filterable_variant.variant.start != 49658590
-        cols, df = cohort.as_dataframe(summary_fn, filter_fn=another_filter_fn, return_cols=True)
-        eq_(list(df[cols[1]]), [1, 1, 4])
+        col, df = cohort.as_dataframe(summary_fn, filter_fn=another_filter_fn, return_cols=True)
+        eq_(list(df[col]), [1, 1, 4])
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
@@ -71,7 +71,7 @@ def test_default_filter_fn(summary_fn=variant_count):
             
 def test_default_filter_fn_with_snv_count():
     """
-    Test that filter_fn falls back to the Cohort default but can be overridden.
+    Test that snv_count filter_fn (which using closure) falls back to the Cohort default but can be overridden.
     """
     test_default_filter_fn(snv_count)
 
