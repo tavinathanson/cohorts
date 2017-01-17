@@ -126,12 +126,16 @@ def effect_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
 
 @count_function
 def nonsynonymous_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def snv_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return (filterable_effect.variant.is_snv and
+                filter_fn(filterable_effect, **kwargs))
     # This only loads one effect per variant.
     patient_id = row["patient_id"]
     return cohort.load_effects(
         only_nonsynonymous=True,
         patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=filter_fn,
+        filter_fn=snv_filter_fn,
         **kwargs)
 
 @count_function
