@@ -556,7 +556,7 @@ class Cohort(Collection):
             logger.info("... disabling filtered cache due to python version")
             use_filtered_cache = False
             
-        ## get cache name, if possible
+        ## confirm that we can get cache-name (else don't use filtered cache)
         if use_filtered_cache:
             logger.debug("... identifying filtered-cache file name")
             try:
@@ -564,18 +564,18 @@ class Cohort(Collection):
                 filtered_cache_file_name = "%s-variants.%s.pkl" % (self.merge_type,
                                                                    self._hash_filter_fn(filter_fn, **kwargs))
             except:
+                logger.warning("... error identifying filtered-cache file name for patient {}: {}".format(
+                        patient.id, filter_fn_name))
                 use_filtered_cache = False
-        
-        ## read from cache, if possible
-        if use_filtered_cache:
-            logger.debug("... trying to load filtered variants from cache: {}".format(filtered_cache_file_name))
-            try:
-                cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
-                if cached is not None:
-                    return cached
-            except:
-                logger.warn("Error loading variants from cache for patient: {}".format(patient.id))
-                pass
+            finally:
+                logger.debug("... trying to load filtered variants from cache: {}".format(filtered_cache_file_name))
+                try:
+                    cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
+                    if cached is not None:
+                        return cached
+                except:
+                    logger.warning("Error loading variants from cache for patient: {}".format(patient.id))
+                    pass
         
         ## get merged variants
         logger.debug("... getting merged variants for: {}".format(patient.id))
