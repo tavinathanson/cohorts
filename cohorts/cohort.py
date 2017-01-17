@@ -567,7 +567,7 @@ class Cohort(Collection):
                 logger.warning("... error identifying filtered-cache file name for patient {}: {}".format(
                         patient.id, filter_fn_name))
                 use_filtered_cache = False
-            finally:
+            else:
                 logger.debug("... trying to load filtered variants from cache: {}".format(filtered_cache_file_name))
                 try:
                     cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
