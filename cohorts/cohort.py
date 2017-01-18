@@ -494,7 +494,10 @@ class Cohort(Collection):
                     if ".vcf" in patient_variants:
                         variant_collections.append(varcode.load_vcf_fast(patient_variants))
                     elif ".maf" in patient_variants:
-                        variant_collections.append(varcode.load_maf(patient_variants))
+                        # See variant_stats.maf_somatic_variant_stats
+                        variant_collections.append(
+                            varcode.load_maf(patient_variants, optional_cols=[
+                                "t_ref_count", "t_alt_count", "n_ref_count", "n_alt_count"]))
                     else:
                         raise ValueError("Don't know how to read %s" % patient_variants)
                 elif type(patient_variants) == VariantCollection:

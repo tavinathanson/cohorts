@@ -1,13 +1,9 @@
 from collections import namedtuple
 
-
 VariantStats = namedtuple("VariantStats",
                           ["depth", "alt_depth", "variant_allele_frequency"])
-
-
 SomaticVariantStats = namedtuple("SomaticVariantStats",
                           ["tumor_stats", "normal_stats"])
-
 
 def strelka_somatic_variant_stats(variant, variant_metadata):
     """Parse out the variant calling statistics for a given variant from a Strelka VCF
@@ -107,19 +103,49 @@ def _mutect_variant_stats(variant, sample_info):
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
 
+def _maf_variant_stats(variant, variant_metadata, prefix="t"):
+    ref_depth = variant_metadata["%s_ref_count" % prefix]
+    alt_depth = variant_metadata["%s_alt_count" % prefix]
+    depth = int(ref_depth) + int(alt_depth)
+    vaf = float(alt_depth) / depth
+    return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
+
+def maf_somatic_variant_stats(variant, variant_metadata):
+    """
+    Parse out the variant calling statistics for a given variant from a MAF file
+
+    Assumes the MAF format described here: https://www.biostars.org/p/161298/#161777
+
+    Parameters
+    ----------
+    variant : varcode.Variant
+    variant_metadata : dict
+        Dictionary of metadata for this variant
+
+    Returns
+    -------
+    SomaticVariantStats
+    """
+    tumor_stats = None
+    normal_stats = None
+    if "t_ref_count" in variant_metadata:
+        tumor_stats = _maf_variant_stats(variant, variant_metadata, prefix="t")
+    if "n_ref_count" in variant_metadata:
+        normal_stats = _maf_variant_stats(variant, variant_metadata, prefix="n")
+    return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
 
 def variant_stats_from_variant(variant,
                                metadata,
                                merge_fn=(lambda all_stats: \
                                 max(all_stats, key=(lambda stats: stats.tumor_stats.depth)))):
-    """Parse the variant calling stats from a variant called from multiple VCFs. The stats are merged
+    """Parse the variant calling stats from a variant called from multiple variant files. The stats are merged
     based on `merge_fn`
 
     Parameters
     ----------
     variant : varcode.Variant
     metadata : dict
-        Dictionary of VCF to variant calling metadata from that VCF file
+        Dictionary of variant file to variant calling metadata from that file
     merge_fn : function
         Function from list of SomaticVariantStats to single SomaticVariantStats.
         This is used if a variant is called by multiple callers or appears in multiple VCFs.
@@ -129,15 +155,15 @@ def variant_stats_from_variant(variant,
     -------
     SomaticVariantStats
     """
-
     all_stats = []
-    for (vcf, variant_metadata) in metadata.items():
-        if "strelka" in vcf.lower():
+    for (variant_file, variant_metadata) in metadata.items():
+        if ".maf" in variant_file.lower():
+            stats = maf_somatic_variant_stats(variant, variant_metadata)
+        elif "strelka" in variant_file.lower():
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
-        elif "mutect" in vcf.lower():
+        elif "mutect" in variant_file.lower():
             stats = mutect_somatic_variant_stats(variant, variant_metadata)
         else:
-            raise ValueError("Cannot parse sample fields, VCF file {} is from an unsupported caller.".format(vcf))
+            raise ValueError("Cannot parse sample fields, variant file {} is from an unsupported caller.".format(variant_file))
         all_stats.append(stats)
-
     return merge_fn(all_stats)
