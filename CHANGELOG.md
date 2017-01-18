@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.5.2](https://github.com/hammerlab/cohorts/tree/0.5.2) (2017-01-18)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.1...0.5.2)
+
+**Merged pull requests:**
+
+- Grab VAFs from MAFs [\#179](https://github.com/hammerlab/cohorts/pull/179) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.5.1](https://github.com/hammerlab/cohorts/tree/0.5.1) (2017-01-17)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.0...0.5.1)
 
