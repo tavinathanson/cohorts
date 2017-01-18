@@ -103,9 +103,9 @@ def _mutect_variant_stats(variant, sample_info):
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
 
-def _maf_variant_stats(variant, metadata, prefix="t"):
-    ref_depth = metadata["%s_ref_count" % prefix]
-    alt_depth = metadata["%s_alt_count" % prefix]
+def _maf_variant_stats(variant, variant_metadata, prefix="t"):
+    ref_depth = variant_metadata["%s_ref_count" % prefix]
+    alt_depth = variant_metadata["%s_alt_count" % prefix]
     depth = int(ref_depth) + int(alt_depth)
     vaf = float(alt_depth) / depth
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
@@ -120,7 +120,7 @@ def maf_somatic_variant_stats(variant, variant_metadata):
     ----------
     variant : varcode.Variant
     variant_metadata : dict
-        Dictionary of variants to variant_metadata dictionaries
+        Dictionary of metadata for this variant
 
     Returns
     -------
@@ -128,11 +128,10 @@ def maf_somatic_variant_stats(variant, variant_metadata):
     """
     tumor_stats = None
     normal_stats = None
-    metadata = variant_metadata[variant]
-    if "t_ref_count" in metadata:
-        tumor_stats = _maf_variant_stats(variant, metadata, prefix="t")
-    if "n_ref_count" in metadata:
-        normal_stats = _maf_variant_stats(variant, metadata, prefix="n")
+    if "t_ref_count" in variant_metadata:
+        tumor_stats = _maf_variant_stats(variant, variant_metadata, prefix="t")
+    if "n_ref_count" in variant_metadata:
+        normal_stats = _maf_variant_stats(variant, variant_metadata, prefix="n")
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
 
 def variant_stats_from_variant(variant,
