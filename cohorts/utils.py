@@ -179,11 +179,9 @@ def strip_column_names(cols, keep_paren_contents=True):
 
     return dict(zip(cols, new_cols))
 
-def get_logger(name):
+def get_logger(name, level=logging.INFO):
     logger = logging.getLogger(name)
     if logger.handlers:
         logger.handlers = []
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    logger.addHandler(stdout_handler)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
     return logger
