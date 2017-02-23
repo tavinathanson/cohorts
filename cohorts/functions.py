@@ -22,6 +22,7 @@ import numpy as np
 from varcode.effects import Substitution
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic
+import inspect
 
 def use_defaults(func):
     """
@@ -87,6 +88,7 @@ def count_variants_function_builder(function_name, filterable_variant_function=N
             filter_fn=count_filter_fn,
             **kwargs)
     count.__name__ = function_name
+    count.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
     return count
 
 def count_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None):
@@ -110,6 +112,8 @@ def count_effects_function_builder(function_name, only_nonsynonymous, filterable
             filter_fn=count_filter_fn,
             **kwargs)
     count.__name__ = function_name
+    count.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) +
+                     str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
     return count
 
 variant_count = count_variants_function_builder("variant_count")
