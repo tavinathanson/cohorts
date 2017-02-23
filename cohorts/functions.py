@@ -69,6 +69,12 @@ def get_patient_to_mb(cohort):
     return patient_to_mb
 
 def count_variants_function_builder(function_name, filterable_variant_function=None):
+    """
+    Creates a function that counts variants that are filtered by the provided filterable_variant_function.
+    The filterable_variant_function is a function that takes a filterable_variant and returns True or False.
+
+    Users of this builder need not worry about applying e.g. the Cohort's default `filter_fn`. That will be applied as well.
+    """
     @count_function
     def count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         def count_filter_fn(filterable_variant, **kwargs):
@@ -84,6 +90,12 @@ def count_variants_function_builder(function_name, filterable_variant_function=N
     return count
 
 def count_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None):
+    """
+    Create a function that counts effects that are filtered by the provided filterable_effect_function.
+    The filterable_effect_function is a function that takes a filterable_effect and returns True or False.
+
+    Users of this builder need not worry about applying e.g. the Cohort's default `filter_fn`. That will be applied as well.
+    """
     @count_function
     def count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         def count_filter_fn(filterable_effect, **kwargs):
