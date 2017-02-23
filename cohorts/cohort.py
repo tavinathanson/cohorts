@@ -341,8 +341,6 @@ class Cohort(Collection):
         if type(on) == FunctionType:
             return apply_func(on, func_name(on), df).return_self(return_cols)
 
-        # For multiple functions, don't allow kwargs since we won't know which functions
-        # they apply to.
         if len(kwargs) > 0:
             logger.warning("Note: kwargs used with multiple functions; passing them to all functions")
 
@@ -405,7 +403,7 @@ class Cohort(Collection):
     def load_from_cache(self, cache_name, patient_id, file_name):
         if not self.cache_results:
             return None
-        
+
         logger.debug("loading patient {} data from {} cache: {}".format(patient_id, cache_name, file_name))
 
         cache_dir = path.join(self.cache_dir, cache_name)
@@ -442,7 +440,7 @@ class Cohort(Collection):
     def save_to_cache(self, obj, cache_name, patient_id, file_name):
         if not self.cache_results:
             return
-        
+
         logger.debug("saving patient {} data to {} cache: {}".format(patient_id, cache_name, file_name))
 
         cache_dir = path.join(self.cache_dir, cache_name)
@@ -481,7 +479,7 @@ class Cohort(Collection):
         else:
             fn_name = fn.__name__
         return fn_name
-    
+
     def load_variants(self, patients=None, filter_fn=None, **kwargs):
         """Load a dictionary of patient_id to varcode.VariantCollection
 
@@ -540,14 +538,14 @@ class Cohort(Collection):
                               closure]
                             )
         return hashed_fn
-    
+
     def _load_single_patient_variants(self, patient, filter_fn, use_cache=True, **kwargs):
         """ Load filtered, merged variants for a single patient, optionally using cache
-        
-            Note that filtered variants are first merged before filtering, and 
+
+            Note that filtered variants are first merged before filtering, and
                 each step is cached independently. Turn on debug statements for more
                 details about cached files.
-                
+
             Use `_load_single_patient_merged_variants` to see merged variants without filtering.
         """
         filter_fn_name = self._get_function_name(filter_fn)
@@ -556,7 +554,7 @@ class Cohort(Collection):
         if sys.version_info < (3, 3):
             logger.info("... disabling filtered cache due to python version")
             use_filtered_cache = False
-            
+
         ## confirm that we can get cache-name (else don't use filtered cache)
         if use_filtered_cache:
             logger.debug("... identifying filtered-cache file name")
@@ -577,7 +575,7 @@ class Cohort(Collection):
                 except:
                     logger.warning("Error loading variants from cache for patient: {}".format(patient.id))
                     pass
-        
+
         ## get merged variants
         logger.debug("... getting merged variants for: {}".format(patient.id))
         merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
@@ -586,7 +584,7 @@ class Cohort(Collection):
         if merged_variants is None:
             logger.info("Variants did not exist for patient %s" % patient.id)
             return None
-        
+
         logger.debug("... applying filters to variants for: {}".format(patient.id))
         filtered_variants = filter_variants(variant_collection=merged_variants,
                                             patient=patient,
@@ -596,11 +594,11 @@ class Cohort(Collection):
             logger.debug("... saving filtered variants to cache: {}".format(filtered_cache_file_name))
             self.save_to_cache(filtered_variants, self.cache_names["variant"], patient.id, filtered_cache_file_name)
         return filtered_variants
-    
+
     def _load_single_patient_merged_variants(self, patient, use_cache=True):
         """ Load merged variants for a single patient, optionally using cache
-        
-            Note that merged variants are not filtered. 
+
+            Note that merged variants are not filtered.
             Use `_load_single_patient_variants` to get filtered variants
         """
         logger.debug("loading merged variants for patient {}".format(patient.id))
@@ -648,12 +646,12 @@ class Cohort(Collection):
         if no_variants:
             print("Variants did not exist for patient %s" % patient.id)
             merged_variants = None
-        
+
         # save merged variants to file
         if use_cache:
             self.save_to_cache(merged_variants, self.cache_names["variant"], patient.id, variant_cache_file_name)
         return merged_variants
-    
+
     def _merge_variant_collections(self, variant_collections, merge_type):
         logger.debug("Merging variants using merge type: {}".format(merge_type))
         assert merge_type in ["union", "intersection"], "Unknown merge type: %s" % merge_type
