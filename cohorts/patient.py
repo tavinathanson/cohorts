@@ -77,7 +77,8 @@ class Patient(object):
         self.hla_alleles = hla_alleles
         self.additional_data = additional_data
 
-        set_attributes(self, self.additional_data)
+        if self.additional_data is not None:
+            set_attributes(self, self.additional_data)
 
         # TODO: This can be removed once all patient-specific functions are
         # removed from Cohort.

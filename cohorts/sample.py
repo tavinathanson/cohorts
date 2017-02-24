@@ -49,4 +49,5 @@ class Sample(object):
         self.kallisto_path = kallisto_path
         self.additional_data = additional_data
 
-        set_attributes(self, self.additional_data)
+        if self.additional_data is not None:
+            set_attributes(self, self.additional_data)
