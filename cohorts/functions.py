@@ -247,6 +247,12 @@ def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwar
                             **kwargs)
 
 def median_vaf_purity(row, cohort):
+    """
+    Estimate purity based on 2 * median VAF.
+
+    Even if the Cohort has a default filter_fn, ignore it: we want to use all variants for
+    this estimate.
+    """
     patient_id = row["patient_id"]
     patient = cohort.patient_from_id(patient_id)
     variants = cohort.load_variants(patients=[patient], filter_fn=no_filter)[patient_id]
