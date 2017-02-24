@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 
-from .utils import require_id_str
+from .utils import require_id_str, set_attributes
 
 class Patient(object):
     """
@@ -47,6 +47,7 @@ class Patient(object):
         A list of this patient's HLA class I alleles.
     additional_data : dict
         A dictionary of additional data: name of datum mapping to value.
+        Will create these attributes in the Patient object.
     """
     def __init__(self,
                  id,
@@ -75,6 +76,8 @@ class Patient(object):
         self.tumor_sample = tumor_sample
         self.hla_alleles = hla_alleles
         self.additional_data = additional_data
+
+        set_attributes(self, self.additional_data)
 
         # TODO: This can be removed once all patient-specific functions are
         # removed from Cohort.

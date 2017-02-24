@@ -22,7 +22,7 @@ from .variant_stats import variant_stats_from_variant
 from functools import wraps
 import numpy as np
 import pandas as pd
-from varcode.effects import Substitution
+from varcode.effects import Substitution, FrameShift
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic
 import inspect
@@ -209,6 +209,20 @@ exonic_insertion_count = count_effects_function_builder(
     filterable_effect_function=lambda filterable_effect: (
         isinstance(filterable_effect.effect, Exonic) and
         filterable_effect.variant.is_insertion))
+
+frameshift_count = count_effects_function_builder(
+    "frameshift_count",
+    only_nonsynonymous=False, # Should not matter, because FrameShift extends NonsilentCodingMutation
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, FrameShift)))
+
+missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
+    "missense_snv_and_nonsynonymous_indel_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        (filterable_effect.variant.is_indel) or
+         (type(filterable_effect.effect) == Substitution and
+          filterable_effect.variant.is_snv)))
 
 @count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):

@@ -14,6 +14,8 @@
 
 from __future__ import print_function
 
+from .utils import set_attributes
+
 class Sample(object):
     """
     Represents a single tumor or normal sample. It can point to DNA and/or
@@ -29,15 +31,22 @@ class Sample(object):
         Path to the RNA BAM file.
     cufflinks_path : str
         Path to the Cufflinks output file.
+    additional_data : dict
+        A dictionary of additional data: name of datum mapping to value.
+        Will create these attributes in the Sample object.
     """
     def __init__(self,
                  is_tumor,
                  bam_path_dna=None,
                  bam_path_rna=None,
                  cufflinks_path=None,
-                 kallisto_path=None):
+                 kallisto_path=None,
+                 additional_data=None):
         self.is_tumor = is_tumor
         self.bam_path_dna = bam_path_dna
         self.bam_path_rna = bam_path_rna
         self.cufflinks_path = cufflinks_path
         self.kallisto_path = kallisto_path
+        self.additional_data = additional_data
+
+        set_attributes(self, self.additional_data)
