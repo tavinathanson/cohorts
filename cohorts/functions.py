@@ -15,10 +15,13 @@
 from __future__ import print_function
 
 from .variant_filters import no_filter, effect_expressed_filter
+from .varcode_utils import FilterableVariant
 from .utils import first_not_none_param
+from .variant_stats import variant_stats_from_variant
 
 from functools import wraps
 import numpy as np
+import pandas as pd
 from varcode.effects import Substitution
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic
@@ -242,3 +245,13 @@ def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwar
                             normalized_per_mb=normalized_per_mb,
                             only_expressed=True,
                             **kwargs)
+
+def median_vaf_purity(row, cohort):
+    patient_id = row["patient_id"]
+    patient = cohort.patient_from_id(patient_id)
+    variants = cohort.load_variants(patients=[patient], filter_fn=no_filter)[patient_id]
+    def grab_vaf(variant):
+        filterable_variant = FilterableVariant(variant, variants, patient)
+        return variant_stats_from_variant(variant, filterable_variant.variant_metadata).tumor_stats.variant_allele_frequency
+    vafs = [grab_vaf(variant) for variant in variants]
+    return 2 * pd.Series(vafs).median()

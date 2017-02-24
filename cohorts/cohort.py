@@ -103,6 +103,8 @@ class Cohort(Collection):
         Verify that the cached provenance is equal to the current environment.
     print_provenance : bool
         Print a summary of cache file provenance.
+    print_filter : bool
+        Print the name of the default `filter_fn` on initialization.
     polyphen_dump_path : str
         Path to a Polyphen database dump.
     pageant_coverage_path : str
@@ -128,6 +130,7 @@ class Cohort(Collection):
                  responder_pfs_equals_os=False,
                  check_provenance=False,
                  print_provenance=True,
+                 print_filter=True,
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
                  benefit_plot_name="Benefit",
@@ -177,6 +180,9 @@ class Cohort(Collection):
                             "polyphen": "cached-polyphen-annotations",
                             "isovar": "cached-isovar-output"}
 
+        if print_filter:
+            print("Applying %s filter by default" % self.filter_fn.__name__ if
+                  self.filter_fn is not None else "None")
         if print_provenance:
             pprint.pprint(self.summarize_data_sources())
 
@@ -506,7 +512,7 @@ class Cohort(Collection):
             if variants is not None:
                 patient_variants[patient.id] = variants
         return patient_variants
-    
+
     def _hash_filter_fn(self, filter_fn, **kwargs):
         """ Construct string representing state of filter_fn
             Used to cache filtered variants or effects uniquely depending on filter fn values
