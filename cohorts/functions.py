@@ -22,6 +22,7 @@ import numpy as np
 from varcode.effects import Substitution
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic
+import inspect
 
 def use_defaults(func):
     """
@@ -68,150 +69,143 @@ def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
 
-@count_function
-def variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    patient_id = row["patient_id"]
-    return cohort.load_variants(
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=filter_fn,
-        **kwargs)
+def count_variants_function_builder(function_name, filterable_variant_function=None):
+    """
+    Creates a function that counts variants that are filtered by the provided filterable_variant_function.
+    The filterable_variant_function is a function that takes a filterable_variant and returns True or False.
 
-@count_function
-def exonic_variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (isinstance(filterable_effect.effect, Exonic) and
-                filter_fn(filterable_effect, **kwargs))
-    # This only loads one effect per variant.
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=False,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_filter_fn,
-        **kwargs)
+    Users of this builder need not worry about applying e.g. the Cohort's default `filter_fn`. That will be applied as well.
+    """
+    @count_function
+    def count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+        def count_filter_fn(filterable_variant, **kwargs):
+            assert filter_fn is not None, "filter_fn should never be None, but it is."
+            return ((filterable_variant_function(filterable_variant) if filterable_variant_function is not None else True) and
+                    filter_fn(filterable_variant, **kwargs))
+        patient_id = row["patient_id"]
+        return cohort.load_variants(
+            patients=[cohort.patient_from_id(patient_id)],
+            filter_fn=count_filter_fn,
+            **kwargs)
+    count.__name__ = function_name
+    count.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
+    return count
 
-@count_function
-def snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    patient_id = row["patient_id"]
-    def snv_filter_fn(filterable_variant, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (filterable_variant.variant.is_snv and
-                filter_fn(filterable_variant=filterable_variant, **kwargs))
-    return cohort.load_variants(
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=snv_filter_fn,
-        **kwargs)
+def count_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None):
+    """
+    Create a function that counts effects that are filtered by the provided filterable_effect_function.
+    The filterable_effect_function is a function that takes a filterable_effect and returns True or False.
 
-@count_function
-def deletion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    patient_id = row["patient_id"]
-    def deletion_filter_fn(filterable_variant, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (filterable_variant.variant.is_indel and
-                filter_fn(filterable_variant=filterable_variant, **kwargs))
-    return cohort.load_variants(
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=deletion_filter_fn,
-        **kwargs)
+    Users of this builder need not worry about applying e.g. the Cohort's default `filter_fn`. That will be applied as well.
+    """
+    @count_function
+    def count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+        def count_filter_fn(filterable_effect, **kwargs):
+            assert filter_fn is not None, "filter_fn should never be None, but it is."
+            return ((filterable_effect_function(filterable_effect) if filterable_effect_function is not None else True) and
+                    filter_fn(filterable_effect, **kwargs))
+        # This only loads one effect per variant.
+        patient_id = row["patient_id"]
+        return cohort.load_effects(
+            only_nonsynonymous=only_nonsynonymous,
+            patients=[cohort.patient_from_id(patient_id)],
+            filter_fn=count_filter_fn,
+            **kwargs)
+    count.__name__ = function_name
+    count.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) +
+                     str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
+    return count
 
-@count_function
-def effect_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    ''' Alternate count of variants using effects instead of variants '''
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=False,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=filter_fn,
-        **kwargs)
+variant_count = count_variants_function_builder("variant_count")
 
-@count_function
-def nonsynonymous_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def snv_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (filterable_effect.variant.is_snv and
-                filter_fn(filterable_effect, **kwargs))
-    # This only loads one effect per variant.
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=True,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=snv_filter_fn,
-        **kwargs)
+snv_count = count_variants_function_builder(
+    "snv_count",
+    filterable_variant_function=lambda filterable_variant: (
+        filterable_variant.variant.is_snv))
 
-@count_function
-def missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def missense_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (type(filterable_effect.effect) == Substitution and
-                filterable_effect.variant.is_snv and
-                filter_fn(filterable_effect, **kwargs))
-    # This only loads one effect per variant.
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=True,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=missense_filter_fn,
-        **kwargs)
+indel_count = count_variants_function_builder(
+    "indel_count",
+    filterable_variant_function=lambda filterable_variant: (
+        filterable_variant.variant.is_indel))
 
-@count_function
-def exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_snv_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (isinstance(filterable_effect.effect, Exonic) and
-                filterable_effect.variant.is_snv and
-                filter_fn(filterable_effect, **kwargs))
-    # This only loads one effect per variant.
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=True,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_snv_filter_fn,
-        **kwargs)
+deletion_count = count_variants_function_builder(
+    "deletion_count",
+    filterable_variant_function=lambda filterable_variant: (
+        filterable_variant.variant.is_deletion))
 
-@count_function
-def exonic_silent_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (isinstance(filterable_effect.effect, Exonic) and
-                filterable_effect.variant.is_snv and
-                filter_fn(filterable_effect, **kwargs))
-    # This only loads one effect per variant.
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=False,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_filter_fn,
-        **kwargs)
+insertion_count = count_variants_function_builder(
+    "insertion_count",
+    filterable_variant_function=lambda filterable_variant: (
+        filterable_variant.variant.is_insertion))
 
-@count_function
-def exonic_deletion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_deletion_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (isinstance(filterable_effect.effect, Exonic) and
-                filterable_effect.variant.is_deletion and
-                filter_fn(filterable_effect, **kwargs))
-    # This only loads one effect per variant.
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=True,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_deletion_filter_fn,
-        **kwargs)
+effect_count = count_effects_function_builder(
+    "effect_count",
+    only_nonsynonymous=False)
 
-@count_function
-def exonic_insertion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def exonic_insertion_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return (isinstance(filterable_effect.effect, Exonic) and
-                filterable_effect.variant.is_insertion and
-                filter_fn(filterable_effect, **kwargs))
-    # This only loads one effect per variant.
-    patient_id = row["patient_id"]
-    return cohort.load_effects(
-        only_nonsynonymous=True,
-        patients=[cohort.patient_from_id(patient_id)],
-        filter_fn=exonic_insertion_filter_fn,
-        **kwargs)
+nonsynonymous_snv_count = count_effects_function_builder(
+    "nonsynonymous_snv_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_snv))
+
+missense_snv_count = count_effects_function_builder(
+    "missense_snv_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        type(filterable_effect.effect) == Substitution and
+        filterable_effect.variant.is_snv))
+
+nonsynonymous_indel_count = count_effects_function_builder(
+    "nonsynonymous_indel_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_indel))
+
+nonsynonymous_deletion_count = count_effects_function_builder(
+    "nonsynonymous_deletion_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_deletion))
+
+nonsynonymous_insertion_count = count_effects_function_builder(
+    "nonsynonymous_insertion_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_insertion))
+
+exonic_variant_count = count_effects_function_builder(
+    "exonic_variant_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic)))
+
+exonic_snv_count = count_effects_function_builder(
+    "exonic_snv_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic) and
+        filterable_effect.variant.is_snv))
+
+exonic_indel_count = count_effects_function_builder(
+    "exonic_indel_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic) and
+        filterable_effect.variant.is_indel))
+
+exonic_deletion_count = count_effects_function_builder(
+    "exonic_deletion_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic) and
+        filterable_effect.variant.is_deletion))
+
+exonic_insertion_count = count_effects_function_builder(
+    "exonic_insertion_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic) and
+        filterable_effect.variant.is_insertion))
 
 @count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
