@@ -45,7 +45,7 @@ def make_simple_cohort(merge_type="union",
                           pfs=row["PFS"],
                           deceased=row["deceased"],
                           progressed_or_deceased=row["progressed_or_deceased"],
-                          additional_data=row
+                          additional_data=dict(row)
                           )
         patients.append(patient)
 
