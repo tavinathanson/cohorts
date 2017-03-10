@@ -74,7 +74,6 @@ def test_simple_cohort():
     eq_(len(cohort.as_dataframe()), 3)
 
     columns = set(cohort.as_dataframe().columns)
-    ok_("id" in columns)
     ok_("patient_id" in columns)
     ok_("age" in columns)
     ok_("pfs" in columns)
