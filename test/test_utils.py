@@ -39,7 +39,7 @@ def make_alt_simple_cohort(merge_type="union", **kwargs):
     patients = []
     for i, row in clinical_dataframe.iterrows():
         row = dict(row)
-        patient = Patient(id=row["id"],
+        patient = Patient(id=row.pop("id"),
                           os=row.pop("os"),
                           pfs=row.pop("pfs"),
                           deceased=row.pop("deceased"),

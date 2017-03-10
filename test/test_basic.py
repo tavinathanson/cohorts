@@ -41,9 +41,9 @@ def make_simple_cohort(merge_type="union",
     patients = []
     for i, row in clinical_dataframe.iterrows():
         row = dict(row)
-        patient = Patient(id=row["id"],
-                          os=row["OS"],
-                          pfs=row["PFS"],
+        patient = Patient(id=row.pop("id"),
+                          os=row.pop("OS"),
+                          pfs=row.pop("PFS"),
                           deceased=row.pop("deceased"),
                           progressed_or_deceased=row.pop("progressed_or_deceased"),
                           additional_data=row)
