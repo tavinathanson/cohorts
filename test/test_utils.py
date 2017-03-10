@@ -38,13 +38,13 @@ def make_alt_simple_cohort(merge_type="union", **kwargs):
     clinical_dataframe = make_alt_simple_clinical_dataframe(**kwargs)
     patients = []
     for i, row in clinical_dataframe.iterrows():
+        row = dict(row)
         patient = Patient(id=row["id"],
-                          os=row["os"],
-                          pfs=row["pfs"],
-                          deceased=row["deceased"],
-                          progressed_or_deceased=row["progressed_or_deceased"],
-                          additional_data=dict(row)
-                          )
+                          os=row.pop("os"),
+                          pfs=row.pop("pfs"),
+                          deceased=row.pop("deceased"),
+                          progressed_or_deceased=row.pop("progressed_or_deceased"),
+                          additional_data=row)
         patients.append(patient)
 
     return Cohort(

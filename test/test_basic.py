@@ -40,13 +40,13 @@ def make_simple_cohort(merge_type="union",
     clinical_dataframe = make_simple_clinical_dataframe(**kwargs)
     patients = []
     for i, row in clinical_dataframe.iterrows():
+        row = dict(row)
         patient = Patient(id=row["id"],
                           os=row["OS"],
                           pfs=row["PFS"],
-                          deceased=row["deceased"],
-                          progressed_or_deceased=row["progressed_or_deceased"],
-                          additional_data=dict(row)
-                          )
+                          deceased=row.pop("deceased"),
+                          progressed_or_deceased=row.pop("progressed_or_deceased"),
+                          additional_data=row)
         patients.append(patient)
 
     Cohort.normalized_per_mb = False
