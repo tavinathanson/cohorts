@@ -43,7 +43,7 @@ def make_alt_simple_cohort(merge_type="union", **kwargs):
                           pfs=row["pfs"],
                           deceased=row["deceased"],
                           progressed_or_deceased=row["progressed_or_deceased"],
-                          additional_data=row
+                          additional_data=dict(row)
                           )
         patients.append(patient)
 
