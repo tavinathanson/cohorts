@@ -15,11 +15,14 @@
 from __future__ import print_function
 
 from .variant_filters import no_filter, effect_expressed_filter
+from .varcode_utils import FilterableVariant
 from .utils import first_not_none_param
+from .variant_stats import variant_stats_from_variant
 
 from functools import wraps
 import numpy as np
-from varcode.effects import Substitution
+import pandas as pd
+from varcode.effects import Substitution, FrameShift
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic
 import inspect
@@ -207,6 +210,20 @@ exonic_insertion_count = count_effects_function_builder(
         isinstance(filterable_effect.effect, Exonic) and
         filterable_effect.variant.is_insertion))
 
+frameshift_count = count_effects_function_builder(
+    "frameshift_count",
+    only_nonsynonymous=False, # Should not matter, because FrameShift extends NonsilentCodingMutation
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, FrameShift)))
+
+missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
+    "missense_snv_and_nonsynonymous_indel_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        (filterable_effect.variant.is_indel) or
+         (type(filterable_effect.effect) == Substitution and
+          filterable_effect.variant.is_snv)))
+
 @count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     patient = cohort.patient_from_id(row["patient_id"])
@@ -242,3 +259,19 @@ def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwar
                             normalized_per_mb=normalized_per_mb,
                             only_expressed=True,
                             **kwargs)
+
+def median_vaf_purity(row, cohort):
+    """
+    Estimate purity based on 2 * median VAF.
+
+    Even if the Cohort has a default filter_fn, ignore it: we want to use all variants for
+    this estimate.
+    """
+    patient_id = row["patient_id"]
+    patient = cohort.patient_from_id(patient_id)
+    variants = cohort.load_variants(patients=[patient], filter_fn=no_filter)[patient_id]
+    def grab_vaf(variant):
+        filterable_variant = FilterableVariant(variant, variants, patient)
+        return variant_stats_from_variant(variant, filterable_variant.variant_metadata).tumor_stats.variant_allele_frequency
+    vafs = [grab_vaf(variant) for variant in variants]
+    return 2 * pd.Series(vafs).median()

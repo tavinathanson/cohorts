@@ -31,9 +31,8 @@ def variant_qc_filter(filterable_variant,
                       min_tumor_vaf,
                       max_normal_vaf,
                       min_tumor_alt_depth):
-    
     logger.debug('Applying variant_qc_filter with params: min_tumor_depth={}, min_normal_depth={}, min_tumor_vaf={}, max_normal_vaf={}, min_tumor_alt_depth={}'.format(min_tumor_depth, min_normal_depth, min_tumor_vaf, max_normal_vaf, min_tumor_alt_depth))
-    
+
     somatic_stats = variant_stats_from_variant(filterable_variant.variant,
                                                filterable_variant.variant_metadata)
 
