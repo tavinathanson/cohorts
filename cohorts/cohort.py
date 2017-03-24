@@ -536,10 +536,10 @@ class Cohort(Collection):
         for (key, val) in nonlocals.items():
             ## capture hash for any function within closure
             if inspect.isfunction(val):
-                closure = "{}-{}".format(self._hash_filter_fn(val).__name__, self._hash_filter_fn(val))
+                closure = "{}-{}".format(filter_fn_name, self._hash_filter_fn(val))
         # construct final string comprising hashed components
         hashed_fn = ".".join(["-".join([filter_fn_name,
-                                        hashed_fn_source]),
+                                        str(hashed_fn_source)]),
                               ".".join(kw_hash),
                               closure]
                             )
