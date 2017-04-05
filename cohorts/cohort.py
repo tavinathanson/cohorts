@@ -536,10 +536,10 @@ class Cohort(Collection):
         for (key, val) in nonlocals.items():
             ## capture hash for any function within closure
             if inspect.isfunction(val):
-                closure = "{}-{}".format(self._hash_filter_fn(val).__name__, self._hash_filter_fn(val))
+                closure = "{}-{}".format(filter_fn_name, self._hash_filter_fn(val))
         # construct final string comprising hashed components
         hashed_fn = ".".join(["-".join([filter_fn_name,
-                                        hashed_fn_source]),
+                                        str(hashed_fn_source)]),
                               ".".join(kw_hash),
                               closure]
                             )
@@ -554,12 +554,15 @@ class Cohort(Collection):
 
             Use `_load_single_patient_merged_variants` to see merged variants without filtering.
         """
-        filter_fn_name = self._get_function_name(filter_fn)
-        logger.debug("loading variants for patient {} with filter_fn {}".format(patient.id, filter_fn_name))
-        use_filtered_cache = use_cache
-        if sys.version_info < (3, 3):
-            logger.info("... disabling filtered cache due to python version")
+        if filter_fn is None:
             use_filtered_cache = False
+        else:
+            filter_fn_name = self._get_function_name(filter_fn)
+            logger.debug("loading variants for patient {} with filter_fn {}".format(patient.id, filter_fn_name))
+            use_filtered_cache = use_cache
+            if sys.version_info < (3, 3):
+                logger.info("... disabling filtered cache due to python version")
+                use_filtered_cache = False
 
         ## confirm that we can get cache-name (else don't use filtered cache)
         if use_filtered_cache:
