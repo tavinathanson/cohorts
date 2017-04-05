@@ -110,3 +110,18 @@ class Patient(object):
         return (
             self.__class__ == other.__class__ and
             self.id == other.id)
+
+    def __str__(self):
+        def str_if_not_none(s):
+            return s if s is not None else "None"
+
+        return "Patient(id=\"{}\", os={:.2f}, pfs={:.2f}, deceased={}, progressed={}, benefit={})".format(
+            self.id,
+            str_if_not_none(self.os),
+            str_if_not_none(self.pfs),
+            str_if_not_none(self.deceased),
+            str_if_not_none(self.progressed),
+            str_if_not_none(self.benefit))
+
+    def __repr__(self):
+        return str(self)
