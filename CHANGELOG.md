@@ -1,5 +1,34 @@
 # Change Log
 
+## [0.5.3](https://github.com/hammerlab/cohorts/tree/0.5.3) (2017-04-05)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.2...0.5.3)
+
+**Implemented enhancements:**
+
+- Add watermark for default filter\_fn on Cohort initialization [\#183](https://github.com/hammerlab/cohorts/issues/183)
+
+**Fixed bugs:**
+
+- deletion\_count is counting all indels [\#182](https://github.com/hammerlab/cohorts/issues/182)
+- exonic\_silent\_snv\_count is confusing [\#181](https://github.com/hammerlab/cohorts/issues/181)
+
+**Closed issues:**
+
+- Don't allow PFS/OS values to be NaN? [\#193](https://github.com/hammerlab/cohorts/issues/193)
+- Add frameshift count function [\#191](https://github.com/hammerlab/cohorts/issues/191)
+- additional\_data should automatically create Patient attributes [\#190](https://github.com/hammerlab/cohorts/issues/190)
+- Minor: old comment [\#184](https://github.com/hammerlab/cohorts/issues/184)
+- Number of functions is ballooning [\#173](https://github.com/hammerlab/cohorts/issues/173)
+- Support "merged" strelka VCF type [\#167](https://github.com/hammerlab/cohorts/issues/167)
+- Using only Strelka tier 1 results in divide by zero sometimes [\#166](https://github.com/hammerlab/cohorts/issues/166)
+
+**Merged pull requests:**
+
+- Add patient \_\_str\_\_ [\#197](https://github.com/hammerlab/cohorts/pull/197) ([tavinathanson](https://github.com/tavinathanson))
+- Fixing filter cache issues [\#196](https://github.com/hammerlab/cohorts/pull/196) ([tavinathanson](https://github.com/tavinathanson))
+- Add a median VAF filter function and a filter\_fn watermark [\#189](https://github.com/hammerlab/cohorts/pull/189) ([tavinathanson](https://github.com/tavinathanson))
+- Refactor and fix functions [\#186](https://github.com/hammerlab/cohorts/pull/186) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.5.2](https://github.com/hammerlab/cohorts/tree/0.5.2) (2017-01-18)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.1...0.5.2)
 
