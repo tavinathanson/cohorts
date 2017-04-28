@@ -19,6 +19,7 @@ import warnings
 from collections import namedtuple
 import sys
 import logging
+from six import string_types
 
 class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
     """Holds a DataFrame along with associated columns of interest."""
@@ -57,8 +58,8 @@ def filter_not_null(df, col):
     return df
 
 def require_id_str(id):
-    if type(id) != str:
-        raise ValueError("Expected ID string, but id = %s" % str(id))
+    if not isinstance(id, string_types):
+        raise ValueError("Expected ID string, but id = {}".format(id))
 
 def _strip_column_name(col_name, keep_paren_contents=True):
     """
