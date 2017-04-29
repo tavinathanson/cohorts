@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.5.4](https://github.com/hammerlab/cohorts/tree/0.5.4) (2017-04-29)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.3...0.5.4)
+
+**Merged pull requests:**
+
+- Update encoding and str handling for Py2/3 compatibility [\#199](https://github.com/hammerlab/cohorts/pull/199) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.5.3](https://github.com/hammerlab/cohorts/tree/0.5.3) (2017-04-05)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.2...0.5.3)
 
