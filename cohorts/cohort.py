@@ -138,6 +138,7 @@ class Cohort(Collection):
         Collection.__init__(
             self,
             elements=patients)
+
         # TODO: Patients shouldn't actually need to reference their Cohort; remove
         # this when patient-specific functions all live in Patient.
         for patient in patients:
@@ -226,7 +227,7 @@ class Cohort(Collection):
         if self.responder_pfs_equals_os:
             cohort_dataframe.apply(func, axis=1)
 
-    def _as_dataframe_unmodified(self, join_with = None, join_how = None):
+    def _as_dataframe_unmodified(self, join_with=None, join_how=None):
         # Use join_with if specified, otherwise fall back to what is defined in the class
         join_with = first_not_none_param([join_with, self.join_with], default=[])
         if type(join_with) == str:
@@ -278,6 +279,7 @@ class Cohort(Collection):
                 df_loader.name,
                 old_len_df,
                 len(df)))
+
         self.dataframe_hash = hash(str(df.sort_values("patient_id")))
         return df
 
@@ -629,8 +631,11 @@ class Cohort(Collection):
                     elif ".maf" in patient_variants:
                         # See variant_stats.maf_somatic_variant_stats
                         variant_collections.append(
-                            varcode.load_maf(patient_variants, optional_cols=[
-                                "t_ref_count", "t_alt_count", "n_ref_count", "n_alt_count"]))
+                            varcode.load_maf(
+                                patient_variants,
+                                optional_cols=[
+                                    "t_ref_count", "t_alt_count", "n_ref_count", "n_alt_count"],
+                                encoding="latin-1"))
                     else:
                         raise ValueError("Don't know how to read %s" % patient_variants)
                 elif type(patient_variants) == VariantCollection:
