@@ -123,7 +123,10 @@ def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
             lambda row: filter_fn(
                 FilterableNeoantigen(neoantigen_row=row,
                                      variant_collection=variant_collection,
-                                     patient=patient)), axis=1)
+                                     patient=patient)),
+            axis=1,
+            # reduce ensures that an empty result is a Series vs. a DataFrame
+            reduce=True)
         return neoantigens_df[filter_mask]
     else:
         return neoantigens_df
@@ -134,7 +137,10 @@ def filter_polyphen(polyphen_df, variant_collection, patient, filter_fn):
             lambda row: filter_fn(
                 FilterablePolyphen(polyphen_row=row,
                                    variant_collection=variant_collection,
-                                   patient=patient)), axis=1)
+                                   patient=patient)),
+            axis=1,
+            # reduce ensures that an empty result is a Series vs. a DataFrame
+            reduce=True)
         return polyphen_df[filter_mask]
     else:
         return polyphen_df
