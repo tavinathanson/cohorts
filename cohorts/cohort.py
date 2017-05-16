@@ -537,17 +537,18 @@ class Cohort(Collection):
         else:
             [kw_hash.append("{}-{}".format(key, h)) for (key, h) in sorted(kw_dict.items())]
         # hash closure vars - for case where filter_fn is defined within closure of filter_fn
-        closure = "null"
+        closure = []
         nonlocals = inspect.getclosurevars(filter_fn).nonlocals
         for (key, val) in nonlocals.items():
             ## capture hash for any function within closure
             if inspect.isfunction(val):
-                closure = "{}-{}".format(filter_fn_name, self._hash_filter_fn(val))
+                closure.append(self._hash_filter_fn(val))
+        closure_str = "null" if len(closure) == 0 else "-".join(closure)
         # construct final string comprising hashed components
         hashed_fn = ".".join(["-".join([filter_fn_name,
                                         str(hashed_fn_source)]),
                               ".".join(kw_hash),
-                              closure]
+                              closure_str]
                             )
         return hashed_fn
 
