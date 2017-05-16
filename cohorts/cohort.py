@@ -543,6 +543,7 @@ class Cohort(Collection):
             ## capture hash for any function within closure
             if inspect.isfunction(val):
                 closure.append(self._hash_filter_fn(val))
+        closure.sort() # Sorted for file name consistency
         closure_str = "null" if len(closure) == 0 else "-".join(closure)
         # construct final string comprising hashed components
         hashed_fn = ".".join(["-".join([filter_fn_name,
