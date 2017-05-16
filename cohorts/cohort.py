@@ -109,6 +109,8 @@ class Cohort(Collection):
         Path to a Polyphen database dump.
     pageant_coverage_path : str
         Path to Pageant CoverageDepth output.
+    pageant_dir_fn : function
+        Function from patient to a specific Pageant CoverageDepth directory within the path. Defaults to the Patietn ID.
     benefit_plot_name : str
         What word to use for "benefit" when plotting.
     merge_type : {"union", "intersection"}, optional
@@ -133,6 +135,7 @@ class Cohort(Collection):
                  print_filter=True,
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
+                 pageant_dir_fn=None,
                  benefit_plot_name="Benefit",
                  merge_type="union"):
         Collection.__init__(
@@ -164,6 +167,7 @@ class Cohort(Collection):
         self.check_provenance = check_provenance
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
+        self.pageant_dir_fn = pageant_dir_fn
         self.benefit_plot_name = benefit_plot_name
         self.merge_type = merge_type
         self._genome = None
@@ -533,17 +537,19 @@ class Cohort(Collection):
         else:
             [kw_hash.append("{}-{}".format(key, h)) for (key, h) in sorted(kw_dict.items())]
         # hash closure vars - for case where filter_fn is defined within closure of filter_fn
-        closure = "null"
+        closure = []
         nonlocals = inspect.getclosurevars(filter_fn).nonlocals
         for (key, val) in nonlocals.items():
             ## capture hash for any function within closure
             if inspect.isfunction(val):
-                closure = "{}-{}".format(filter_fn_name, self._hash_filter_fn(val))
+                closure.append(self._hash_filter_fn(val))
+        closure.sort() # Sorted for file name consistency
+        closure_str = "null" if len(closure) == 0 else "-".join(closure)
         # construct final string comprising hashed components
         hashed_fn = ".".join(["-".join([filter_fn_name,
                                         str(hashed_fn_source)]),
                               ".".join(kw_hash),
-                              closure]
+                              closure_str]
                             )
         return hashed_fn
 
@@ -1109,7 +1115,8 @@ class Cohort(Collection):
             cohort=self,
             coverage_path=self.pageant_coverage_path,
             min_normal_depth=self.min_coverage_normal_depth,
-            min_tumor_depth=self.min_coverage_tumor_depth)
+            min_tumor_depth=self.min_coverage_tumor_depth,
+            pageant_dir_fn=self.pageant_dir_fn)
 
     def clear_caches(self):
         for cache in self.cache_names.keys():
