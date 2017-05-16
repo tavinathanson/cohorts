@@ -84,7 +84,7 @@ def variant_expressed_filter(filterable_variant, **kwargs):
 def effect_expressed_filter(filterable_effect, **kwargs):
     return variant_expressed_filter(filterable_effect, **kwargs)
 
-def load_ensembl_coverage(cohort, coverage_path, min_tumor_depth, min_normal_depth=None,
+def load_ensembl_coverage(cohort, coverage_path, min_tumor_depth, min_normal_depth=0,
                           pageant_dir_fn=None):
     """
     Load in Pageant CoverageDepth results with Ensembl loci.
@@ -92,7 +92,7 @@ def load_ensembl_coverage(cohort, coverage_path, min_tumor_depth, min_normal_dep
     coverage_path is a path to Pageant CoverageDepth output directory, with
     one subdirectory per patient and a `cdf.csv` file inside each patient subdir.
 
-    If min_normal_depth is None, calculate tumor coverage. Otherwise, calculate
+    If min_normal_depth is 0, calculate tumor coverage. Otherwise, calculate
     join tumor/normal coverage.
 
     pageant_dir_fn is a function that takes in a Patient and produces a Pageant
