@@ -1,5 +1,8 @@
 # Change Log
 
+## [0.5.5](https://github.com/hammerlab/cohorts/tree/0.5.5) (2017-04-29)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.4...0.5.5)
+
 ## [0.5.4](https://github.com/hammerlab/cohorts/tree/0.5.4) (2017-04-29)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.3...0.5.4)
 
