@@ -1,7 +1,16 @@
 # Change Log
 
-## [0.5.5](https://github.com/hammerlab/cohorts/tree/0.5.5) (2017-04-29)
+## [0.5.5](https://github.com/hammerlab/cohorts/tree/0.5.5) (2017-05-16)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.4...0.5.5)
+
+**Closed issues:**
+
+- TypeError: "load\_maf\(\) got an unexpected keyword argument 'encoding'" [\#203](https://github.com/hammerlab/cohorts/issues/203)
+- Solve intermittent test failures [\#201](https://github.com/hammerlab/cohorts/issues/201)
+
+**Merged pull requests:**
+
+- Update Pageant logic [\#205](https://github.com/hammerlab/cohorts/pull/205) ([tavinathanson](https://github.com/tavinathanson))
 
 ## [0.5.4](https://github.com/hammerlab/cohorts/tree/0.5.4) (2017-04-29)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.3...0.5.4)
