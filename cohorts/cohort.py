@@ -75,6 +75,8 @@ class Cohort(Collection):
         A list of `Patient`s for this cohort.
     cache_dir : str
         Path to store cached results, e.g. cached variant effects.
+    show_progress : bool
+        Whether or not to show DataFrame application progress as an increasing percentage.
     kallisto_ensembl_version : int
         Cached release version to use from pyensembl to annotate Kallisto data
     cache_results : bool
@@ -119,6 +121,7 @@ class Cohort(Collection):
     def __init__(self,
                  patients,
                  cache_dir,
+                 show_progress=True,
                  kallisto_ensembl_version=None,
                  cache_results=True,
                  extra_df_loaders=[],
@@ -147,6 +150,7 @@ class Cohort(Collection):
         for patient in patients:
             patient.cohort = self
         self.cache_dir = cache_dir
+        self.show_progress = show_progress
         self.cache_results = cache_results
         self.kallisto_ensembl_version = kallisto_ensembl_version
 
@@ -340,8 +344,12 @@ class Cohort(Collection):
                 func = lambda row: on(row=row, **kwargs)
             else:
                 func = lambda row: on(row=row, cohort=self, **kwargs)
-            tqdm.pandas(desc=col)
-            df[col] = df.progress_apply(func, axis=1) ## depends on tqdm on prev line
+
+            if self.show_progress:
+                tqdm.pandas(desc=col)
+                df[col] = df.progress_apply(func, axis=1) ## depends on tqdm on prev line
+            else:
+                df[col] = df.apply(func, axis=1)
             return DataFrameHolder(col, df)
 
         def func_name(func, num=0):
