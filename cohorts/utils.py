@@ -1,4 +1,4 @@
-# Copyright (c) 2016. Mount Sinai School of Medicine
+# Copyright (c) 2017. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import re
 import warnings
 from collections import namedtuple
 import sys
 import logging
-from six import string_types
 
 class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
     """Holds a DataFrame along with associated columns of interest."""
@@ -58,7 +55,7 @@ def filter_not_null(df, col):
     return df
 
 def require_id_str(id):
-    if not isinstance(id, string_types):
+    if type(id) != str:
         raise ValueError("Expected ID string, but id = {}".format(id))
 
 def _strip_column_name(col_name, keep_paren_contents=True):

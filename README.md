@@ -7,6 +7,8 @@ Cohorts is a library for analyzing and plotting clinical data, mutations and neo
 
 It calls out to external libraries like [topiary](https://github.com/hammerlab/topiary) and caches the results for easy manipulation.
 
+Cohorts requires Python 3. We are no longer maintaining compatability with Python 2. For context, see this [Python 3 statement](www.python3statement.org).
+
 Installation
 ------------
 
