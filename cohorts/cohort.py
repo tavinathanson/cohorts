@@ -1,4 +1,4 @@
-# Copyright (c) 2016. Mount Sinai School of Medicine
+# Copyright (c) 2017. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 from os import path, makedirs
 from shutil import rmtree
 import pandas as pd
@@ -25,12 +23,11 @@ from copy import copy
 import dill
 import hashlib
 import inspect
-import sys
 import logging
+import pickle
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
-import six.moves.cPickle as pickle
 from types import FunctionType
 
 import vap  ## vcf-annotate-polyphen
@@ -576,9 +573,6 @@ class Cohort(Collection):
             filter_fn_name = self._get_function_name(filter_fn)
             logger.debug("loading variants for patient {} with filter_fn {}".format(patient.id, filter_fn_name))
             use_filtered_cache = use_cache
-            if sys.version_info < (3, 3):
-                logger.info("... disabling filtered cache due to python version")
-                use_filtered_cache = False
 
         ## confirm that we can get cache-name (else don't use filtered cache)
         if use_filtered_cache:

@@ -1,8 +1,8 @@
 sudo: false  # Use container-based infrastructure
 language: python
 python:
-  - "2.7"
   - "3.4"
+  - "3.6"
 env:
   # Use a non-interactive backend to avoid PyQt4 install issues, and because
   # we don't need interactivity in Travis.
@@ -11,11 +11,7 @@ before_install:
   # Commands below copied from: http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
   # version is the same.
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   # reset the shell's lookup table for program name to path mappings
@@ -27,7 +23,7 @@ before_install:
 install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy nose pandas matplotlib
   - source activate test-environment
-  - conda install -c bioconda pysam=0.9.0
+  - conda install -c bioconda pysam>=0.9.0
   - conda install -c conda-forge pypandoc
   - pip install -r requirements.txt
   - pip install .

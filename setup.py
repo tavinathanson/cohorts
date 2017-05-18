@@ -1,4 +1,4 @@
-# Copyright (c) 2016. Mount Sinai School of Medicine
+# Copyright (c) 2017. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ if __name__ == "__main__":
         ],
         install_requires=install_requires,
         dependency_links=dependency_links,
+        python_requires=">=3.3",
         long_description=readme,
         packages=["cohorts"],
     )
