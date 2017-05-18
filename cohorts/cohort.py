@@ -24,6 +24,7 @@ import dill
 import hashlib
 import inspect
 import logging
+import pickle
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
