@@ -23,7 +23,6 @@ from copy import copy
 import dill
 import hashlib
 import inspect
-import sys
 import logging
 
 # pylint doesn't like this line
@@ -573,9 +572,6 @@ class Cohort(Collection):
             filter_fn_name = self._get_function_name(filter_fn)
             logger.debug("loading variants for patient {} with filter_fn {}".format(patient.id, filter_fn_name))
             use_filtered_cache = use_cache
-            if sys.version_info < (3, 3):
-                logger.info("... disabling filtered cache due to python version")
-                use_filtered_cache = False
 
         ## confirm that we can get cache-name (else don't use filtered cache)
         if use_filtered_cache:
