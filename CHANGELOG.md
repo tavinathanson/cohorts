@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.6.0](https://github.com/hammerlab/cohorts/tree/0.6.0) (2017-05-18)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.5...0.6.0)
+
+**Closed issues:**
+
+- Not identifying filtered-cache-name in python 3 [\#195](https://github.com/hammerlab/cohorts/issues/195)
+
+**Merged pull requests:**
+
+- Require Python 3 [\#208](https://github.com/hammerlab/cohorts/pull/208) ([tavinathanson](https://github.com/tavinathanson))
+- Add optional show\_progress [\#206](https://github.com/hammerlab/cohorts/pull/206) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.5.5](https://github.com/hammerlab/cohorts/tree/0.5.5) (2017-05-16)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.4...0.5.5)
 
