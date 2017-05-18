@@ -24,7 +24,7 @@ before_install:
 install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy nose pandas matplotlib
   - source activate test-environment
-  - conda install -c bioconda pysam=0.9.0
+  - conda install -c bioconda pysam>=0.9.0
   - conda install -c conda-forge pypandoc
   - pip install -r requirements.txt
   - pip install .
