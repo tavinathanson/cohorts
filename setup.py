@@ -53,7 +53,7 @@ if __name__ == "__main__":
         cmdclass=versioneer.get_cmdclass(),
         description="Utilities for analyzing mutations and neoepitopes in patient cohorts",
         author="Tavi Nathanson",
-        author_email="tavi {dot} nathanson {at} gmail {dot} com",
+        author_email="tavi@hammerlab.org",
         url="https://github.com/tavinathanson/cohorts",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
