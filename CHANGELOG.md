@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.6.1](https://github.com/hammerlab/cohorts/tree/0.6.1) (2017-05-19)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.0...0.6.1)
+
+**Merged pull requests:**
+
+- Add new PyPi server [\#210](https://github.com/hammerlab/cohorts/pull/210) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.6.0](https://github.com/hammerlab/cohorts/tree/0.6.0) (2017-05-18)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.5.5...0.6.0)
 
