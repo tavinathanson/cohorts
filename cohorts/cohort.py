@@ -152,9 +152,9 @@ class Cohort(Collection):
         self.kallisto_ensembl_version = kallisto_ensembl_version
 
         df_loaders = [
-            DataFrameLoader("kallisto", self.load_kallisto),
-            DataFrameLoader("cufflinks", self.load_cufflinks),
-            DataFrameLoader("ensembl_coverage", self.load_ensembl_coverage)]
+            DataFrameLoader("kallisto", lambda: self.load_kallisto()),
+            DataFrameLoader("cufflinks", lambda: self.load_cufflinks()),
+            DataFrameLoader("ensembl_coverage", lambda: self.load_ensembl_coverage())]
         df_loaders.extend(extra_df_loaders)
         self.df_loaders = df_loaders
         self.join_with = join_with
