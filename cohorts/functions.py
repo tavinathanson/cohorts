@@ -258,7 +258,7 @@ def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwar
                             only_expressed=True,
                             **kwargs)
 
-def median_vaf_purity(row, cohort):
+def median_vaf_purity(row, cohort, **kwargs):
     """
     Estimate purity based on 2 * median VAF.
 
