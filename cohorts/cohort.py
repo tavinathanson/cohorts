@@ -74,6 +74,8 @@ class Cohort(Collection):
         Path to store cached results, e.g. cached variant effects.
     cache_root_dir : str
         (optional) directory in which cache_dir should be created
+    cache_dir_kwargs : dict
+        (optional) dictionary of name=value data to use when formatting cache_dir str
     show_progress : bool
         Whether or not to show DataFrame application progress as an increasing percentage.
     kallisto_ensembl_version : int
@@ -121,6 +123,7 @@ class Cohort(Collection):
                  patients,
                  cache_dir,
                  cache_root_dir=None,
+                 cache_dir_kwargs=None,
                  show_progress=True,
                  kallisto_ensembl_version=None,
                  cache_results=True,
@@ -149,7 +152,7 @@ class Cohort(Collection):
         # this when patient-specific functions all live in Patient.
         for patient in patients:
             patient.cohort = self
-        self.cache_dir = get_cache_dir(cache_dir=cache_dir, cache_root_dir=cache_root_dir)
+        self.cache_dir = get_cache_dir(cache_dir=cache_dir, cache_root_dir=cache_root_dir, **cache_dir_kwargs)
         self.cache_root_dir = cache_root_dir
         self.show_progress = show_progress
         self.cache_results = cache_results
