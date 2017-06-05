@@ -19,6 +19,8 @@ import sys
 import logging
 from os import path
 
+logger = get_logger(__name__, level=logging.INFO)
+
 def get_cache_dir(cache_dir, cache_root_dir=None, *args, **kwargs):
     """
     Return full cache_dir, according to following logic:
@@ -29,12 +31,14 @@ def get_cache_dir(cache_dir, cache_root_dir=None, *args, **kwargs):
     """
     cache_dir = cache_dir.format(*args, **kwargs)
     if path.isabs(cache_dir):
-        return(cache_dir)
+        if cache_root_dir is not None:
+            logger.warning('cache_dir ({}) is a full path; ignoring cache_root_dir'.format(cache_dir))
+        return cache_dir
     if cache_root_dir is not None:
         return path.join(cache_root_dir, cache_dir)
     else:
         logger.warning("cache dir is not full path & cache_root_dir not given. Caching may not work as expected!")
-    return(None)
+    return None
 
 
 class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
@@ -50,7 +54,7 @@ class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
     def return_obj(cols, df, return_cols=False):
         """Construct a DataFrameHolder and then return either that or the DataFrame."""
         df_holder = DataFrameHolder(cols=cols, df=df)
-        return df_holder.return_self(return_cols=return_cols)
+        return df_holder.eenurn_self(return_cols=return_cols)
 
 class InvalidDataError(ValueError):
     pass
