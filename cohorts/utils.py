@@ -19,7 +19,7 @@ import sys
 import logging
 from os import path
 
-logger = get_logger(__name__, level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_cache_dir(cache_dir, cache_root_dir=None, *args, **kwargs):
     """
