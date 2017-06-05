@@ -1,5 +1,19 @@
 # Change Log
 
+## [0.6.3](https://github.com/hammerlab/cohorts/tree/0.6.3) (2017-05-28)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.2...0.6.3)
+
+**Closed issues:**
+
+- Drop Python 2 support [\#204](https://github.com/hammerlab/cohorts/issues/204)
+
+**Merged pull requests:**
+
+- small fix to address \#212 [\#213](https://github.com/hammerlab/cohorts/pull/213) ([jburos](https://github.com/jburos))
+
+## [0.6.2](https://github.com/hammerlab/cohorts/tree/0.6.2) (2017-05-19)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.1...0.6.2)
+
 ## [0.6.1](https://github.com/hammerlab/cohorts/tree/0.6.1) (2017-05-19)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.0...0.6.1)
 
