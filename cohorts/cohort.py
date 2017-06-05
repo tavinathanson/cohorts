@@ -123,7 +123,7 @@ class Cohort(Collection):
                  patients,
                  cache_dir,
                  cache_root_dir=None,
-                 cache_dir_kwargs=None,
+                 cache_dir_kwargs=dict(),
                  show_progress=True,
                  kallisto_ensembl_version=None,
                  cache_results=True,
