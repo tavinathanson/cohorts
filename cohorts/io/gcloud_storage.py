@@ -131,7 +131,7 @@ class GoogleStorageIO:
         return os.rename(tmp_file_path, localpath)
 
 
-class GoogleStorageFile(AbstractContextManager):
+class GoogleStorageFile(object):
     """
     This class is a context manager and a context decorator (future) that
     is meant to make working on GS files feel similar to local ones.
