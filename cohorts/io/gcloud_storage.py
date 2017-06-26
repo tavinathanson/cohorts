@@ -1,6 +1,6 @@
 import os
 import tempfile
-from contextlib import contextmanager, AbstractContextManager
+from contextlib import contextmanager
 from urllib.parse import urlparse
 
 from google.cloud import storage
