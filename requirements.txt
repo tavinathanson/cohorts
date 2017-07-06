@@ -18,4 +18,3 @@ serializable>=0.0.8
 dill>=0.2.5
 tqdm>=4.10.0
 pysam>=0.9.0
-google-cloud-storage>=1.1.1
