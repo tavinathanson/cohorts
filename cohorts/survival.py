@@ -85,8 +85,8 @@ def plot_kmf(df,
                      True: with_condition_label}
         color_map = {False: no_condition_color,
                      True: with_condition_color}
-    elif df[condition_col].dtype == 'O':
-        condition = df[condition_col].astype('category')
+    elif df[condition_col].dtype == 'O' or df[condition_col].dtype == 'category':
+        condition = df[condition_col]
         label_map = dict()
         [label_map.update({condition_value: '{} = {}'.format(condition_col,
                                                     condition_value)})
