@@ -1297,6 +1297,9 @@ class Cohort(Collection):
                       no_condition_color="#A941AC",
                       with_condition_label=None,
                       no_condition_label=None,
+                      color_map=None,
+                      label_map=None,
+                      color_palette="Set2",
                       threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
         Parameters
@@ -1339,7 +1342,10 @@ class Cohort(Collection):
             with_condition_color=with_condition_color,
             no_condition_color=no_condition_color,
             with_condition_label=with_condition_label,
-            no_condition_label=no_condition_label
+            no_condition_label=no_condition_label,
+            color_palette=color_palette,
+            label_map=label_map,
+            color_map=color_map,
         )
         return results
 

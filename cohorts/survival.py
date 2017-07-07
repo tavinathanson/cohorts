@@ -35,6 +35,9 @@ def plot_kmf(df,
              no_condition_color="#A941AC",
              with_condition_label=None,
              no_condition_label=None,
+             color_map=None,
+             label_map=None,
+             color_palette="Set1",
              ci_show=False,
              print_as_title=False):
     """
@@ -59,6 +62,17 @@ def plot_kmf(df,
         ax: an existing matplotlib ax, optional, default None
         with_condition_color: str, hex code color for the with-condition curve
         no_condition_color: str, hex code color for the no-condition curve
+        with_condition_label: str, optional, label for TRUE condition case
+        no_condition_label: str, optional, label for FALSE condition case
+        color_map: dict, optional, mapping of hex-values to condition text
+          in the form of {value_name: color_hex_code}.
+          defaults to `sb.color_palette` using `default_color_palette` name,
+          or *_condition_color options in case of boolean operators.
+        label_map: dict, optional, mapping of labels to condition text.
+          defaults to "condition_name = condition_value", or *_condition_label
+          options in case of boolean operators.
+        color_palette: str, optional, name of sb.color_palette to use
+          if color_map not provided.
         print_as_title: bool, optional, whether or not to print text
           within the plot's title vs. stdout, default False
     """
@@ -79,29 +93,35 @@ def plot_kmf(df,
         default_label_with_condition = "%s > %s" % (condition_col, label_suffix)
         with_condition_label = with_condition_label or default_label_with_condition
         no_condition_label = no_condition_label or default_label_no_condition
-        label_map = {False: no_condition_label,
-                     True: with_condition_label}
-        color_map = {False: no_condition_color,
-                     True: with_condition_color}
+        if not label_map:
+            label_map = {False: no_condition_label,
+                         True: with_condition_label}
+        if not color_map:
+            color_map = {False: no_condition_color,
+                         True: with_condition_color}
     elif df[condition_col].dtype == 'O' or df[condition_col].dtype.name == "category":
         condition = df[condition_col].astype("category")
-        label_map = dict()
-        [label_map.update({condition_value: '{} = {}'.format(condition_col,
-                                                    condition_value)})
-                 for condition_value in condition.unique()]
-        rgb_values = sb.color_palette("Set2", len(label_map.keys()))
-        hex_values = [colors.to_hex(col) for col in rgb_values]
-        color_map = dict(zip(label_map.keys(), hex_values))
+        if not label_map:
+            label_map = dict()
+            [label_map.update({condition_value: '{} = {}'.format(condition_col,
+                                                        condition_value)})
+                     for condition_value in condition.unique()]
+        if not color_map:
+            rgb_values = sb.color_palette(color_palette, len(label_map.keys()))
+            hex_values = [colors.to_hex(col) for col in rgb_values]
+            color_map = dict(zip(label_map.keys(), hex_values))
     elif df[condition_col].dtype == 'bool':
         condition = df[condition_col]
         default_label_with_condition = "= {}".format(condition_col)
         default_label_no_condition = "¬ {}".format(condition_col)
         with_condition_label = with_condition_label or default_label_with_condition
         no_condition_label = no_condition_label or default_label_no_condition
-        label_map = {False: no_condition_label,
-                     True: with_condition_label}
-        color_map = {False: no_condition_color,
-                     True: with_condition_color}
+        if not label_map:
+            label_map = {False: no_condition_label,
+                         True: with_condition_label}
+        if not color_map:
+            color_map = {False: no_condition_color,
+                         True: with_condition_color}
     else:
         raise ValueError('Don\'t know how to plot data of type\
                          {}'.format(df[condition_col].dtype))
