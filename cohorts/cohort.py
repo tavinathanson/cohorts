@@ -1322,6 +1322,8 @@ class Cohort(Collection):
         df = filter_not_null(df, plot_col)
         if df[plot_col].dtype == "bool":
             default_threshold = None
+        if df[plot_col].dtype == "O": # is string
+            default_threshold = None
         else:
             default_threshold = "median"
         results = plot_kmf(
