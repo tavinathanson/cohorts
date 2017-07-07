@@ -25,6 +25,7 @@ import hashlib
 import inspect
 import logging
 import pickle
+import numpy as np
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -1296,6 +1297,9 @@ class Cohort(Collection):
                       no_condition_color="#A941AC",
                       with_condition_label=None,
                       no_condition_label=None,
+                      color_map=None,
+                      label_map=None,
+                      color_palette="Set2",
                       threshold=None, **kwargs):
         """Plot a Kaplan Meier survival curve by splitting the cohort into two groups
         Parameters
@@ -1317,6 +1321,12 @@ class Cohort(Collection):
         df = filter_not_null(df, plot_col)
         if df[plot_col].dtype == "bool":
             default_threshold = None
+        elif np.issubdtype(df[plot_col].dtype, np.number):
+            default_threshold = "median"
+        elif df[plot_col].dtype == "O": # is string
+            default_threshold = None
+        elif df[plot_col].dtype.name == "category":
+            default_threshold = None
         else:
             default_threshold = "median"
         results = plot_kmf(
@@ -1332,7 +1342,10 @@ class Cohort(Collection):
             with_condition_color=with_condition_color,
             no_condition_color=no_condition_color,
             with_condition_label=with_condition_label,
-            no_condition_label=no_condition_label
+            no_condition_label=no_condition_label,
+            color_palette=color_palette,
+            label_map=label_map,
+            color_map=color_map,
         )
         return results
 
