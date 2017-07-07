@@ -62,8 +62,6 @@ def plot_kmf(df,
         print_as_title: bool, optional, whether or not to print text
           within the plot's title vs. stdout, default False
     """
-    if ax is None:
-        ax = plt.subplot(111)
     if colors.is_color_like(with_condition_color):
         with_condition_color = colors.to_hex(with_condition_color)
     if colors.is_color_like(no_condition_color):
@@ -85,8 +83,8 @@ def plot_kmf(df,
                      True: with_condition_label}
         color_map = {False: no_condition_color,
                      True: with_condition_color}
-    elif df[condition_col].dtype == 'O' or df[condition_col].dtype == 'category':
-        condition = df[condition_col]
+    elif df[condition_col].dtype == 'O' or df[condition_col].dtype.name == "category":
+        condition = df[condition_col].astype("category")
         label_map = dict()
         [label_map.update({condition_value: '{} = {}'.format(condition_col,
                                                     condition_value)})

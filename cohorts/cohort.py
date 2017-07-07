@@ -25,6 +25,7 @@ import hashlib
 import inspect
 import logging
 import pickle
+import numpy as np
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -1317,7 +1318,11 @@ class Cohort(Collection):
         df = filter_not_null(df, plot_col)
         if df[plot_col].dtype == "bool":
             default_threshold = None
-        if df[plot_col].dtype == "O" or df[plot_col].dtype == 'category': # is string
+        elif np.issubdtype(df[plot_col].dtype, np.number):
+            default_threshold = "median"
+        elif df[plot_col].dtype == "O": # is string
+            default_threshold = None
+        elif df[plot_col].dtype.name == "category":
             default_threshold = None
         else:
             default_threshold = "median"
