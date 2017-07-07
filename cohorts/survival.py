@@ -59,8 +59,10 @@ def plot_kmf(df,
         print_as_title: bool, optional, whether or not to print text
           within the plot's title vs. stdout, default False
     """
-    with_condition_color = colors.hex2color(with_condition_color)
-    no_condition_color = colors.hex2color(no_condition_color)
+    if colors.is_color_like(with_condition_color):
+        with_condition_color = colors.to_hex(with_condition_color)
+    if colors.is_color_like(no_condition_color):
+        no_condition_color = colors.to_hex(no_condition_color)
     kmf = KaplanMeierFitter()
     if threshold is not None:
         is_median = threshold == "median"
