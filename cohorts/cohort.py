@@ -642,7 +642,12 @@ class Cohort(Collection):
             for patient_variants in patient.variants_list:
                 if type(patient_variants) == str:
                     if ".vcf" in patient_variants:
-                        variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                        try:
+                            variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                        except StopIteration as e:
+                            logger.warning('Error loading VCFs for patient '+
+                                             '{} {}'.format(patient.id,
+                                                             str(e)))
                     elif ".maf" in patient_variants:
                         # See variant_stats.maf_somatic_variant_stats
                         variant_collections.append(
@@ -1316,6 +1321,8 @@ class Cohort(Collection):
         plot_col = self.plot_col_from_cols(cols=cols, only_allow_one=True)
         df = filter_not_null(df, plot_col)
         if df[plot_col].dtype == "bool":
+            default_threshold = None
+        if df[plot_col].dtype == "O": # is string
             default_threshold = None
         else:
             default_threshold = "median"
