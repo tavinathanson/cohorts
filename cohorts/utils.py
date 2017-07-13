@@ -19,7 +19,7 @@ import sys
 import logging
 from os import path
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 def get_cache_dir(cache_dir, cache_root_dir=None, *args, **kwargs):
     """
@@ -200,11 +200,11 @@ def strip_column_names(cols, keep_paren_contents=True):
 
     return dict(zip(cols, new_cols))
 
-def get_logger(name, level=logging.INFO):
+def get_logger(name):
     logger = logging.getLogger(name)
-    if logger.handlers:
-        logger.handlers = []
-    logger.setLevel(level)
+    # per
+    # https://docs.python.org/3/howto/logging.html#configuring-logging-for-a-library
+    logger.addHandler(logging.NullHandler())
     return logger
 
 def set_attributes(obj, additional_data):
