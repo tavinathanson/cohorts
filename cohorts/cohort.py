@@ -643,7 +643,12 @@ class Cohort(Collection):
             for patient_variants in patient.variants_list:
                 if type(patient_variants) == str:
                     if ".vcf" in patient_variants:
-                        variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                        try:
+                            variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                        except StopIteration as e:
+                            logger.warning('Error loading VCFs for patient '+
+                                             '{} {}'.format(patient.id,
+                                                             str(e)))
                     elif ".maf" in patient_variants:
                         # See variant_stats.maf_somatic_variant_stats
                         variant_collections.append(
