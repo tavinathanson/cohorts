@@ -64,10 +64,10 @@ class GoogleStorageIO:
         return self._client
 
 
-    def list_files(self, gsuri):
+    def list_files(self, gsuri, **kwargs):
         bucket_name, gs_rel_path = self.parse_uri(gsuri)
         bucket = self._client.get_bucket(bucket_name)
-        return bucket.list_blobs()
+        return bucket.list_blobs(**kwargs)
 
 
     @client.setter
@@ -94,7 +94,7 @@ class GoogleStorageIO:
         ublob.upload_from_filename(localpath)
 
 
-    def download_to_path(self, gsuri, localpath, binary_mode=False):
+    def download_to_path(self, gsuri, localpath, binary_mode=False, tmpdir=None):
         """
         This method is analogous to "gsutil cp gsuri localpath", but in a
         programatically accesible way. The only difference is that we
@@ -119,8 +119,10 @@ class GoogleStorageIO:
                 "No such file on Google Storage: '{}'".format(gs_rel_path))
 
         # A tmp file to serve intermediate phase
-        tmp_fid, tmp_file_path = tempfile.mkstemp(text=(not binary_mode))
-        # Download starts in a sec....
+        tmp_fid, tmp_file_path = tempfile.mkstemp(text=(not binary_mode),
+                                                  dir=tmpdir)
+        # Download starts in a seca....
+        ablob.chunk_size = 1<<30
         ablob.download_to_filename(client=self._client, filename=tmp_file_path)
         # ... end download ends. Let's move our finished file over.
 
