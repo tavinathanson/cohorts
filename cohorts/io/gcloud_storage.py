@@ -119,10 +119,13 @@ class GoogleStorageIO:
                 "No such file on Google Storage: '{}'".format(gs_rel_path))
 
         # A tmp file to serve intermediate phase
+        # should be on same filesystem as localpath
         tmp_fid, tmp_file_path = tempfile.mkstemp(text=(not binary_mode),
                                                   dir=tmpdir)
-        # Download starts in a seca....
+        # set chunk_size to reasonable default
+        # https://github.com/GoogleCloudPlatform/google-cloud-python/issues/2222
         ablob.chunk_size = 1<<30
+        # Download starts in a sec....
         ablob.download_to_filename(client=self._client, filename=tmp_file_path)
         # ... end download ends. Let's move our finished file over.
 
