@@ -645,10 +645,12 @@ class Cohort(Collection):
                     if ".vcf" in patient_variants:
                         try:
                             variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                        # StopIteration is thrown for empty VCFs. For an empty VCF, don't append any variants,
+                        # and don't throw an error. But do record a warning, in case the StopIteration was
+                        # thrown for another reason.
                         except StopIteration as e:
-                            logger.warning('Error loading VCFs for patient '+
-                                             '{} {}'.format(patient.id,
-                                                             str(e)))
+                            logger.warning("Empty VCF (or possibly a VCF error) for patient {}: {}".format(
+                                patient.id, str(e)))
                     elif ".maf" in patient_variants:
                         # See variant_stats.maf_somatic_variant_stats
                         variant_collections.append(
