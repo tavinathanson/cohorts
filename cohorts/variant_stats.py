@@ -14,6 +14,7 @@
 
 # pylint: disable=unsubscriptable-object
 from collections import namedtuple
+import re
 import vcf
 
 VariantStats = namedtuple("VariantStats",
@@ -160,28 +161,43 @@ def maf_somatic_variant_stats(variant, variant_metadata):
         normal_stats = _maf_variant_stats(variant, variant_metadata, prefix="n")
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
 
-def _vcf_is_strelka(variant_file):
+def _vcf_is_strelka(variant_file, variant_metadata):
     """Return True if variant_file given is in strelka format
     """
-    return "strelka" in variant_file.lower()
+    if "strelka" in variant_file.lower():
+        return True
+    elif 'NORMAL' in variant_metadata['sample_info'].keys():
+        return True
+    else:
+        vcf_reader = vcf.Reader(open(variant_file, "r"))
+        try:
+            vcf_type = vcf_reader.metadata['content']
+        except KeyError:
+            vcf_type = ''
+        if re.search(string=vcf_type.lower(), pattern='strelka'):
+            return True
+    return False
 
 def _vcf_is_maf(variant_file):
     """Retrun True if variant_file given is in .maf format
     """
     return ".maf" in variant_file.lower()
 
-def _vcf_is_mutect(variant_file):
+def _vcf_is_mutect(variant_file, variant_metadata):
     """Return True if variant_file give is in mutect format
     """
     if "mutect" in variant_file.lower():
         return True
+    elif 'GT' in variant_metadata['sample_info'].keys():
+        return True
     else:
+        vcf_reader = vcf.Reader(open(variant_file, "r"))
         try:
-            vcf_reader = vcf.Reader(open(variant_file, "r"))
-            if vcf_reader.metadata["GATKCommandLine"][0]["ID"] == "MuTect":
-                return True
-        except:
-            pass
+            vcf_type = vcf_reader.metadata["GATKCommandLine"][0]["ID"]
+        except KeyError:
+            vcf_type = ''
+        if vcf_type.lower() == 'mutect':
+            return True
     return False
 
 def variant_stats_from_variant(variant,
@@ -209,17 +225,13 @@ def variant_stats_from_variant(variant,
     for (variant_file, variant_metadata) in metadata.items():
         if _vcf_is_maf(variant_file=variant_file):
             stats = maf_somatic_variant_stats(variant, variant_metadata)
-        elif _vcf_is_strelka(variant_file=variant_file):
+        elif _vcf_is_strelka(variant_file=variant_file,
+                             variant_metadata=variant_metadata):
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
-        elif _vcf_is_mutect(variant_file=variant_file):
+        elif _vcf_is_mutect(variant_file=variant_file,
+                            variant_metadata=variant_metadata):
             stats = mutect_somatic_variant_stats(variant, variant_metadata)
         else:
-            try:
-                stats = strelka_somatic_variant_stats(variant, variant_metadata)
-            except:
-                try:
-                    stats = mutect_somatic_variant_stats(variant, variant_metadata)
-                except:
-                    raise ValueError("Cannot parse sample fields, variant file {} is from an unsupported caller.".format(variant_file))
+            raise ValueError("Cannot parse sample fields, variant file {} is from an unsupported caller.".format(variant_file))
         all_stats.append(stats)
     return merge_fn(all_stats)
