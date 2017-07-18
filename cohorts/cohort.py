@@ -1364,6 +1364,10 @@ class Cohort(Collection):
                 f, ax = plt.subplots(n_strata, sharex=True)
             a = 0
             for strat, strat_df in df.groupby(strata):
+                if n_strata == 1:
+                    my_axis = ax
+                else:
+                    my_axis = ax[a]
                 results.append(plot_kmf(df=strat_df,
                                         condition_col=plot_col,
                                         xlabel=survival_units,
@@ -1371,7 +1375,7 @@ class Cohort(Collection):
                                         censor_col="deceased" if how == "os" else "progressed_or_deceased",
                                         survival_col=how,
                                         threshold=threshold if threshold is not None else default_threshold,
-                                        ax=ax[a],
+                                        ax=my_axis,
                                         ci_show=ci_show,
                                         with_condition_color=with_condition_color,
                                         no_condition_color=no_condition_color,
@@ -1381,6 +1385,7 @@ class Cohort(Collection):
                                         label_map=label_map,
                                         color_map=color_map,
                                         ))
+                my_axis.set_title("{}: {}".format(strata, strat))
                 a += 1
         return results
 
