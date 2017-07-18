@@ -181,7 +181,6 @@ def plot_kmf(df,
     results.event_data_series = grp_event_data
     return results
 
-
 class NullSurvivalResults(object):
     pass
 
