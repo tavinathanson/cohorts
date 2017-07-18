@@ -167,6 +167,8 @@ def plot_kmf(df,
                                grp_survival_data[grp_names[1]],
                                event_observed_A=grp_event_data[grp_names[0]],
                                event_observed_B=grp_event_data[grp_names[1]])
+    elif len(grp_names) == 1:
+        results = NullSurvivalResults()
     else:
         cf = CoxPHFitter()
         cox_df = patsy.dmatrix('+'.join([condition_col, survival_col,
@@ -179,6 +181,9 @@ def plot_kmf(df,
     results.event_data_series = grp_event_data
     return results
 
+
+class NullSurvivalResults(object):
+    pass
 
 def logrank(df,
             condition_col,
