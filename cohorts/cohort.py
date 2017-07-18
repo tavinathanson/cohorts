@@ -1360,7 +1360,7 @@ class Cohort(Collection):
                 color_map=color_map,
             )
         else:
-            results = list()
+            results = dict()
             n_strata = len(df[strata].unique())
             if ax is None:
                 f, ax = plt.subplots(n_strata, sharex=True)
@@ -1370,7 +1370,9 @@ class Cohort(Collection):
                     my_axis = ax
                 else:
                     my_axis = ax[a]
-                results.append(plot_kmf(df=strat_df,
+                title = "{}: {}".format(strata, strat)
+                print(title)
+                results[title] = plot_kmf(df=strat_df,
                                         condition_col=plot_col,
                                         xlabel=survival_units,
                                         ylabel="Overall Survival (%)" if how == "os" else "Progression-Free Survival (%)",
@@ -1386,8 +1388,8 @@ class Cohort(Collection):
                                         color_palette=color_palette,
                                         label_map=label_map,
                                         color_map=color_map,
-                                        ))
-                my_axis.set_title("{}: {}".format(strata, strat))
+                                        )
+                my_axis.set_title(title)
                 a += 1
         return results
 
