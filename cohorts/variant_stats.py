@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=unsubscriptable-object
 from collections import namedtuple
+import vcf
 
 VariantStats = namedtuple("VariantStats",
                           ["depth", "alt_depth", "variant_allele_frequency"])
@@ -158,6 +160,45 @@ def maf_somatic_variant_stats(variant, variant_metadata):
         normal_stats = _maf_variant_stats(variant, variant_metadata, prefix="n")
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
 
+def _vcf_is_strelka(variant_file, variant_metadata):
+    """Return True if variant_file given is in strelka format
+    """
+    if "strelka" in variant_file.lower():
+        return True
+    elif "NORMAL" in variant_metadata["sample_info"].keys():
+        return True
+    else:
+        vcf_reader = vcf.Reader(open(variant_file, "r"))
+        try:
+            vcf_type = vcf_reader.metadata["content"]
+        except KeyError:
+            vcf_type = ""
+        if "strelka" in vcf_type.lower():
+            return True
+    return False
+
+def _vcf_is_maf(variant_file):
+    """Retrun True if variant_file given is in .maf format
+    """
+    return ".maf" in variant_file.lower()
+
+def _vcf_is_mutect(variant_file, variant_metadata):
+    """Return True if variant_file give is in mutect format
+    """
+    if "mutect" in variant_file.lower():
+        return True
+    elif "GT" in variant_metadata["sample_info"].keys():
+        return True
+    else:
+        vcf_reader = vcf.Reader(open(variant_file, "r"))
+        try:
+            vcf_type = vcf_reader.metadata["GATKCommandLine"][0]["ID"]
+        except KeyError:
+            vcf_type = ""
+        if "mutect" in vcf_type.lower():
+            return True
+    return False
+
 def variant_stats_from_variant(variant,
                                metadata,
                                merge_fn=(lambda all_stats: \
@@ -181,11 +222,13 @@ def variant_stats_from_variant(variant,
     """
     all_stats = []
     for (variant_file, variant_metadata) in metadata.items():
-        if ".maf" in variant_file.lower():
+        if _vcf_is_maf(variant_file=variant_file):
             stats = maf_somatic_variant_stats(variant, variant_metadata)
-        elif "strelka" in variant_file.lower():
+        elif _vcf_is_strelka(variant_file=variant_file,
+                             variant_metadata=variant_metadata):
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
-        elif "mutect" in variant_file.lower():
+        elif _vcf_is_mutect(variant_file=variant_file,
+                            variant_metadata=variant_metadata):
             stats = mutect_somatic_variant_stats(variant, variant_metadata)
         else:
             raise ValueError("Cannot parse sample fields, variant file {} is from an unsupported caller.".format(variant_file))

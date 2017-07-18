@@ -81,7 +81,6 @@ def extraction(cohort, extractor):
 
             ok_(somatic_stats.normal_stats.variant_allele_frequency == 0)
 
-@raises(ValueError)
 def test_extract_unsupported_stats():
     vcf_dir, cohort = None, None
     try:
