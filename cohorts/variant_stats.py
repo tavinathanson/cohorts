@@ -14,7 +14,6 @@
 
 # pylint: disable=unsubscriptable-object
 from collections import namedtuple
-import re
 import vcf
 
 VariantStats = namedtuple("VariantStats",
@@ -166,15 +165,15 @@ def _vcf_is_strelka(variant_file, variant_metadata):
     """
     if "strelka" in variant_file.lower():
         return True
-    elif 'NORMAL' in variant_metadata['sample_info'].keys():
+    elif "NORMAL" in variant_metadata["sample_info"].keys():
         return True
     else:
         vcf_reader = vcf.Reader(open(variant_file, "r"))
         try:
-            vcf_type = vcf_reader.metadata['content']
+            vcf_type = vcf_reader.metadata["content"]
         except KeyError:
-            vcf_type = ''
-        if re.search(string=vcf_type.lower(), pattern='strelka'):
+            vcf_type = ""
+        if "strelka" in vcf_type.lower():
             return True
     return False
 
@@ -188,15 +187,15 @@ def _vcf_is_mutect(variant_file, variant_metadata):
     """
     if "mutect" in variant_file.lower():
         return True
-    elif 'GT' in variant_metadata['sample_info'].keys():
+    elif "GT" in variant_metadata["sample_info"].keys():
         return True
     else:
         vcf_reader = vcf.Reader(open(variant_file, "r"))
         try:
             vcf_type = vcf_reader.metadata["GATKCommandLine"][0]["ID"]
         except KeyError:
-            vcf_type = ''
-        if vcf_type.lower() == 'mutect':
+            vcf_type = ""
+        if "mutect" in vcf_type.lower():
             return True
     return False
 
