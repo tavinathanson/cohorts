@@ -26,6 +26,7 @@ import inspect
 import logging
 import pickle
 import numpy as np
+from matplotlib import pyplot as plt
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -1337,7 +1338,7 @@ class Cohort(Collection):
             default_threshold = None
         else:
             default_threshold = "median"
-        if strata_col is None:
+        if strata is None:
             results = plot_kmf(
                 df=df,
                 condition_col=plot_col,
@@ -1358,11 +1359,11 @@ class Cohort(Collection):
             )
         else:
             results = list()
-            n_strata = len(unique(df[strata_col]))
+            n_strata = len(df[strata].unique())
             if ax is None:
-                ax = plt.subplots(n_strata)
+                f, ax = plt.subplots(n_strata, sharex=True)
             a = 0
-            for strat, strat_df in df.groupby(strata_col):
+            for strat, strat_df in df.groupby(strata):
                 results.append(plot_kmf(df=strat_df,
                                         condition_col=plot_col,
                                         xlabel=survival_units,
@@ -1380,6 +1381,7 @@ class Cohort(Collection):
                                         label_map=label_map,
                                         color_map=color_map,
                                         ))
+                a += 1
         return results
 
     def plot_correlation(self, on, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, plot_kwargs={}, **kwargs):
