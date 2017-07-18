@@ -2,6 +2,7 @@ pandas>=0.15
 seaborn>=0.7.0
 scipy>=0.17.0
 topiary>=0.1.0, <0.2.0
+mhcnames==0.1.0
 mhctools>=0.3.0, <0.4.0
 varcode>=0.5.15, <0.6.0
 pyensembl>=1.0.1, <1.1.0
