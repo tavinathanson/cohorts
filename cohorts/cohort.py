@@ -26,6 +26,7 @@ import inspect
 import logging
 import pickle
 import numpy as np
+from matplotlib import pyplot as plt
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
@@ -1298,6 +1299,7 @@ class Cohort(Collection):
                       on,
                       how="os",
                       survival_units="Days",
+                      strata=None,
                       ax=None,
                       ci_show=False,
                       with_condition_color="#B38600",
@@ -1317,6 +1319,8 @@ class Cohort(Collection):
             Whether to plot OS (overall survival) or PFS (progression free survival)
         survival_units : str
             Unit of time for the survival measure, i.e. Days or Months
+        strata : str
+            column name of stratifying variable
         ci_show : bool
             Display the confidence interval around the survival curve
         threshold : int or "median", optional
@@ -1336,24 +1340,55 @@ class Cohort(Collection):
             default_threshold = None
         else:
             default_threshold = "median"
-        results = plot_kmf(
-            df=df,
-            condition_col=plot_col,
-            xlabel=survival_units,
-            ylabel="Overall Survival (%)" if how == "os" else "Progression-Free Survival (%)",
-            censor_col="deceased" if how == "os" else "progressed_or_deceased",
-            survival_col=how,
-            threshold=threshold if threshold is not None else default_threshold,
-            ax=ax,
-            ci_show=ci_show,
-            with_condition_color=with_condition_color,
-            no_condition_color=no_condition_color,
-            with_condition_label=with_condition_label,
-            no_condition_label=no_condition_label,
-            color_palette=color_palette,
-            label_map=label_map,
-            color_map=color_map,
-        )
+        if strata is None:
+            results = plot_kmf(
+                df=df,
+                condition_col=plot_col,
+                xlabel=survival_units,
+                ylabel="Overall Survival (%)" if how == "os" else "Progression-Free Survival (%)",
+                censor_col="deceased" if how == "os" else "progressed_or_deceased",
+                survival_col=how,
+                threshold=threshold if threshold is not None else default_threshold,
+                ax=ax,
+                ci_show=ci_show,
+                with_condition_color=with_condition_color,
+                no_condition_color=no_condition_color,
+                with_condition_label=with_condition_label,
+                no_condition_label=no_condition_label,
+                color_palette=color_palette,
+                label_map=label_map,
+                color_map=color_map,
+            )
+        else:
+            results = list()
+            n_strata = len(df[strata].unique())
+            if ax is None:
+                f, ax = plt.subplots(n_strata, sharex=True)
+            a = 0
+            for strat, strat_df in df.groupby(strata):
+                if n_strata == 1:
+                    my_axis = ax
+                else:
+                    my_axis = ax[a]
+                results.append(plot_kmf(df=strat_df,
+                                        condition_col=plot_col,
+                                        xlabel=survival_units,
+                                        ylabel="Overall Survival (%)" if how == "os" else "Progression-Free Survival (%)",
+                                        censor_col="deceased" if how == "os" else "progressed_or_deceased",
+                                        survival_col=how,
+                                        threshold=threshold if threshold is not None else default_threshold,
+                                        ax=my_axis,
+                                        ci_show=ci_show,
+                                        with_condition_color=with_condition_color,
+                                        no_condition_color=no_condition_color,
+                                        with_condition_label=with_condition_label,
+                                        no_condition_label=no_condition_label,
+                                        color_palette=color_palette,
+                                        label_map=label_map,
+                                        color_map=color_map,
+                                        ))
+                my_axis.set_title("{}: {}".format(strata, strat))
+                a += 1
         return results
 
     def plot_correlation(self, on, x_col=None, plot_type="jointplot", stat_func=pearsonr, show_stat_func=True, plot_kwargs={}, **kwargs):
