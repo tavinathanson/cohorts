@@ -158,6 +158,30 @@ def maf_somatic_variant_stats(variant, variant_metadata):
         normal_stats = _maf_variant_stats(variant, variant_metadata, prefix="n")
     return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
 
+def _vcf_is_strelka(variant_file):
+    """Return True if variant_file given is in strelka format
+    """
+    return "strelka" in variant_file.lower()
+
+def _vcf_is_maf(variant_file):
+    """Retrun True if variant_file given is in .maf format
+    """
+    return ".maf" in variant_file.lower()
+
+def _vcf_is_mutect(variant_file):
+    """Return True if variant_file give is in mutect format
+    """
+    if "mutect" in variant_file.lower():
+        return True
+    else:
+        try:
+            vcf_reader = vcf.Reader(open(variant_file, "r"))
+            if vcf_reader.metadata["GATKCommandLine"][0]["ID"] == "MuTect":
+                return True
+        except:
+            pass
+    return False
+
 def variant_stats_from_variant(variant,
                                metadata,
                                merge_fn=(lambda all_stats: \
@@ -181,13 +205,19 @@ def variant_stats_from_variant(variant,
     """
     all_stats = []
     for (variant_file, variant_metadata) in metadata.items():
-        if ".maf" in variant_file.lower():
+        if _vcf_is_maf(variant_file=variant_file):
             stats = maf_somatic_variant_stats(variant, variant_metadata)
-        elif "strelka" in variant_file.lower():
+        elif _vcf_is_strelka(variant_file=variant_file):
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
-        elif "mutect" in variant_file.lower():
+        elif _vcf_is_mutect(variant_file=variant_file):
             stats = mutect_somatic_variant_stats(variant, variant_metadata)
         else:
-            raise ValueError("Cannot parse sample fields, variant file {} is from an unsupported caller.".format(variant_file))
+            try:
+                stats = strelka_somatic_variant_stats(variant, variant_metadata)
+            except:
+                try:
+                    stats = mutect_somatic_variant_stats(variant, variant_metadata)
+                except:
+                    raise ValueError("Cannot parse sample fields, variant file {} is from an unsupported caller.".format(variant_file))
         all_stats.append(stats)
     return merge_fn(all_stats)
