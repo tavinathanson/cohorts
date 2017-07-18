@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from collections import namedtuple
+import vcf
 
 VariantStats = namedtuple("VariantStats",
                           ["depth", "alt_depth", "variant_allele_frequency"])
