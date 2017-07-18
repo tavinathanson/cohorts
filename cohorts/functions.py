@@ -267,7 +267,11 @@ def median_vaf_purity(row, cohort, **kwargs):
     """
     patient_id = row["patient_id"]
     patient = cohort.patient_from_id(patient_id)
-    variants = cohort.load_variants(patients=[patient], filter_fn=no_filter)[patient_id]
+    variants = cohort.load_variants(patients=[patient], filter_fn=no_filter)
+    if patient_id in variants.keys():
+        variants = variants[patient_id]
+    else:
+        return np.nan
     def grab_vaf(variant):
         filterable_variant = FilterableVariant(variant, variants, patient)
         return variant_stats_from_variant(variant, filterable_variant.variant_metadata).tumor_stats.variant_allele_frequency
