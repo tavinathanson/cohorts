@@ -21,11 +21,13 @@ from matplotlib import pyplot as plt
 import seaborn as sb
 import patsy
 from .rounding import float_str
+import inspect
 
 def plot_kmf(df,
              condition_col,
              censor_col,
              survival_col,
+             strata_col=None,
              threshold=None,
              title=None,
              xlabel=None,
@@ -55,11 +57,14 @@ def plot_kmf(df,
         condition_col: string, column which contains the condition to split on
         survival_col: string, column which contains the survival time
         censor_col: string,
+        strata_col: optional string, denoting column containing data to
+                    stratify by (default: None)
         threshold: int or string, if int, condition_col is thresholded,
                                   if 'median', condition_col thresholded
                                   at its median
         title: Title for the plot, default None
         ax: an existing matplotlib ax, optional, default None
+             note: not currently supported when `strata_col` is not None
         with_condition_color: str, hex code color for the with-condition curve
         no_condition_color: str, hex code color for the no-condition curve
         with_condition_label: str, optional, label for TRUE condition case
@@ -76,6 +81,38 @@ def plot_kmf(df,
         print_as_title: bool, optional, whether or not to print text
           within the plot's title vs. stdout, default False
     """
+    # if strata not None, call plot_kmf for each of the strata
+    if strata_col:
+        # want this at the top of the function!
+        arglist = locals() ## save input args for reuse
+        # create axis / subplots
+        if ax is not None:
+            raise ValueError('ax not supported with stratified analysis.')
+        n_strata = len(df[strata_col].unique())
+        f, ax = plt.subplots(n_strata, sharex=True)
+        a = 0 ## index for ax
+        # create results dict to hold per-strata results
+        results = dict()
+        # update strata_col to be None for each sub-call
+        arglist['strata_col'] = None
+        # call plot_kmf for each strata, using same args
+        for strat_name, strat_df in df.groupby(strata_col):
+            if n_strata == 1:
+                arglist['ax'] = ax
+            else:
+                arglist['ax'] = ax[a]
+            subtitle = "{}: {}".format(strata_col, strat_name)
+            arglist['title'] = subtitle
+            arglist['df'] = strat_df
+            print(subtitle) ## print a header, since plot_kmf prints results
+            results[subtitle] = plot_kmf(**arglist)
+            [print(desc) for desc in results[subtitle].desc]
+            a += 1
+        if title:
+            f.suptitle(title)
+        return results
+
+    # if strata is None, produce plot
     if colors.is_color_like(with_condition_color):
         with_condition_color = colors.to_hex(with_condition_color)
     if colors.is_color_like(no_condition_color):
@@ -179,6 +216,7 @@ def plot_kmf(df,
         results.print_summary()
     results.survival_data_series = grp_survival_data
     results.event_data_series = grp_event_data
+    results.desc = grp_desc
     return results
 
 class NullSurvivalResults(object):
