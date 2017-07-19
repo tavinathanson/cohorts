@@ -21,7 +21,6 @@ from matplotlib import pyplot as plt
 import seaborn as sb
 import patsy
 from .rounding import float_str
-import inspect
 
 def plot_kmf(df,
              condition_col,

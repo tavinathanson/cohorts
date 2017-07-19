@@ -26,7 +26,6 @@ import inspect
 import logging
 import pickle
 import numpy as np
-from matplotlib import pyplot as plt
 
 # pylint doesn't like this line
 # pylint: disable=no-name-in-module
