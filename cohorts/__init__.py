@@ -16,6 +16,7 @@ from .cohort import Cohort
 from .patient import Patient
 from .sample import Sample
 from .dataframe_loader import DataFrameLoader
+from . import io
 
 from ._version import get_versions
 __version__ = get_versions()['version']
