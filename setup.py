@@ -69,5 +69,5 @@ if __name__ == "__main__":
         dependency_links=dependency_links,
         python_requires=">=3.3",
         long_description=readme,
-        packages=["cohorts"],
+        packages=["cohorts", "cohorts.io"],
     )
