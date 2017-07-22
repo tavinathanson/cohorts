@@ -29,7 +29,9 @@ class DataFrameLoader(object):
     def __init__(self,
                  name,
                  load_dataframe,
-                 join_on="patient_id"):
+                 join_on="patient_id",
+                 join_on_left="patient_id"):
         self.name = name
         self.load_dataframe = load_dataframe
-        self.join_on = join_on
+        self.join_on_left = join_on_left
+        self.join_on_right = join_on
