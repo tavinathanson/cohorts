@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
+
 class DataFrameLoader(object):
     """
     Wraps a `DataFrame` with some information on how to join it.
@@ -29,9 +31,15 @@ class DataFrameLoader(object):
     def __init__(self,
                  name,
                  load_dataframe,
-                 join_on="patient_id",
+                 join_on=None,
+                 join_on_right="patient_id",
                  join_on_left="patient_id"):
         self.name = name
         self.load_dataframe = load_dataframe
+        if join_on:
+            warnings.warn("`join_on` parameter is deprecated. Please use `join_on_right` instead.", warnings.DeprecationWarning)
+            if join_on_right:
+                ValueError("Both join_on_right & join_on given, but only one is supported.")
+            self.join_on_right = join_on
         self.join_on_left = join_on_left
-        self.join_on_right = join_on
+        self.join_on_right = join_on_right
