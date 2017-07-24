@@ -1298,7 +1298,6 @@ class Cohort(Collection):
                       on,
                       how="os",
                       survival_units="Days",
-                      strata=None,
                       ax=None,
                       ci_show=False,
                       with_condition_color="#B38600",
@@ -1318,8 +1317,6 @@ class Cohort(Collection):
             Whether to plot OS (overall survival) or PFS (progression free survival)
         survival_units : str
             Unit of time for the survival measure, i.e. Days or Months
-        strata : str
-            (optional) column name of stratifying variable
         ci_show : bool
             Display the confidence interval around the survival curve
         threshold : int or "median", optional
@@ -1346,7 +1343,6 @@ class Cohort(Collection):
             ylabel="Overall Survival (%)" if how == "os" else "Progression-Free Survival (%)",
             censor_col="deceased" if how == "os" else "progressed_or_deceased",
             survival_col=how,
-            strata_col=strata,
             threshold=threshold if threshold is not None else default_threshold,
             ax=ax,
             ci_show=ci_show,
