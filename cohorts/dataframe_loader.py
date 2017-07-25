@@ -24,9 +24,12 @@ class DataFrameLoader(object):
         The name of the dataframe, to easily reference it.
     load_dataframe : function
         A function that returns the `DataFrame` object.
-    join_on : str
+    join_on_right : str
         The column of the `DataFrame` to join on (i.e. the patient
         ID column name).
+    join_on_left: str
+        The corresponding column in the `cohorts.Patient.additional_data` 
+	to join on, if not the `id` (which is the default).
     """
     def __init__(self,
                  name,
@@ -37,9 +40,8 @@ class DataFrameLoader(object):
         self.name = name
         self.load_dataframe = load_dataframe
         if join_on:
-            warnings.warn("`join_on` parameter is deprecated. Please use `join_on_right` instead.", warnings.DeprecationWarning)
-            if join_on_right:
-                ValueError("Both join_on_right & join_on given, but only one is supported.")
+            warnings.warn("`join_on` parameter is deprecated. Please use `join_on_right` instead.", DeprecationWarning)
             self.join_on_right = join_on
+        else:
+            self.join_on_right = join_on_right
         self.join_on_left = join_on_left
-        self.join_on_right = join_on_right
