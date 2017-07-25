@@ -18,69 +18,44 @@ from lifelines import KaplanMeierFitter, CoxPHFitter
 from lifelines.statistics import logrank_test
 import matplotlib.colors as colors
 from matplotlib import pyplot as plt
+import numpy as np
 import seaborn as sb
 import patsy
 from .rounding import float_str
 
-def plot_kmf(df,
-             condition_col,
-             censor_col,
-             survival_col,
-             threshold=None,
-             title=None,
-             xlabel=None,
-             ylabel=None,
-             ax=None,
-             with_condition_color="#B38600",
-             no_condition_color="#A941AC",
-             with_condition_label=None,
-             no_condition_label=None,
-             color_map=None,
-             label_map=None,
-             color_palette="Set1",
-             ci_show=False,
-             print_as_title=False):
+
+def _plot_kmf_single(df,
+                     condition_col,
+                     survival_col,
+                     censor_col,
+                     threshold,
+                     title,
+                     xlabel,
+                     ylabel,
+                     ax,
+                     with_condition_color,
+                     no_condition_color,
+                     with_condition_label,
+                     no_condition_label,
+                     color_map,
+                     label_map,
+                     color_palette,
+                     ci_show,
+                     print_as_title):
     """
-    Plot survival curves by splitting the dataset into two groups based on
-    condition_col
+    Helper function to produce a single KM survival plot, among observations in df by groups defined by condition_col.
 
-    if threshold is defined, the groups are split based on being > or <
-    condition_col
-
-    if threshold == 'median', the threshold is set to the median of condition_col
-
-    Parameters
-    ----------
-        df: dataframe
-        condition_col: string, column which contains the condition to split on
-        survival_col: string, column which contains the survival time
-        censor_col: string,
-        threshold: int or string, if int, condition_col is thresholded,
-                                  if 'median', condition_col thresholded
-                                  at its median
-        title: Title for the plot, default None
-        ax: an existing matplotlib ax, optional, default None
-        with_condition_color: str, hex code color for the with-condition curve
-        no_condition_color: str, hex code color for the no-condition curve
-        with_condition_label: str, optional, label for TRUE condition case
-        no_condition_label: str, optional, label for FALSE condition case
-        color_map: dict, optional, mapping of hex-values to condition text
-          in the form of {value_name: color_hex_code}.
-          defaults to `sb.color_palette` using `default_color_palette` name,
-          or *_condition_color options in case of boolean operators.
-        label_map: dict, optional, mapping of labels to condition text.
-          defaults to "condition_name = condition_value", or *_condition_label
-          options in case of boolean operators.
-        color_palette: str, optional, name of sb.color_palette to use
-          if color_map not provided.
-        print_as_title: bool, optional, whether or not to print text
-          within the plot's title vs. stdout, default False
+    All inputs are required - this function is intended to be called by `plot_kmf`.
     """
+    # make color in puts consistent hex format
     if colors.is_color_like(with_condition_color):
         with_condition_color = colors.to_hex(with_condition_color)
     if colors.is_color_like(no_condition_color):
         no_condition_color = colors.to_hex(no_condition_color)
-    kmf = KaplanMeierFitter()
+    ## prepare data to be plotted; producing 3 outputs:
+    # - `condition`, series containing category labels to be plotted
+    # - `label_map` (mapping condition values to plot labels)
+    # - `color_map` (mapping condition values to plotted colors)
     if threshold is not None:
         is_median = threshold == "median"
         if is_median:
@@ -126,6 +101,8 @@ def plot_kmf(df,
         raise ValueError('Don\'t know how to plot data of type\
                          {}'.format(df[condition_col].dtype))
 
+    # produce kmf plot for each category (group) identified above
+    kmf = KaplanMeierFitter()
     grp_desc = list()
     grp_survival_data = dict()
     grp_event_data = dict()
@@ -145,29 +122,37 @@ def plot_kmf(df,
         else:
             ax = kmf.plot(show_censors=True, ci_show=ci_show, color=grp_color)
 
+    ## format the plot
     # Set the y-axis to range 0 to 1
     ax.set_ylim(0, 1)
     y_tick_vals = ax.get_yticks()
     ax.set_yticklabels(["%d" % int(y_tick_val * 100) for y_tick_val in y_tick_vals])
-
+    # plot title
     if title:
         ax.set_title(title)
     elif print_as_title:
         ax.set_title(' | '.join(grp_desc))
     else:
         [print(desc) for desc in grp_desc]
-
+    # axis labels
     if xlabel:
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
-
+    
+    ## summarize analytical version of results
+    ## again using same groups as are plotted
     if len(grp_names) == 2:
+        # use log-rank test for 2 groups
         results = logrank_test(grp_survival_data[grp_names[0]],
                                grp_survival_data[grp_names[1]],
                                event_observed_A=grp_event_data[grp_names[0]],
                                event_observed_B=grp_event_data[grp_names[1]])
+    elif len(grp_names) == 1:
+        # no analytical result for 1 or 0 groups
+        results = NullSurvivalResults()
     else:
+        # cox PH fitter for >2 groups
         cf = CoxPHFitter()
         cox_df = patsy.dmatrix('+'.join([condition_col, survival_col,
                                          censor_col]),
@@ -175,9 +160,145 @@ def plot_kmf(df,
         del cox_df['Intercept']
         results = cf.fit(cox_df, survival_col, event_col=censor_col)
         results.print_summary()
+    # add metadata to results object so caller can print them
     results.survival_data_series = grp_survival_data
     results.event_data_series = grp_event_data
+    results.desc = grp_desc
     return results
+
+
+def plot_kmf(df,
+             condition_col,
+             censor_col,
+             survival_col,
+             strata_col=None,
+             threshold=None,
+             title=None,
+             xlabel=None,
+             ylabel=None,
+             ax=None,
+             with_condition_color="#B38600",
+             no_condition_color="#A941AC",
+             with_condition_label=None,
+             no_condition_label=None,
+             color_map=None,
+             label_map=None,
+             color_palette="Set1",
+             ci_show=False,
+             print_as_title=False):
+    """
+    Plot survival curves by splitting the dataset into two groups based on
+    condition_col. Report results for a log-rank test (if two groups are plotted)
+    or CoxPH survival analysis (if >2 groups) for association with survival.
+
+    Regarding definition of groups:
+        If condition_col is numeric, values are split into 2 groups.
+             - if threshold is defined, the groups are split on being > or < condition_col
+             - if threshold == 'median', the threshold is set to the median of condition_col
+        If condition_col is categorical or string, results are plotted for each unique value in the dataset.
+        If condition_col is None, results are plotted for all observations
+
+    Currently, if `strata_col` is given, the results are repeated among each stratum of the df.
+    A truly "stratified" analysis is not yet supported by may be soon.
+
+    Parameters
+    ----------
+        df: dataframe
+        condition_col: string, column which contains the condition to split on
+        survival_col: string, column which contains the survival time
+        censor_col: string,
+        strata_col: optional string, denoting column containing data to
+                    stratify by (default: None)
+        threshold: int or string, if int, condition_col is thresholded,
+                                  if 'median', condition_col thresholded
+                                  at its median
+                                  if 'median per-strata', & if stratified analysis
+                                  then condition_col thresholded by strata
+        title: Title for the plot, default None
+        ax: an existing matplotlib ax, optional, default None
+             note: not currently supported when `strata_col` is not None
+        with_condition_color: str, hex code color for the with-condition curve
+        no_condition_color: str, hex code color for the no-condition curve
+        with_condition_label: str, optional, label for TRUE condition case
+        no_condition_label: str, optional, label for FALSE condition case
+        color_map: dict, optional, mapping of hex-values to condition text
+          in the form of {value_name: color_hex_code}.
+          defaults to `sb.color_palette` using `default_color_palette` name,
+          or *_condition_color options in case of boolean operators.
+        label_map: dict, optional, mapping of labels to condition text.
+          defaults to "condition_name = condition_value", or *_condition_label
+          options in case of boolean operators.
+        color_palette: str, optional, name of sb.color_palette to use
+          if color_map not provided.
+        print_as_title: bool, optional, whether or not to print text
+          within the plot's title vs. stdout, default False
+    """
+    
+    # set reasonable default threshold value depending on type of condition_col
+    if threshold is None:
+        if df[condition_col].dtype != 'bool' and \
+            np.issubdtype(df[condition_col].dtype, np.number):
+                threshold = 'median'
+
+    # construct kwarg dict to pass to _plot_kmf_single.
+    # start with args that do not vary according to strata_col
+    arglist = dict(
+            condition_col=condition_col,
+            survival_col=survival_col,
+            censor_col=censor_col,
+            threshold=threshold,
+            with_condition_color=with_condition_color,
+            no_condition_color=no_condition_color,
+            with_condition_label=with_condition_label,
+            no_condition_label=no_condition_label,
+            color_map=color_map,
+            label_map=label_map,
+            xlabel=xlabel,
+            ylabel=ylabel,
+            ci_show=ci_show,
+            color_palette=color_palette,
+            print_as_title=print_as_title)
+
+    # if strata_col is None, pass all parameters to _plot_kmf_single
+    if strata_col is None:
+        arglist.update(dict(
+            df=df,
+            title=title,
+            ax=ax))
+        return _plot_kmf_single(**arglist)
+    else:
+        # prepare for stratified analysis
+        if threshold == 'median':
+            # by default, "median" threshold should be intra-strata median
+            arglist['threshold'] = df[condition_col].dropna().median()
+        elif threshold == 'median per-strata':
+            arglist['threshold'] = 'median'
+        # create axis / subplots for stratified results
+        if ax is not None:
+            raise ValueError('ax not supported with stratified analysis.')
+        n_strata = len(df[strata_col].unique())
+        f, ax = plt.subplots(n_strata, sharex=True)
+        # create results dict to hold per-strata results
+        results = dict()
+        # call _plot_kmf_single for each of the strata
+        for i, (strat_name, strat_df) in enumerate(df.groupby(strata_col)):
+            if n_strata == 1:
+                arglist['ax'] = ax
+            else:
+                arglist['ax'] = ax[i]
+            subtitle = "{}: {}".format(strata_col, strat_name)
+            arglist['title'] = subtitle
+            arglist['df'] = strat_df
+            results[subtitle] = plot_kmf(**arglist)
+            [print(desc) for desc in results[subtitle].desc]
+        if title:
+            f.suptitle(title)
+        return results
+
+
+class NullSurvivalResults(object):
+    def __repr__(self):
+        return "No model fit."
 
 
 def logrank(df,
