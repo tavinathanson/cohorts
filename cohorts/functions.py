@@ -239,12 +239,19 @@ exonic_frameshift_deletion_count = count_effects_function_builder(
         isinstance(filterable_effect.effect, Exonic)))
 
 exonic_frameshift_insertion_count = count_effects_function_builder(
-    "exonic_frameshift_deletion_count",
+    "exonic_frameshift_insertion_count",
     only_nonsynonymous=False,
     filterable_effect_function=lambda filterable_effect: (
         filterable_effect.variant.is_insertion and
         isinstance(filterable_effect.effect, FrameShift) and
         isinstance(filterable_effect.effect, Exonic)))
+
+exonic_frameshift_snv_count = count_effects_function_builder(
+    "exonic_frameshift_snv_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic) and
+        isinstance(filterable_effect.effect, FrameShift)))
 
 missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
     "missense_snv_and_nonsynonymous_indel_count",
