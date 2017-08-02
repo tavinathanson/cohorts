@@ -129,6 +129,7 @@ indel_count = count_variants_function_builder(
     filterable_variant_function=lambda filterable_variant: (
         filterable_variant.variant.is_indel))
 
+
 deletion_count = count_variants_function_builder(
     "deletion_count",
     filterable_variant_function=lambda filterable_variant: (
@@ -213,6 +214,37 @@ frameshift_count = count_effects_function_builder(
     only_nonsynonymous=False, # Should not matter, because FrameShift extends NonsilentCodingMutation
     filterable_effect_function=lambda filterable_effect: (
         isinstance(filterable_effect.effect, FrameShift)))
+
+frameshift_indel_count = count_effects_function_builder(
+    "frameshift_indel_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_indel and
+        isinstance(filterable_effect.effect, FrameShift)))
+
+exonic_frameshift_indel_count = count_effects_function_builder(
+    "exonic_frameshift_indel_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_indel and
+        isinstance(filterable_effect.effect, FrameShift) and
+        isinstance(filterable_effect.effect, Exonic)))
+
+exonic_frameshift_deletion_count = count_effects_function_builder(
+    "exonic_frameshift_deletion_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_deletion and
+        isinstance(filterable_effect.effect, FrameShift) and
+        isinstance(filterable_effect.effect, Exonic)))
+
+exonic_frameshift_insertion_count = count_effects_function_builder(
+    "exonic_frameshift_deletion_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_insertion and
+        isinstance(filterable_effect.effect, FrameShift) and
+        isinstance(filterable_effect.effect, Exonic)))
 
 missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
     "missense_snv_and_nonsynonymous_indel_count",
