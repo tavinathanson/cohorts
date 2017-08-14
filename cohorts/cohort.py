@@ -1322,23 +1322,13 @@ class Cohort(Collection):
             (optional) column name of stratifying variable
         ci_show : bool
             Display the confidence interval around the survival curve
-        threshold : int or "median", optional
+        threshold : int, "median", "median-per-strata" or None (optional)
             Threshold of `col` on which to split the cohort
         """
         assert how in ["os", "pfs"], "Invalid choice of survival plot type %s" % how
         cols, df = self.as_dataframe(on, return_cols=True, **kwargs)
         plot_col = self.plot_col_from_cols(cols=cols, only_allow_one=True)
         df = filter_not_null(df, plot_col)
-        if df[plot_col].dtype == "bool":
-            default_threshold = None
-        elif np.issubdtype(df[plot_col].dtype, np.number):
-            default_threshold = "median"
-        elif df[plot_col].dtype == "O": # is string
-            default_threshold = None
-        elif df[plot_col].dtype.name == "category":
-            default_threshold = None
-        else:
-            default_threshold = "median"
         results = plot_kmf(
             df=df,
             condition_col=plot_col,
@@ -1347,7 +1337,7 @@ class Cohort(Collection):
             censor_col="deceased" if how == "os" else "progressed_or_deceased",
             survival_col=how,
             strata_col=strata,
-            threshold=threshold if threshold is not None else default_threshold,
+            threshold=threshold,
             ax=ax,
             ci_show=ci_show,
             with_condition_color=with_condition_color,
