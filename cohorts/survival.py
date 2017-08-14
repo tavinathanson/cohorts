@@ -47,7 +47,7 @@ def _plot_kmf_single(df,
 
     All inputs are required - this function is intended to be called by `plot_kmf`.
     """
-    # make color in puts consistent hex format
+    # make color inputs consistent hex format
     if colors.is_color_like(with_condition_color):
         with_condition_color = colors.to_hex(with_condition_color)
     if colors.is_color_like(no_condition_color):
@@ -209,18 +209,18 @@ def plot_kmf(df,
         censor_col: string,
         strata_col: optional string, denoting column containing data to
                     stratify by (default: None)
-        threshold: int or string, if int, condition_col is thresholded,
+        threshold: int or string, if int, condition_col is thresholded at int,
                                   if 'median', condition_col thresholded
                                   at its median
-                                  if 'median per-strata', & if stratified analysis
+                                  if 'median-per-strata', & if stratified analysis
                                   then condition_col thresholded by strata
         title: Title for the plot, default None
         ax: an existing matplotlib ax, optional, default None
              note: not currently supported when `strata_col` is not None
         with_condition_color: str, hex code color for the with-condition curve
         no_condition_color: str, hex code color for the no-condition curve
-        with_condition_label: str, optional, label for TRUE condition case
-        no_condition_label: str, optional, label for FALSE condition case
+        with_condition_label: str, optional, label for True condition case
+        no_condition_label: str, optional, label for False condition case
         color_map: dict, optional, mapping of hex-values to condition text
           in the form of {value_name: color_hex_code}.
           defaults to `sb.color_palette` using `default_color_palette` name,
@@ -236,9 +236,16 @@ def plot_kmf(df,
     
     # set reasonable default threshold value depending on type of condition_col
     if threshold is None:
-        if df[condition_col].dtype != 'bool' and \
+        if df[condition_col].dtype != "bool" and \
             np.issubdtype(df[condition_col].dtype, np.number):
-                threshold = 'median'
+                threshold = "median"
+    # check inputs for threshold for validity
+    elif isinstance(threshold, numbers.Number):
+        logger.debug("threshold value is numeric")
+    elif threshold not in ("median", "median-per-strata"):
+        raise ValueError("invalid input for threshold. Must be numeric, None, 'median', or 'median-per-strata'.")
+    elif threshold == "median-per-strata" and strata_col is None:
+        raise ValueError("threshold given was 'median-per-strata' and yet `strata_col` was None. Did you mean 'median'?")
 
     # construct kwarg dict to pass to _plot_kmf_single.
     # start with args that do not vary according to strata_col
@@ -268,14 +275,14 @@ def plot_kmf(df,
         return _plot_kmf_single(**arglist)
     else:
         # prepare for stratified analysis
-        if threshold == 'median':
+        if threshold == "median":
             # by default, "median" threshold should be intra-strata median
-            arglist['threshold'] = df[condition_col].dropna().median()
-        elif threshold == 'median per-strata':
-            arglist['threshold'] = 'median'
+            arglist["threshold"] = df[condition_col].dropna().median()
+        elif threshold == "median-per-strata":
+            arglist["threshold"] = "median"
         # create axis / subplots for stratified results
         if ax is not None:
-            raise ValueError('ax not supported with stratified analysis.')
+            raise ValueError("ax not supported with stratified analysis.")
         n_strata = len(df[strata_col].unique())
         f, ax = plt.subplots(n_strata, sharex=True)
         # create results dict to hold per-strata results
@@ -283,12 +290,12 @@ def plot_kmf(df,
         # call _plot_kmf_single for each of the strata
         for i, (strat_name, strat_df) in enumerate(df.groupby(strata_col)):
             if n_strata == 1:
-                arglist['ax'] = ax
+                arglist["ax"] = ax
             else:
-                arglist['ax'] = ax[i]
+                arglist["ax"] = ax[i]
             subtitle = "{}: {}".format(strata_col, strat_name)
-            arglist['title'] = subtitle
-            arglist['df'] = strat_df
+            arglist["title"] = subtitle
+            arglist["df"] = strat_df
             results[subtitle] = plot_kmf(**arglist)
             [print(desc) for desc in results[subtitle].desc]
         if title:
@@ -307,7 +314,7 @@ def logrank(df,
             survival_col,
             threshold=None):
     if threshold is not None:
-        if threshold == 'median':
+        if threshold == "median":
             threshold = df[condition_col].median()
         condition = df[condition_col] > threshold
     else:
