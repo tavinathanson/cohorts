@@ -18,6 +18,7 @@ from lifelines import KaplanMeierFitter, CoxPHFitter
 from lifelines.statistics import logrank_test
 import matplotlib.colors as colors
 from matplotlib import pyplot as plt
+import numbers
 import numpy as np
 import seaborn as sb
 import patsy
