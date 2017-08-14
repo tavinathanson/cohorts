@@ -284,8 +284,8 @@ class Cohort(Collection):
             old_len_df = len(df)
             df = df.merge(
                 loaded_df,
-                left_on="patient_id",
-                right_on=df_loader.join_on,
+                left_on=df_loader.join_on_left,
+                right_on=df_loader.join_on_right,
                 how=join_how)
             print("%s join with %s: %d to %d rows" % (
                 join_how,
