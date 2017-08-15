@@ -28,7 +28,7 @@ class DataFrameLoader(object):
         The column of the `DataFrame` to join on (i.e. the patient
         ID column name).
     join_on_left: str
-        The corresponding column in the `cohorts.Patient.additional_data` 
+        The corresponding column in the `cohorts.Patient.additional_data`
 	to join on, if not the `id` (which is the default).
     """
     def __init__(self,
@@ -39,7 +39,7 @@ class DataFrameLoader(object):
                  join_on_left="patient_id"):
         self.name = name
         self.load_dataframe = load_dataframe
-        if join_on:
+        if join_on is not None:
             warnings.warn("`join_on` parameter is deprecated. Please use `join_on_right` instead.", DeprecationWarning)
             self.join_on_right = join_on
         else:
