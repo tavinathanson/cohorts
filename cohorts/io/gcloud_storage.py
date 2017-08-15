@@ -135,12 +135,6 @@ class GoogleStorageIO:
         # corrupted/incomplete data to be around as much as possible.
         return os.rename(tmp_file_path, localpath)
 
-    def get_blob(self, gsuri):
-        bucket_name, gs_rel_path = self.parse_uri(gsuri)
-        bucket = self._client.get_bucket(bucket_name)
-        ablob = bucket.get_blob(gs_rel_path)
-        return ablob
-
 
 class GoogleStorageFile(object):
     """

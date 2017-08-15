@@ -143,7 +143,7 @@ def _plot_kmf_single(df,
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
-
+    
     ## summarize analytical version of results
     ## again using same groups as are plotted
     if len(grp_names) == 2:
@@ -237,7 +237,7 @@ def plot_kmf(df,
         print_as_title: bool, optional, whether or not to print text
           within the plot's title vs. stdout, default False
     """
-
+    
     # set reasonable default threshold value depending on type of condition_col
     if threshold is None:
         if df[condition_col].dtype != "bool" and \

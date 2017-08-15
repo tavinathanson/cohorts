@@ -129,7 +129,6 @@ indel_count = count_variants_function_builder(
     filterable_variant_function=lambda filterable_variant: (
         filterable_variant.variant.is_indel))
 
-
 deletion_count = count_variants_function_builder(
     "deletion_count",
     filterable_variant_function=lambda filterable_variant: (
