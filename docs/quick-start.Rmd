@@ -1,0 +1,151 @@
+
+# Using cohorts
+
+[Cohorts](http://github.com/hammerlab/cohorts) is a library for analyzing and plotting clinical data, mutations and neoepitopes in patient cohorts.
+
+It calls out to external libraries like topiary and caches the results for easy manipulation.
+
+
+# Motivating use case
+
+The motivating use case for Cohorts is a clinical study for checkpoint blockade (ie cancer immunotherapy).
+
+These studies typically collect a wide range of data for each patient, such as:
+
+- clinical data (e.g. outcome, treatment assignment, gender, risk factors, etc)
+- whole-exome sequencing (WES) or whole-genome sequencing (WGS) data
+   - typically for tumor & normal samples
+- expression data (e.g. RNA-seq)
+- immune infiltrate data 
+- targeted sequencing data (e.g. IMPACT calls or foundation panel data)
+- etc.
+
+Data inputs are processed into clinically-relevant features, such as:
+
+- somatic mutations
+- predicted neoantigens
+- mutational signatures
+- tumor heterogeneity estimates
+- etc.
+
+Because of the computational overhead frequently involved in computing the above-mentioned 
+features, Cohorts caches these computed features by default. The [caching strategy](#caching-strategy)
+will be described in some detail below, but in general Cohorts uses file-based caching.
+
+Cohorts then provides utilities to aid in filtering, summarizing & evaluating these features and 
+their correlation with a variety of clinical outcomes in either a Survival-analysis context or 
+a logistic regression. 
+
+Clinical outcomes evaluated typically include survival, progression-free survival, durable clinical 
+benefit, RECIST, or mRECIST criteria.  
+
+We expect that the sets of input data, features & clinical outcome measures will not only 
+vary from cohort to cohort, but will also likely grow in variety over time. [Cohorts](http://github.com/hammerlab/cohorts) is designed with this flexibility in mind.
+
+
+# Design philosophy
+
+A `Cohort` is, at its most basic level, a collection of Patients. 
+
+At a minimum, each Patient has the following data elements: 
+
+ * id: unique identifier
+ * deceased: boolean indicating if patient deceased
+ * progressed: boolean indicating if patient progressed
+ * os: time (usually days) to death or censor event
+ * pfs: time (days) to progression, death or censor event
+
+The two pairs of endopint data (`os`,`deceased`) and (`pfs`, `progressed`) are used to define the primary endpoint(s) of the study, namely: 
+
+ * Overall Survival, and
+ * Progression-Free Survival
+
+### Minimal example
+
+To illustrate this in practice, let's simulate data for a few sample patients.
+
+```{python, engine.path='/Users/jacquelineburos/anaconda3/envs/py35/bin/python'}
+import cohorts
+
+```
+
+## Example with genetic data
+
+We can also use [pygdc](http://github.com/hammerlab/pygdc)'s `build_cohort` function to easily create a cohort from TCGA data.
+
+```{python, engine.path="/usr/local/bin/python"}
+import pygdc
+
+lung_cohort = pygdc.build_cohort(
+    primary_site='Lung', 
+    cohort_cache_dir='cache-dir')
+
+lung_cohort.plot_survival('age_at_diagnosis')
+```
+
+# Concepts
+
+## Filters
+
+## Provenance
+
+# Caching strategy
+
+For cohorts that include variants or Samples, the results can be summarized at various levels. 
+
+Many of these will save computed data for each patient in a pickled object, to be re-used on subsequent calls.
+
+Some examples of functions that cache results:
+
+   - `cohorts.load_effects()` -> computed variant effects are stored in `cached-effects`
+   - `cohorts.load_variants()` -> VariantCollection stored in `cached-variants`
+   - . etc.
+
+Cached objects are created when used. So, for example, if you only reference effects for a single patient, only those effects will be cached. 
+
+There is no automated checking of cached objects. To clear the cache, simply delete or rename the `cache-dir`.
+
+## Provenance files & Caching
+
+This leads to a possibility that cached objects of the same type but for different patients could have been generated in different environments.
+
+Consider, for example, the following scenario:
+   1. Initial analysis of cohort is performed on first 10 samples received. 
+      - results are cached under `variant-effects` for patients 1-10
+   2. *... several weeks go by while awaiting additional sample data ...*
+      - meanwhile, there have been updates to libraries such as `varcode` or `Cohorts`
+   3. Data for samples from patients 11-20 are recieved, plus updated sample calls for patients 1-10
+      - the analysis is re-run, with intention of updating data
+      - data for patients 1-10 are retreived from cache; data for patients 11-20 are generated & cached
+   4. The analysis loads data from the Cohort, which prints a summary of data sources
+      - the data frame hash will have been updated since the data summaries include sample data for addt'l 10 patients
+      - provenance_summary checks which versions of packages were used to generated cached object
+         - if inconsistent among patients within a data-type, reports an error. 
+         - otherwise, if inconsistent only between data-types, reports a warning
+         - if consistent across all patients & data-types, prints a summary for comparison to other analyses
+
+# Best Practices
+
+In general, we recommend creating a repository for each Cohort that is analyzed.
+
+Each Cohort should have several elements:
+
+   - source data files, or links to files (clinical data & samples)
+   - dedicated cache-dir
+   - an `init_cohort` script, to ensure consistent cohort settings across analyses
+   - accompanying analysis files
+
+Here are some examples of repositories using Cohorts:
+
+   - [tcga-blca](http://github.com/jburos/tcga-blca) repo, containing mock-analysis of TCGA-BLCA data & samples
+
+We have additionally created a [cookiecutter](https://github.com/audreyr/cookiecutter) template to set up a recommended directory structure for an analysis project using Cohorts.
+
+To use this, first install Cookiecutter. 
+
+Then :
+    
+    $ cookiecutter https://github.com/jburos/cookiecutter-cohort.git
+   
+And follow the prompts to create your project template.
+

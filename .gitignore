@@ -8,3 +8,4 @@ ENV.sh
 generated/
 .idea/
 cohorts.egg-info/
+.Rproj.user

@@ -23,7 +23,9 @@ import numpy as np
 import seaborn as sb
 import patsy
 from .rounding import float_str
+from .utils import get_logger
 
+logger = get_logger(__name__, level=logging.INFO)
 
 def _plot_kmf_single(df,
                      condition_col,
