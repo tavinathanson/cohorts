@@ -14,6 +14,7 @@
 
 from .variant_stats import variant_stats_from_variant
 from .utils import get_logger
+from .errors import RNABamFileNotFound
 
 from varcode import Variant
 from varcode.common import memoize
@@ -60,10 +61,14 @@ def expressed_variant_set(cohort, patient, variant_collection):
     # TODO: we're currently using the same isovar cache that we use for expressed
     # neoantigen prediction; so we pass in the same epitope lengths.
     # This is hacky and should be addressed.
-    df_isovar = patient.cohort.load_single_patient_isovar(
-        patient=patient,
-        variants=variant_collection,
-        epitope_lengths=[8, 9, 10, 11])
+    try:
+        df_isovar = patient.cohort.load_single_patient_isovar(
+            patient=patient,
+            variants=variant_collection,
+            epitope_lengths=[8, 9, 10, 11])
+    except RNABamFileNotFound as e:
+        logger.debug('caught exception: {}'.format(repr(e)))
+        return None
     expressed_variant_set = set()
     for _, row in df_isovar.iterrows():
         expressed_variant = Variant(contig=row["chr"],
@@ -79,7 +84,10 @@ def variant_expressed_filter(filterable_variant, **kwargs):
         cohort=filterable_variant.patient.cohort,
         patient=filterable_variant.patient,
         variant_collection=filterable_variant.variant_collection)
-    return filterable_variant.variant in expressed_variants
+    if expressed_variants is None:
+        return None
+    else:
+        return filterable_variant.variant in expressed_variants
 
 def effect_expressed_filter(filterable_effect, **kwargs):
     return variant_expressed_filter(filterable_effect, **kwargs)
