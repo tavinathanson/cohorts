@@ -60,6 +60,7 @@ from .varcode_utils import (filter_variants, filter_effects,
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
+from .errors import BamFileNotFound, TumorBamFileNotFound, RNABamFileNotFound
 
 logger = get_logger(__name__, level=logging.INFO)
 
@@ -1098,9 +1099,9 @@ class Cohort(Collection):
         import logging
         logging.disable(logging.INFO)
         if patient.tumor_sample is None:
-            raise ValueError("Patient %s has no tumor sample" % patient.id)
+            raise TumorBamFileNotFound(patient_id=patient.id)
         if patient.tumor_sample.bam_path_rna is None:
-            raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
+            raise RNABamFileNotFound(patient_id=patient.id)
         rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
 
         # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
