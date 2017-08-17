@@ -61,14 +61,10 @@ def expressed_variant_set(cohort, patient, variant_collection):
     # TODO: we're currently using the same isovar cache that we use for expressed
     # neoantigen prediction; so we pass in the same epitope lengths.
     # This is hacky and should be addressed.
-    try:
-        df_isovar = patient.cohort.load_single_patient_isovar(
-            patient=patient,
-            variants=variant_collection,
-            epitope_lengths=[8, 9, 10, 11])
-    except RNABamFileNotFound as e:
-        logger.debug('caught exception: {}'.format(repr(e)))
-        return None
+    df_isovar = patient.cohort.load_single_patient_isovar(
+        patient=patient,
+        variants=variant_collection,
+        epitope_lengths=[8, 9, 10, 11])
     expressed_variant_set = set()
     for _, row in df_isovar.iterrows():
         expressed_variant = Variant(contig=row["chr"],
