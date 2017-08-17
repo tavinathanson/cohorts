@@ -610,7 +610,8 @@ class Cohort(Collection):
 
         # Note None here is different from 0. We want to preserve None
         if merged_variants is None:
-            logger.info("Variants did not exist for patient %s" % patient.id)
+            # note as debug, since also reported by _load_single_patient_merged_variants
+            logger.debug("_load_single_patient_variants: Variants did not exist for patient %s" % patient.id)
             return None
 
         logger.debug("... applying filters to variants for: {}".format(patient.id))
@@ -682,7 +683,7 @@ class Cohort(Collection):
         # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
         # collections will lead to NaN variants and neoantigens.
         if no_variants:
-            print("Variants did not exist for patient %s" % patient.id)
+            logger.info("Variants did not exist for patient %s" % patient.id)
             merged_variants = None
 
         # save merged variants to file
@@ -838,32 +839,38 @@ class Cohort(Collection):
             else:
                 cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            return filter_effects(effect_collection=cached,
-                                  variant_collection=variants,
-                                  patient=patient,
-                                  filter_fn=filter_fn,
-                                 **kwargs)
+            filtered_effects = filter_effects(effect_collection=cached,
+                                              variant_collection=variants,
+                                              patient=patient,
+                                              filter_fn=filter_fn,
+                                              **kwargs)
+        else:
 
-        effects = variants.effects()
+            effects = variants.effects()
 
-        self.save_to_cache(effects, self.cache_names["all_effect"], patient.id, cached_file_name)
+            self.save_to_cache(effects, self.cache_names["all_effect"], patient.id, cached_file_name)
 
-        effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
-        self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
+            effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
+            self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
 
-        # Always take the top priority effect per variant so we end up with a single
-        # effect per variant.
-        nonsynonymous_effects = EffectCollection(
-            list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
-        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
+            # Always take the top priority effect per variant so we end up with a single
+            # effect per variant.
+            nonsynonymous_effects = EffectCollection(
+                list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
+            self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
 
-        return filter_effects(
-            effect_collection=(
-                nonsynonymous_effects if only_nonsynonymous else effects),
-            variant_collection=variants,
-            patient=patient,
-            filter_fn=filter_fn,
-            **kwargs)
+            filtered_effects = filter_effects(
+                effect_collection=(
+                    nonsynonymous_effects if only_nonsynonymous else effects),
+                variant_collection=variants,
+                patient=patient,
+                filter_fn=filter_fn,
+                **kwargs)
+
+        if filtered_effects is None:
+            logger.info("Effects did not exist for patient {}".format(patient.id))
+
+        return filtered_effects
 
     def load_kallisto(self):
         """
