@@ -303,6 +303,36 @@ def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwar
                             only_expressed=True,
                             **kwargs)
 
+@use_defaults
+def expressed_exonic_indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_indel_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_insertion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_insertion_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_deletion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_deletion_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
 def median_vaf_purity(row, cohort, **kwargs):
     """
     Estimate purity based on 2 * median VAF.
