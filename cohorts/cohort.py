@@ -60,6 +60,7 @@ from .varcode_utils import (filter_variants, filter_effects,
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
+from .errors import BamFileNotFound, TumorBamFileNotFound, RNABamFileNotFound
 
 logger = get_logger(__name__, level=logging.INFO)
 
