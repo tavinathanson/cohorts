@@ -14,8 +14,9 @@
 
 from .variant_filters import no_filter, effect_expressed_filter
 from .varcode_utils import FilterableVariant
-from .utils import first_not_none_param
+from .utils import first_not_none_param, get_logger
 from .variant_stats import variant_stats_from_variant
+from .errors import BamFileNotFound
 
 from functools import wraps
 import numpy as np
@@ -24,6 +25,8 @@ from varcode.effects import Substitution, FrameShift
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic
 import inspect
+
+logger = get_logger(__name__)
 
 def use_defaults(func):
     """
@@ -65,28 +68,30 @@ def count_function(func):
         return np.nan
     return wrapper
 
-def agg_function(func):
+def agg_function(agg):
     """
     Decorator for functions that return a Series to be aggregated (summed) up. 
     Also automatically falls back to the Cohort-default filter_fn and normalized_per_mb if
     not specified
     """
-    @use_defaults
-    @wraps(func)
-    def wrapper(row, cohort, filter_fn=None, normalized_per_mb=None, **kwargs):
-        per_patient_data = func(row=row,
-                                cohort=cohort,
-                                filter_fn=filter_fn,
-                                normalized_per_mb=normalized_per_mb,
-                                **kwargs)
-        patient_id = row["patient_id"]
-        if patient_id in per_patient_data:
-            res = per_patient_data[patient_id].sum()
-            if normalized_per_mb:
-                res /= float(get_patient_to_mb(cohort)[patient_id])
-            return res
-        return np.nan
-    return wrapper
+    def agg_function_decorator(func):
+        @use_defaults
+        @wraps(func)
+        def wrapper(row, cohort, filter_fn=None, normalized_per_mb=None, **kwargs):
+            per_patient_data = func(row=row,
+                                    cohort=cohort,
+                                    filter_fn=filter_fn,
+                                    normalized_per_mb=normalized_per_mb,
+                                    **kwargs)
+            patient_id = row["patient_id"]
+            if patient_id in per_patient_data:
+                res = agg(per_patient_data[patient_id])
+                if normalized_per_mb:
+                    res /= float(get_patient_to_mb(cohort)[patient_id])
+                return res
+            return np.nan
+        return wrapper
+    return agg_function_decorator
 
 @memoize
 def get_patient_to_mb(cohort):
@@ -144,7 +149,7 @@ def count_effects_function_builder(function_name, only_nonsynonymous, filterable
 def weighted_variants_function_builder(function_name, filterable_variant_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
     """
     """
-    @agg_function
+    @agg_function(agg)
     def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         def variant_filter_fn(filterable_variant, **kwargs):
             assert filter_fn is not None, "filter_fn should never be None, but it is."
@@ -155,9 +160,16 @@ def weighted_variants_function_builder(function_name, filterable_variant_functio
             patients=[cohort.patient_from_id(patient_id)],
             filter_fn=variant_filter_fn,
             **kwargs)
-        isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=variants[patient_id],
-                                                      epitope_lengths=[8,9,10,11])
-        return isovar_df.apply(data_trans, axis=1)
+        try:
+            isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=variants[patient_id],
+                                                          epitope_lengths=[8,9,10,11])
+        except BamFileNotFound as e:
+            logger.warning(str(e))
+            return {}
+        if len(isovar_df.index) == 0:
+            return {patient_id: [0]}
+        else:
+            return {patient_id: isovar_df.apply(data_trans, axis=1)}
     agg_fn.__name__ = function_name
     agg_fn.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
     return agg_fn
@@ -165,7 +177,7 @@ def weighted_variants_function_builder(function_name, filterable_variant_functio
 def weighted_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
     """
     """
-    @agg_function
+    @agg_function(agg)
     def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         def effect_filter_fn(filterable_effect, **kwargs):
             assert filter_fn is not None, "filter_fn should never be None, but it is."
@@ -177,9 +189,16 @@ def weighted_effects_function_builder(function_name, only_nonsynonymous, filtera
             patients=[cohort.patient_from_id(patient_id)],
             filter_fn=effect_filter_fn,
             **kwargs)
-        isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=[eff.variant for eff in effects[patient_id]],
-                                                      epitope_lengths=[8,9,10,11])
-        return isovar_df.apply(data_trans, axis=1)
+        try:
+            isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=[eff.variant for eff in effects[patient_id]],
+                                                          epitope_lengths=[8,9,10,11])
+        except BamFileNotFound as e:
+            logger.warning(str(e))
+            return {}
+        if len(isovar_df.index) == 0:
+            return {patient_id: [0]}
+        else:
+            return {patient_id: isovar_df.apply(data_trans, axis=1)}
     agg_fn.__name__ = function_name
     agg_fn.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) + 
                       str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
