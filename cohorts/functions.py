@@ -287,11 +287,25 @@ exonic_snv_count = count_effects_function_builder(
         isinstance(filterable_effect.effect, Exonic) and
         filterable_effect.variant.is_snv))
 
+weighted_exonic_snv_count = weighted_effects_function_builder(
+    "weighted_exonic_snv_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic) and
+        filterable_effect.variant.is_snv))
+
 exonic_indel_count = count_effects_function_builder(
     "exonic_indel_count",
     only_nonsynonymous=False,
     filterable_effect_function=lambda filterable_effect: (
         isinstance(filterable_effect.effect, Exonic) and
+        filterable_effect.variant.is_indel))
+
+weighted_exonic_indel_count = weighted_effects_function_builder(
+    "weighted_exonic_indel_count",
+    only_nonsynonymous=False,
+    filterable_effect_function=lambda filterable_effect: (
+        isinstance(filterable_effect.effect, Exonic) and 
         filterable_effect.variant.is_indel))
 
 exonic_deletion_count = count_effects_function_builder(
