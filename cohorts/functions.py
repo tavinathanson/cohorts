@@ -65,6 +65,29 @@ def count_function(func):
         return np.nan
     return wrapper
 
+def agg_function(func):
+    """
+    Decorator for functions that return a Series to be aggregated (summed) up. 
+    Also automatically falls back to the Cohort-default filter_fn and normalized_per_mb if
+    not specified
+    """
+    @use_defaults
+    @wraps(func)
+    def wrapper(row, cohort, filter_fn=None, normalized_per_mb=None, **kwargs):
+        per_patient_data = func(row=row,
+                                cohort=cohort,
+                                filter_fn=filter_fn,
+                                normalized_per_mb=normalized_per_mb,
+                                **kwargs)
+        patient_id = row["patient_id"]
+        if patient_id in per_patient_data:
+            res = per_patient_data[patient_id].apply(agg)
+            if normalized_per_mb:
+                res /= float(get_patient_to_mb(cohort)[patient_id])
+            return res
+        return np.nan
+    return wrapper
+
 @memoize
 def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
@@ -92,6 +115,7 @@ def count_variants_function_builder(function_name, filterable_variant_function=N
     count.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
     return count
 
+
 def count_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None):
     """
     Create a function that counts effects that are filtered by the provided filterable_effect_function.
@@ -117,6 +141,52 @@ def count_effects_function_builder(function_name, only_nonsynonymous, filterable
                      str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
     return count
 
+def weighted_variants_function_builder(function_name, filterable_variant_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
+    """
+    """
+    @agg_function
+    def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+        def variant_filter_fn(filterable_variant, **kwargs):
+            assert filter_fn is not None, "filter_fn should never be None, but it is."
+            return ((filterable_variant_function(filterable_variant) if filterable_variant_function is not None else True) and
+                    filter_fn(filterable_variant, **kwargs))
+        patient_id = row['patient_id']
+        variants = cohort.load_variants(
+            patients=[cohort.patient_from_id(patient_id)],
+            filter_fn=variant_filter_fn,
+            **kwargs)
+        isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=variants[patient_id],
+                                                      epitope_lengths=[8,9,10,11])
+        return isovar_df.apply(data_trans, axis=1)
+    agg_fn.__name__ = function_name
+    agg_fn.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
+    return agg_fn
+
+def weighted_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
+    """
+    """
+    @agg_function
+    def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+        def effect_filter_fn(filterable_effect, **kwargs):
+            assert filter_fn is not None, "filter_fn should never be None, but it is."
+            return ((filterable_effect_function(filterable_effect) if filterable_effect_function is not None else True) and
+                    filter_fn(filterable_effect, **kwargs))
+        patient_id = row["patient_id"]
+        effects = cohort.load_effects(
+            only_nonsynonymous=only_nonsynonymous,
+            patients=[cohort.patient_from_id(patient_id)],
+            filter_fn=effect_filter_fn,
+            **kwargs)
+        isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=[eff.variant for eff in effects[patient_id]],
+                                                      epitope_lengths=[8,9,10,11])
+        return isovar_df.apply(data_trans, axis=1)
+    agg_fn.__name__ = function_name
+    agg_fn.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) + 
+                      str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
+    return agg_fn
+
+weighted_variant_count = weighted_variants_function_builder("weighted_variant_count")
+
 variant_count = count_variants_function_builder("variant_count")
 
 snv_count = count_variants_function_builder(
@@ -141,6 +211,10 @@ insertion_count = count_variants_function_builder(
 
 effect_count = count_effects_function_builder(
     "effect_count",
+    only_nonsynonymous=False)
+
+weighted_effect_count = weighted_effects_function_builder(
+    "weighted_effect_count",
     only_nonsynonymous=False)
 
 nonsynonymous_snv_count = count_effects_function_builder(
@@ -256,6 +330,7 @@ exonic_frameshift_snv_count = count_effects_function_builder(
     "exonic_frameshift_snv_count",
     only_nonsynonymous=False,
     filterable_effect_function=lambda filterable_effect: (
+        filterable_effect.variant.is_snv and
         isinstance(filterable_effect.effect, Exonic) and
         isinstance(filterable_effect.effect, FrameShift)))
 
@@ -322,6 +397,38 @@ def expressed_exonic_insertion_count(row, cohort, filter_fn, normalized_per_mb, 
                               cohort=cohort,
                               filter_fn=expressed_filter_fn,
                               normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_variant_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_frameshift_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_frameshift_snv_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_frameshift_indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_frameshift_indel_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+
 
 @use_defaults
 def expressed_exonic_deletion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
