@@ -23,7 +23,6 @@ from copy import copy
 import dill
 import hashlib
 import inspect
-import logging
 import pickle
 import numpy as np
 
@@ -62,7 +61,7 @@ from .styling import set_styling
 from . import variant_filters
 from .utils import make_hash
 
-logger = get_logger(__name__, level=logging.INFO)
+logger = get_logger(__name__)
 
 class Cohort(Collection):
     """

@@ -203,11 +203,8 @@ def strip_column_names(cols, keep_paren_contents=True):
 
     return dict(zip(cols, new_cols))
 
-def get_logger(name, level=logging.INFO):
+def get_logger(name):
     logger = logging.getLogger(name)
-    #if logger.handlers:
-    #    logger.handlers = []
-    #logger.setLevel(level)
     return logger
 
 def set_attributes(obj, additional_data):
