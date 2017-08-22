@@ -61,6 +61,9 @@ from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
 
+from .errors import BamFileNotFound, TumorBamFileNotFound, RNABamFileNotFound
+from .hash import make_hash
+
 logger = get_logger(__name__, level=logging.INFO)
 
 class Cohort(Collection):
@@ -1090,7 +1093,9 @@ class Cohort(Collection):
     def load_single_patient_isovar(self, patient, variants, epitope_lengths):
         # TODO: different epitope lengths, and other parameters, should result in
         # different caches
-        isovar_cached_file_name = "%s-isovar.csv" % self.merge_type
+        variant_hash = make_hash(frozenset(variants))
+        epitope_hash = make_hash(frozenset(epitope_lengths))
+        isovar_cached_file_name = "{}-isovar.{}-{}.csv".format(self.merge_type, str(epitope_hash), str(variant_hash))
         df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         if df_isovar is not None:
             return df_isovar
