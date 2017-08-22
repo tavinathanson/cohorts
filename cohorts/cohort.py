@@ -63,6 +63,9 @@ from . import variant_filters
 from .errors import BamFileNotFound, TumorBamFileNotFound, RNABamFileNotFound
 from .hash import make_hash
 
+from .errors import BamFileNotFound, TumorBamFileNotFound, RNABamFileNotFound
+from .hash import make_hash
+
 logger = get_logger(__name__, level=logging.INFO)
 
 class Cohort(Collection):
