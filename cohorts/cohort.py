@@ -1098,6 +1098,9 @@ class Cohort(Collection):
         return EpitopeCollection(mutant_binding_predictions)
 
     def _load_single_patient_isovar_unfiltered(self, patient, epitope_lengths):
+        """
+        Version of _load_single_patient_isovar, runs on all variants without filtering
+        """
         logger.debug("Loading unfiltered isovar data for patient: {}".format(patient.id))
         epitope_hash = make_hash(frozenset(epitope_lengths))
         cache_file_name = "{}-isovar.{}.csv".format(self.merge_type, str(epitope_hash))
@@ -1118,6 +1121,9 @@ class Cohort(Collection):
         return df_isovar
 
     def _load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        """
+        Version of load_single_patient_isovar, without any caching (used by companion functions)
+        """
         # load result from bam file
         if patient.tumor_sample is None:
             raise ValueError("Patient %s has no tumor sample" % patient.id)
@@ -1151,6 +1157,9 @@ class Cohort(Collection):
         return df_isovar
 
     def load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        """
+        Load isovar results for a patient, filtered to provided variants
+        """
         logger.debug("Loading isovar for patient: {}".format(patient.id))
 
         # different cache depending on epitope length & variant set
