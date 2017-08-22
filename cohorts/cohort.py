@@ -60,11 +60,6 @@ from .varcode_utils import (filter_variants, filter_effects,
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
-from .errors import BamFileNotFound, TumorBamFileNotFound, RNABamFileNotFound
-from .hash import make_hash
-
-from .errors import BamFileNotFound, TumorBamFileNotFound, RNABamFileNotFound
-from .hash import make_hash
 
 logger = get_logger(__name__, level=logging.INFO)
 
@@ -614,8 +609,7 @@ class Cohort(Collection):
 
         # Note None here is different from 0. We want to preserve None
         if merged_variants is None:
-            # note as debug, since also reported by _load_single_patient_merged_variants
-            logger.debug("_load_single_patient_variants: Variants did not exist for patient %s" % patient.id)
+            logger.info("Variants did not exist for patient %s" % patient.id)
             return None
 
         logger.debug("... applying filters to variants for: {}".format(patient.id))
@@ -687,7 +681,7 @@ class Cohort(Collection):
         # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
         # collections will lead to NaN variants and neoantigens.
         if no_variants:
-            logger.info("Variants did not exist for patient %s" % patient.id)
+            print("Variants did not exist for patient %s" % patient.id)
             merged_variants = None
 
         # save merged variants to file
@@ -843,38 +837,32 @@ class Cohort(Collection):
             else:
                 cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            filtered_effects = filter_effects(effect_collection=cached,
-                                              variant_collection=variants,
-                                              patient=patient,
-                                              filter_fn=filter_fn,
-                                              **kwargs)
-        else:
+            return filter_effects(effect_collection=cached,
+                                  variant_collection=variants,
+                                  patient=patient,
+                                  filter_fn=filter_fn,
+                                 **kwargs)
 
-            effects = variants.effects()
+        effects = variants.effects()
 
-            self.save_to_cache(effects, self.cache_names["all_effect"], patient.id, cached_file_name)
+        self.save_to_cache(effects, self.cache_names["all_effect"], patient.id, cached_file_name)
 
-            effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
-            self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
+        effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
+        self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
 
-            # Always take the top priority effect per variant so we end up with a single
-            # effect per variant.
-            nonsynonymous_effects = EffectCollection(
-                list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
-            self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
+        # Always take the top priority effect per variant so we end up with a single
+        # effect per variant.
+        nonsynonymous_effects = EffectCollection(
+            list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
+        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
 
-            filtered_effects = filter_effects(
-                effect_collection=(
-                    nonsynonymous_effects if only_nonsynonymous else effects),
-                variant_collection=variants,
-                patient=patient,
-                filter_fn=filter_fn,
-                **kwargs)
-
-        if filtered_effects is None:
-            logger.info("Effects did not exist for patient {}".format(patient.id))
-
-        return filtered_effects
+        return filter_effects(
+            effect_collection=(
+                nonsynonymous_effects if only_nonsynonymous else effects),
+            variant_collection=variants,
+            patient=patient,
+            filter_fn=filter_fn,
+            **kwargs)
 
     def load_kallisto(self):
         """
@@ -979,27 +967,23 @@ class Cohort(Collection):
 
         dfs = {}
         for patient in self.iter_patients(patients):
-            try:
-                df_epitopes = self._load_single_patient_neoantigens(
-                    patient=patient,
-                    only_expressed=only_expressed,
-                    epitope_lengths=epitope_lengths,
-                    ic50_cutoff=ic50_cutoff,
-                    process_limit=process_limit,
-                    max_file_records=max_file_records,
-                    filter_fn=filter_fn)
-            except BamFileNotFound as e:
-                logger.warning(str(e))
-            else:
-                if df_epitopes is not None:
-                    dfs[patient.id] = df_epitopes
+            df_epitopes = self._load_single_patient_neoantigens(
+                patient=patient,
+                only_expressed=only_expressed,
+                epitope_lengths=epitope_lengths,
+                ic50_cutoff=ic50_cutoff,
+                process_limit=process_limit,
+                max_file_records=max_file_records,
+                filter_fn=filter_fn)
+            if df_epitopes is not None:
+                dfs[patient.id] = df_epitopes
         return dfs
 
     def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
         cached_file_name = "%s-neoantigens.csv" % self.merge_type
-        logger.debug('loading neoantigens for patient {}'.format(patient.id))
+        logger.debug("loading neoantigens for patient {}".format(patient.id))
 
         # Don't filter here, as these variants are used to generate the
         # neoantigen cache; and cached items are never filtered.
@@ -1007,18 +991,18 @@ class Cohort(Collection):
         if variants is None:
             return None
 
-        logger.debug('.. patient HLA alleles are: {}'.format(str(patient.hla_alleles)))
+        logger.debug(".. patient HLA alleles are: {}".format(str(patient.hla_alleles)))
         if patient.hla_alleles is None:
             print("HLA alleles did not exist for patient %s" % patient.id)
             return None
 
-        logger.debug('.. trying to load from cache')
+        logger.debug(".. trying to load from cache")
         if only_expressed:
             cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
         else:
             cached = self.load_from_cache(self.cache_names["neoantigen"], patient.id, cached_file_name)
         if cached is not None:
-            logger.debug('.. filtering neoantigens from cached file')
+            logger.debug(".. filtering neoantigens from cached file")
             return filter_neoantigens(neoantigens_df=cached,
                                       variant_collection=variants,
                                       patient=patient,
@@ -1042,10 +1026,10 @@ class Cohort(Collection):
                                                          epitope_lengths=epitope_lengths)
 
             if len(df_isovar.index) == 0:
-                logger.warning('patient {} has no expressed variants'.format(patient.id))
-                df_epitopes = pd.DataFrame(columns=['source_sequence_key', 'source_sequence', 'offset', 'allele', 'peptide',
-                                                    'length', 'value', 'measure', 'percentile_rank', 'prediction_method_name',
-                                                    'chr', 'start', 'ref', 'alt', 'patient_id']
+                logger.warning("patient {} has no expressed variants".format(patient.id))
+                df_epitopes = pd.DataFrame(columns=["source_sequence_key", "source_sequence", "offset", "allele", "peptide",
+                                                    "length", "value", "measure", "percentile_rank", "prediction_method_name",
+                                                    "chr", "start", "ref", "alt", "patient_id"]
                                                    )
             else:
                 # Map from isovar rows to protein sequences
@@ -1119,16 +1103,17 @@ class Cohort(Collection):
         variant_hash = make_hash(frozenset(variants))
         epitope_hash = make_hash(frozenset(epitope_lengths))
         isovar_cached_file_name = "{}-isovar.{}-{}.csv".format(self.merge_type, str(epitope_hash), str(variant_hash))
+        
         df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         if df_isovar is not None:
             return df_isovar
 
-        #import logging
-        #logging.disable(logging.INFO)
+        import logging
+        logging.disable(logging.INFO)
         if patient.tumor_sample is None:
-            raise TumorBamFileNotFound(patient_id=patient.id)
+            raise ValueError("Patient %s has no tumor sample" % patient.id)
         if patient.tumor_sample.bam_path_rna is None:
-            raise RNABamFileNotFound(patient_id=patient.id)
+            raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
         rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
 
         # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
