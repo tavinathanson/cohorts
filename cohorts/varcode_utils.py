@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from varcode import EffectCollection, Variant
-from .errors import BamFileNotFound
+from .errors import MissingBamFile
 import logging
 
 logger = logging.getLogger(__name__)
@@ -107,9 +107,12 @@ def filter_variants(variant_collection, patient, filter_fn, **kwargs):
                         patient=patient,
                         ), **kwargs)
             ])
-        except BamFileNotFound as e:
-            logger.warning(repr(e))
-            return None
+        except MissingBamFile as e:
+            if patient.cohort.fail_on_missing_bams:
+                raise
+            else:
+                logger.info(repr(e))
+                return None
     else:
         return variant_collection
 
