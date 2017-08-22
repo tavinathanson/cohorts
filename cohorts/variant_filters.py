@@ -14,7 +14,6 @@
 
 from .variant_stats import variant_stats_from_variant
 from .utils import get_logger
-from .errors import RNABamFileNotFound
 
 from varcode import Variant
 from varcode.common import memoize

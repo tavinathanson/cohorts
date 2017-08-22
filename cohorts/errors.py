@@ -1,10 +1,10 @@
 
-class BamFileNotFound(Exception):
+class MissingData(Exception):
 
-    def __init__(self, filepath=None, patient_id=None, filetype=None):
+    def __init__(self, filepath=None, patient_id=None, filetype='Data'):
         self.filepath = filepath
         self.patient_id = patient_id
-        self.filetype = "Bamfile" if filetype is None else filetype
+        self.filetype = filetype
 
     def __str__(self):
         if self.patient_id is not None:
@@ -18,14 +18,26 @@ class BamFileNotFound(Exception):
             print_str = "{} has no {}.".format(patient_str, self.filetype)
         return print_str
 
-class RNABamFileNotFound(BamFileNotFound):
+class MissingBamFile(MissingData):
+    def __init__(self, filetype='Bamfile', *args, **kwargs):
+        super().__init__(filetype=filetype, *args, **kwargs)
+
+class MissingRNABamFile(MissingBamFile):
     def __init__(self, filetype="tumor RNA Bamfile", *args, **kwargs):
         super().__init__(filetype=filetype, *args, **kwargs)
 
-class TumorBamFileNotFound(BamFileNotFound):
+class MissingTumorBamFile(MissingBamFile):
     def __init__(self, filetype="tumor sample bamfile", *args, **kwargs):
         super().__init__(filetype=filetype, *args, **kwargs)
 
-class NormalBamFileNotFound(BamFileNotFound):
+class MissingNormalBamFile(MissingBamFile):
     def __init__(self, filetype="normal sample bamfile", *args, **kwargs):
+        super().__init__(filetype=filetype, *args, **kwargs)
+
+class MissingHLAType(MissingData):
+    def __init__(self, filetype="HLA alleles", *args, **kwargs):
+        super().__init__(filetype=filetype, *args, **kwargs)
+
+class MissingVariantFile(MissingData):
+    def __init__(self, filetype="vcf/maf files", *args, **kwargs):
         super().__init__(filetype=filetype, *args, **kwargs)
