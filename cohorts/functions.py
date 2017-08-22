@@ -16,7 +16,7 @@ from .variant_filters import no_filter, effect_expressed_filter
 from .varcode_utils import FilterableVariant
 from .utils import first_not_none_param, get_logger
 from .variant_stats import variant_stats_from_variant
-from .errors import BamFileNotFound
+from .errors import MissingBamFile
 
 from functools import wraps
 import numpy as np
@@ -163,7 +163,7 @@ def weighted_variants_function_builder(function_name, filterable_variant_functio
         try:
             isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=variants[patient_id],
                                                           epitope_lengths=[8,9,10,11])
-        except BamFileNotFound as e:
+        except MissingBamFile as e:
             logger.warning(str(e))
             return {}
         if len(isovar_df.index) == 0:
@@ -192,7 +192,7 @@ def weighted_effects_function_builder(function_name, only_nonsynonymous, filtera
         try:
             isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=[eff.variant for eff in effects[patient_id]],
                                                           epitope_lengths=[8,9,10,11])
-        except BamFileNotFound as e:
+        except MissingBamFile as e:
             logger.warning(str(e))
             return {}
         if len(isovar_df.index) == 0:
