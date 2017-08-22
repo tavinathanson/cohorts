@@ -975,16 +975,20 @@ class Cohort(Collection):
 
         dfs = {}
         for patient in self.iter_patients(patients):
-            df_epitopes = self._load_single_patient_neoantigens(
-                patient=patient,
-                only_expressed=only_expressed,
-                epitope_lengths=epitope_lengths,
-                ic50_cutoff=ic50_cutoff,
-                process_limit=process_limit,
-                max_file_records=max_file_records,
-                filter_fn=filter_fn)
-            if df_epitopes is not None:
-                dfs[patient.id] = df_epitopes
+            try:
+                df_epitopes = self._load_single_patient_neoantigens(
+                    patient=patient,
+                    only_expressed=only_expressed,
+                    epitope_lengths=epitope_lengths,
+                    ic50_cutoff=ic50_cutoff,
+                    process_limit=process_limit,
+                    max_file_records=max_file_records,
+                    filter_fn=filter_fn)
+            except BamFileNotFound as e:
+                logger.warning(str(e))
+            else:
+                if df_epitopes is not None:
+                    dfs[patient.id] = df_epitopes
         return dfs
 
     def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
