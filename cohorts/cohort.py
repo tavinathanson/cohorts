@@ -1108,8 +1108,8 @@ class Cohort(Collection):
         if df_isovar is not None:
             return df_isovar
 
-        #import logging
-        #logging.disable(logging.INFO)
+        import logging
+        logging.disable(logging.INFO)
         if patient.tumor_sample is None:
             raise ValueError("Patient %s has no tumor sample" % patient.id)
         if patient.tumor_sample.bam_path_rna is None:
