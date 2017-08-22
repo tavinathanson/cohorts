@@ -60,6 +60,7 @@ from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
 from .utils import make_hash
+from .errors import MissingBamFile, MissingTumorBamFile, MissingRNABamFile, MissingHLAType, MissingVariantFile
 
 logger = get_logger(__name__)
 
@@ -119,6 +120,19 @@ class Cohort(Collection):
         What word to use for "benefit" when plotting.
     merge_type : {"union", "intersection"}, optional
         Use this method to merge multiple variant sets for a single patient, default "union"
+    fail_on_missing_bams: boolean
+        Whether to proceed with analysis if some patients are missing BAMs required for analysis
+        (e.g. analysis using expressed variants generally require tumor RNA bam files to be present)
+        defaults to True
+    fail_on_missing_variants: boolean
+        Whether to proceed with analysis if some patients are missing variant files required for analysis
+        (e.g. analysis of snvs or neoantigens require presense of VCF, MAF, or other file format containing
+        somatic variants)
+        defaults to False
+    fail_on_missing_hla: boolean
+        Whether to proceed with analysis if some patients are missing HLA type
+        (e.g. predicted neoantigen counts require that HLA types are provided)
+        defaults to False
     """
     def __init__(self,
                  patients,
@@ -144,7 +158,10 @@ class Cohort(Collection):
                  pageant_coverage_path=None,
                  pageant_dir_fn=None,
                  benefit_plot_name="Benefit",
-                 merge_type="union"):
+                 merge_type="union",
+                 fail_on_missing_bams=True,
+                 fail_on_missing_variants=False,
+                 fail_on_missing_hla=False):
         Collection.__init__(
             self,
             elements=patients)
@@ -180,6 +197,9 @@ class Cohort(Collection):
         self.benefit_plot_name = benefit_plot_name
         self.merge_type = merge_type
         self._genome = None
+        self.fail_on_missing_bams = fail_on_missing_bams
+        self.fail_on_missing_variants = fail_on_missing_variants
+        self.fail_on_missing_hla = fail_on_missing_hla
 
         self.verify_id_uniqueness()
         self.verify_survival()
@@ -604,12 +624,18 @@ class Cohort(Collection):
                     pass
 
         ## get merged variants
-        merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
+        logger.debug("... getting merged variants for: {}".format(patient.id))
+        try:
+            merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
+        except MissingVariantFile as e:
+            if self.fail_on_missing_variants:
+                raise
+            else:
+                logger.info(str(e))
+                return None
 
         # Note None here is different from 0. We want to preserve None
-        if merged_variants is None:
-            logger.info("Variants did not exist for patient %s" % patient.id)
-            return None
+        assert merged_variants is not None, "Bug found - merged_variants should not be None. Please file an issue"
 
         logger.debug("applying filters to variants for: {}".format(patient.id))
         filtered_variants = filter_variants(variant_collection=merged_variants,
@@ -628,6 +654,8 @@ class Cohort(Collection):
             Use `_load_single_patient_variants` to get filtered variants
         """
         logger.debug("loading merged variants for patient {}".format(patient.id))
+        if len(patient.variants_list) == 0:
+            raise MissingVariantFile(patient_id=patient.id)
         no_variants = False
         try:
             # get merged-variants from cache
@@ -674,14 +702,14 @@ class Cohort(Collection):
             else:
                 merged_variants = self._merge_variant_collections(variant_collections, self.merge_type)
         except IOError:
+            logger.warning("Error reading from variant files for patient {}".format(patient.id))
             no_variants = True
 
         # Note that this is the number of variant collections and not the number of
         # variants. 0 variants will lead to 0 neoantigens, for example, but 0 variant
         # collections will lead to NaN variants and neoantigens.
         if no_variants:
-            print("Variants did not exist for patient %s" % patient.id)
-            merged_variants = None
+            raise MissingVariantFile(patient_id=patient.id)
 
         # save merged variants to file
         if use_cache:
@@ -966,16 +994,28 @@ class Cohort(Collection):
 
         dfs = {}
         for patient in self.iter_patients(patients):
-            df_epitopes = self._load_single_patient_neoantigens(
-                patient=patient,
-                only_expressed=only_expressed,
-                epitope_lengths=epitope_lengths,
-                ic50_cutoff=ic50_cutoff,
-                process_limit=process_limit,
-                max_file_records=max_file_records,
-                filter_fn=filter_fn)
-            if df_epitopes is not None:
-                dfs[patient.id] = df_epitopes
+            try:
+                df_epitopes = self._load_single_patient_neoantigens(
+                    patient=patient,
+                    only_expressed=only_expressed,
+                    epitope_lengths=epitope_lengths,
+                    ic50_cutoff=ic50_cutoff,
+                    process_limit=process_limit,
+                    max_file_records=max_file_records,
+                    filter_fn=filter_fn)
+            except MissingBamFile as e:
+                if self.fail_on_missing_bams:
+                    raise
+                else:
+                    logger.info(str(e))
+            except MissingHLAType as e:
+                if self.fail_on_missing_hla:
+                    raise
+                else:
+                    logger.info(str(e))
+            else:
+                if df_epitopes is not None:
+                    dfs[patient.id] = df_epitopes
         return dfs
 
     def _load_single_patient_neoantigens(self, patient, only_expressed, epitope_lengths,
@@ -992,8 +1032,7 @@ class Cohort(Collection):
 
         logger.debug("patient HLA alleles are: {}".format(str(patient.hla_alleles)))
         if patient.hla_alleles is None:
-            print("HLA alleles did not exist for patient %s" % patient.id)
-            return None
+            raise MissingHLAType(patient_id=patient.id)
 
         logger.debug("trying to load from cache")
         if only_expressed:
@@ -1126,10 +1165,9 @@ class Cohort(Collection):
         """
         # load result from bam file
         if patient.tumor_sample is None:
-            raise ValueError("Patient %s has no tumor sample" % patient.id)
+            raise MissingTumorBamFile(patient_id=patient.id)
         if patient.tumor_sample.bam_path_rna is None:
-            raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
-        logger.debug("loading RNA bam file: {}".format(patient.tumor_sample.bam_path_rna))
+            raise MissingRNABamFile(patient_id=patient.id)
         rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
 
         # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
