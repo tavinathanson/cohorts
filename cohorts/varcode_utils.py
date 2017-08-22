@@ -141,7 +141,7 @@ def filter_effects(effect_collection, variant_collection, patient, filter_fn, **
                         effect=effect,
                         variant_collection=variant_collection,
                         patient=patient), **kwargs)])
-        except BamFileNotFound as e:
+        except MissingBamFile as e:
             logger.warning(repr(e))
             return None
     else:
@@ -159,7 +159,7 @@ def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
                 # reduce ensures that an empty result is a Series vs. a DataFrame
                 reduce=True)
             return neoantigens_df[filter_mask]
-        except BamFileNotFound as e:
+        except MissingBamFile as e:
             logger.warning(repr(e))
             return None
     else:
