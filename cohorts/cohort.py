@@ -436,7 +436,7 @@ class Cohort(Collection):
         cache_file = path.join(patient_cache_dir, file_name)
 
         if not path.exists(cache_file):
-            logger.debug("... cache file does not exist. Checking for older format.")
+            logger.debug("cache file does not exist. Checking for older format.")
             # We removed variant_type from the cache name. Eventually remove this notification.
             if (path.exists(path.join(patient_cache_dir, "snv-" + file_name)) or
                 path.exists(path.join(patient_cache_dir, "indel-" + file_name))):
@@ -444,7 +444,7 @@ class Cohort(Collection):
             return None
 
         if self.check_provenance:
-            logger.debug("... Checking cache provenance")
+            logger.debug("Checking cache provenance")
             num_discrepant = compare_provenance(
                 this_provenance = self.generate_provenance(),
                 other_provenance = self.load_provenance(patient_cache_dir),
@@ -453,10 +453,10 @@ class Cohort(Collection):
                 )
         try:
             if path.splitext(cache_file)[1] == ".csv":
-                logger.debug("... Loading cache as csv file")
+                logger.debug("Loading cache as csv file")
                 return pd.read_csv(cache_file, dtype={"patient_id": object})
             else:
-                logger.debug("... Loading cache as pickled file")
+                logger.debug("Loading cache as pickled file")
                 with open(cache_file, "rb") as f:
                     return pickle.load(f)
         except IOError:
@@ -584,17 +584,17 @@ class Cohort(Collection):
 
         ## confirm that we can get cache-name (else don't use filtered cache)
         if use_filtered_cache:
-            logger.debug("... identifying filtered-cache file name")
+            logger.debug("identifying filtered-cache file name")
             try:
                 ## try to load filtered variants from cache
                 filtered_cache_file_name = "%s-variants.%s.pkl" % (self.merge_type,
                                                                    self._hash_filter_fn(filter_fn, **kwargs))
             except:
-                logger.warning("... error identifying filtered-cache file name for patient {}: {}".format(
+                logger.warning("error identifying filtered-cache file name for patient {}: {}".format(
                         patient.id, filter_fn_name))
                 use_filtered_cache = False
             else:
-                logger.debug("... trying to load filtered variants from cache: {}".format(filtered_cache_file_name))
+                logger.debug("trying to load filtered variants from cache: {}".format(filtered_cache_file_name))
                 try:
                     cached = self.load_from_cache(self.cache_names["variant"], patient.id, filtered_cache_file_name)
                     if cached is not None:
@@ -604,7 +604,6 @@ class Cohort(Collection):
                     pass
 
         ## get merged variants
-        logger.debug("... getting merged variants for: {}".format(patient.id))
         merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
 
         # Note None here is different from 0. We want to preserve None
@@ -612,13 +611,13 @@ class Cohort(Collection):
             logger.info("Variants did not exist for patient %s" % patient.id)
             return None
 
-        logger.debug("... applying filters to variants for: {}".format(patient.id))
+        logger.debug("applying filters to variants for: {}".format(patient.id))
         filtered_variants = filter_variants(variant_collection=merged_variants,
                                             patient=patient,
                                             filter_fn=filter_fn,
                                             **kwargs)
         if use_filtered_cache:
-            logger.debug("... saving filtered variants to cache: {}".format(filtered_cache_file_name))
+            logger.debug("saving filtered variants to cache: {}".format(filtered_cache_file_name))
             self.save_to_cache(filtered_variants, self.cache_names["variant"], patient.id, filtered_cache_file_name)
         return filtered_variants
 
@@ -984,18 +983,18 @@ class Cohort(Collection):
         if variants is None:
             return None
 
-        logger.debug(".. patient HLA alleles are: {}".format(str(patient.hla_alleles)))
+        logger.debug("patient HLA alleles are: {}".format(str(patient.hla_alleles)))
         if patient.hla_alleles is None:
             print("HLA alleles did not exist for patient %s" % patient.id)
             return None
 
-        logger.debug(".. trying to load from cache")
+        logger.debug("trying to load from cache")
         if only_expressed:
             cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
         else:
             cached = self.load_from_cache(self.cache_names["neoantigen"], patient.id, cached_file_name)
         if cached is not None:
-            logger.debug(".. filtering neoantigens from cached file")
+            logger.debug("filtering neoantigens from cached file")
             return filter_neoantigens(neoantigens_df=cached,
                                       variant_collection=variants,
                                       patient=patient,
@@ -1091,23 +1090,33 @@ class Cohort(Collection):
                 mutant_binding_predictions.append(binding_prediction)
         return EpitopeCollection(mutant_binding_predictions)
 
-    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
-        # different cache depending on epitope length & variant set
-        variant_hash = make_hash(frozenset(variants))
+    def _load_single_patient_isovar_unfiltered(self, patient, epitope_lengths):
+        logger.debug("Loading unfiltered isovar data for patient: {}".format(patient.id))
         epitope_hash = make_hash(frozenset(epitope_lengths))
-        isovar_cached_file_name = "{}-isovar.{}-{}.csv".format(self.merge_type, str(epitope_hash), str(variant_hash))
-        logger.debug("isovar_cached_file_name set to: {}".format(isovar_cached_file_name))
-
-        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+        cache_file_name = "{}-isovar.{}.csv".format(self.merge_type, str(epitope_hash))
+        import pdb; pdb.set_trace()
+        # try to load from cache
+        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, cache_file_name)
         if df_isovar is not None:
+            logger.debug("returning result from cache")
             return df_isovar
 
-        import logging
-        logging.disable(logging.INFO)
+        # prepare unfiltered isovar result
+        logger.debug("loading all variants")
+        variants = self._load_single_patient_variants(patient, filter_fn=None)
+
+        logger.debug("generating dataframe of results")
+        df_isovar = self._load_single_patient_isovar(patient=patient, variants=variants, epitope_lengths=epitope_lengths)
+        self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, cache_file_name)
+        return df_isovar
+
+    def _load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        # load result from bam file
         if patient.tumor_sample is None:
             raise ValueError("Patient %s has no tumor sample" % patient.id)
         if patient.tumor_sample.bam_path_rna is None:
             raise ValueError("Patient %s has no tumor RNA BAM path" % patient.id)
+        logger.debug("loading RNA bam file: {}".format(patient.tumor_sample.bam_path_rna))
         rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
 
         # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
@@ -1116,11 +1125,13 @@ class Cohort(Collection):
         # 123456789AB
         #           123456789AB
         # AAAAAAAAAAVAAAAAAAAAA
+        logger.debug("getting reads containing somatic variants")
         protein_sequence_length = (max(epitope_lengths) * 2) - 1
         allele_reads_generator = reads_overlapping_variants(
             variants=variants,
             samfile=rna_bam_file,
             min_mapping_quality=1)
+        logger.debug("determining protein sequences from reads")
         protein_sequences_generator = reads_generator_to_protein_sequences_generator(
             allele_reads_generator,
             protein_sequence_length=protein_sequence_length,
@@ -1128,7 +1139,29 @@ class Cohort(Collection):
             min_variant_sequence_coverage=3,
             max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
             variant_sequence_assembly=False)
+        logger.debug("generating dataframe of results")
         df_isovar = protein_sequences_generator_to_dataframe(protein_sequences_generator)
+        return df_isovar
+
+    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        logger.debug("Loading isovar for patient: {}".format(patient.id))
+
+        # different cache depending on epitope length & variant set
+        variant_hash = make_hash(frozenset(variants))
+        epitope_hash = make_hash(frozenset(epitope_lengths))
+        isovar_cached_file_name = "{}-isovar.{}-{}.csv".format(self.merge_type, str(epitope_hash), str(variant_hash))
+        logger.debug("isovar_cached_file_name set to: {}".format(isovar_cached_file_name))
+
+        # try to load filtered isovar result from cache
+        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+        if df_isovar is not None:
+            logger.debug("returning result from cache")
+            return df_isovar
+
+        # get isovar results
+        df_isovar = self._load_single_patient_isovar(patient=patient, epitope_lengths=epitope_lengths, variants=variants)
+
+        logger.debug("saving results to cache: {}".format(isovar_cached_file_name))
         self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         return df_isovar
 
