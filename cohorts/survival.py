@@ -16,7 +16,6 @@
 
 from lifelines import KaplanMeierFitter, CoxPHFitter
 from lifelines.statistics import logrank_test
-import logging
 import matplotlib.colors as colors
 from matplotlib import pyplot as plt
 import numbers
@@ -26,7 +25,7 @@ import patsy
 from .rounding import float_str
 from .utils import get_logger
 
-logger = get_logger(__name__, level=logging.INFO)
+logger = get_logger(__name__)
 
 def _plot_kmf_single(df,
                      condition_col,
