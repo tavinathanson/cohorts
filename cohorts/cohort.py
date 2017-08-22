@@ -983,7 +983,7 @@ class Cohort(Collection):
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
         cached_file_name = "%s-neoantigens.csv" % self.merge_type
-        logger.debug('loading neoantigens for patient {}'.format(patient.id))
+        logger.debug("loading neoantigens for patient {}".format(patient.id))
 
         # Don't filter here, as these variants are used to generate the
         # neoantigen cache; and cached items are never filtered.
@@ -991,18 +991,18 @@ class Cohort(Collection):
         if variants is None:
             return None
 
-        logger.debug('.. patient HLA alleles are: {}'.format(str(patient.hla_alleles)))
+        logger.debug(".. patient HLA alleles are: {}".format(str(patient.hla_alleles)))
         if patient.hla_alleles is None:
             print("HLA alleles did not exist for patient %s" % patient.id)
             return None
 
-        logger.debug('.. trying to load from cache')
+        logger.debug(".. trying to load from cache")
         if only_expressed:
             cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
         else:
             cached = self.load_from_cache(self.cache_names["neoantigen"], patient.id, cached_file_name)
         if cached is not None:
-            logger.debug('.. filtering neoantigens from cached file')
+            logger.debug(".. filtering neoantigens from cached file")
             return filter_neoantigens(neoantigens_df=cached,
                                       variant_collection=variants,
                                       patient=patient,
@@ -1026,10 +1026,10 @@ class Cohort(Collection):
                                                          epitope_lengths=epitope_lengths)
 
             if len(df_isovar.index) == 0:
-                logger.warning('patient {} has no expressed variants'.format(patient.id))
-                df_epitopes = pd.DataFrame(columns=['source_sequence_key', 'source_sequence', 'offset', 'allele', 'peptide',
-                                                    'length', 'value', 'measure', 'percentile_rank', 'prediction_method_name',
-                                                    'chr', 'start', 'ref', 'alt', 'patient_id']
+                logger.warning("patient {} has no expressed variants".format(patient.id))
+                df_epitopes = pd.DataFrame(columns=["source_sequence_key", "source_sequence", "offset", "allele", "peptide",
+                                                    "length", "value", "measure", "percentile_rank", "prediction_method_name",
+                                                    "chr", "start", "ref", "alt", "patient_id"]
                                                    )
             else:
                 # Map from isovar rows to protein sequences
