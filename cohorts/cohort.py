@@ -60,7 +60,7 @@ from .varcode_utils import (filter_variants, filter_effects,
 from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
-from .hash import make_hash
+from .utils import make_hash
 
 logger = get_logger(__name__, level=logging.INFO)
 
@@ -1018,7 +1018,7 @@ class Cohort(Collection):
                                                          variants=variants,
                                                          epitope_lengths=epitope_lengths)
 
-            if len(df_isovar.index) == 0:
+            if len(df_isovar) == 0:
                 logger.warning("patient {} has no expressed variants".format(patient.id))
                 df_epitopes = pd.DataFrame(columns=["source_sequence_key", "source_sequence", "offset", "allele", "peptide",
                                                     "length", "value", "measure", "percentile_rank", "prediction_method_name",
@@ -1096,7 +1096,8 @@ class Cohort(Collection):
         variant_hash = make_hash(frozenset(variants))
         epitope_hash = make_hash(frozenset(epitope_lengths))
         isovar_cached_file_name = "{}-isovar.{}-{}.csv".format(self.merge_type, str(epitope_hash), str(variant_hash))
-        
+        logger.debug("isovar_cached_file_name set to: {}".format(isovar_cached_file_name))
+
         df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         if df_isovar is not None:
             return df_isovar
