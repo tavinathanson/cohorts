@@ -1089,29 +1089,6 @@ class Cohort(Collection):
                 mutant_binding_predictions.append(binding_prediction)
         return EpitopeCollection(mutant_binding_predictions)
 
-    def _load_single_patient_isovar_unfiltered(self, patient, epitope_lengths):
-        """
-        Version of _load_single_patient_isovar, runs on all variants without filtering
-        """
-        logger.debug("Loading unfiltered isovar data for patient: {}".format(patient.id))
-        epitope_hash = make_hash(frozenset(epitope_lengths))
-        cache_file_name = "{}-isovar.{}.csv".format(self.merge_type, str(epitope_hash))
-        import pdb; pdb.set_trace()
-        # try to load from cache
-        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, cache_file_name)
-        if df_isovar is not None:
-            logger.debug("returning result from cache")
-            return df_isovar
-
-        # prepare unfiltered isovar result
-        logger.debug("loading all variants")
-        variants = self._load_single_patient_variants(patient, filter_fn=None)
-
-        logger.debug("generating dataframe of results")
-        df_isovar = self._load_single_patient_isovar(patient=patient, variants=variants, epitope_lengths=epitope_lengths)
-        self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, cache_file_name)
-        return df_isovar
-
     def _load_single_patient_isovar(self, patient, variants, epitope_lengths):
         """
         Version of load_single_patient_isovar, without any caching (used by companion functions)
