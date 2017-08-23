@@ -111,7 +111,7 @@ def filter_variants(variant_collection, patient, filter_fn, **kwargs):
             if patient.cohort.fail_on_missing_bams:
                 raise
             else:
-                logger.info(repr(e))
+                logger.info(str(e))
                 return None
     else:
         return variant_collection
@@ -142,7 +142,7 @@ def filter_effects(effect_collection, variant_collection, patient, filter_fn, **
                         variant_collection=variant_collection,
                         patient=patient), **kwargs)])
         except MissingBamFile as e:
-            logger.warning(repr(e))
+            logger.warning(str(e))
             return None
     else:
         return effect_collection
@@ -160,7 +160,7 @@ def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
                 reduce=True)
             return neoantigens_df[filter_mask]
         except MissingBamFile as e:
-            logger.warning(repr(e))
+            logger.warning(str(e))
             return None
     else:
         return neoantigens_df
