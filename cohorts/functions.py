@@ -70,7 +70,7 @@ def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
 
-def count_variants_function_builder(function_name, filterable_variant_function=None):
+def count_variants_function_builder(function_name, only_nonsynonymous=False, filterable_variant_function=None):
     """
     Creates a function that counts variants that are filtered by the provided filterable_variant_function.
     The filterable_variant_function is a function that takes a filterable_variant and returns True or False.
@@ -84,7 +84,8 @@ def count_variants_function_builder(function_name, filterable_variant_function=N
             return ((filterable_variant_function(filterable_variant) if filterable_variant_function is not None else True) and
                     filter_fn(filterable_variant, **kwargs))
         patient_id = row["patient_id"]
-        return cohort.load_variants(
+        return cohort.load_effects(
+            only_nonsynonymous=only_nonsynonymous,
             patients=[cohort.patient_from_id(patient_id)],
             filter_fn=count_filter_fn,
             **kwargs)
@@ -142,6 +143,10 @@ insertion_count = count_variants_function_builder(
 effect_count = count_effects_function_builder(
     "effect_count",
     only_nonsynonymous=False)
+
+nonsynonymous_effect_count = count_effects_function_builder(
+    "nonsynonymous_effect_count",
+    only_nonsynonymous=True)
 
 nonsynonymous_snv_count = count_effects_function_builder(
     "nonsynonymous_snv_count",
@@ -203,8 +208,12 @@ def create_effect_filter(effect_name, effect_filter):
     return filter_by_type
 
 only_exonic = create_effect_filter("exonic", lambda filterable_effect: isinstance(filterable_effect.effect, Exonic))
-only_frameshift = create_effect_filter("frameshift", lambda filterable_effect: isinstance(filterable_effect, Frameshift))
+only_frameshift = create_effect_filter("frameshift", lambda filterable_effect: isinstance(filterable_effect.effect, Frameshift))
 only_indel = create_effect_filter("indel", lambda filterable_effect: filterable_effect.variant.is_indel)
+only_missense = create_effect_filter("missense", lambda filterable_effect: type(filterable_effect.effect) == Substitution)
+only_insertion = create_effect_filter("insertion", lambda filterable_effect: filterable_effect.variant.is_insertion)
+only_deletion = create_effect_filter("deletion", lambda filterable_effect: filterable_effect.variant.is_deletion)
+only_stoploss = create_effect_filter("stoploss", lambda filterable_effect: isinstance(filterable_effect.effect, StopLoss))
 only_expressed = create_effect_filter("expressed", lambda filterable_effect: effect_expressed_filter(filterable_effect))
 
 exonic_snv_count = only_exonic(snv_count)
