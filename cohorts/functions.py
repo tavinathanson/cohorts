@@ -98,28 +98,6 @@ def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
 
-def count_variants_function_builder(function_name, filterable_variant_function=None):
-    """
-    Creates a function that counts variants that are filtered by the provided filterable_variant_function.
-    The filterable_variant_function is a function that takes a filterable_variant and returns True or False.
-
-    Users of this builder need not worry about applying e.g. the Cohort's default `filter_fn`. That will be applied as well.
-    """
-    @count_function
-    def count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-        def count_filter_fn(filterable_variant, **kwargs):
-            assert filter_fn is not None, "filter_fn should never be None, but it is."
-            return ((filterable_variant_function(filterable_variant) if filterable_variant_function is not None else True) and
-                    filter_fn(filterable_variant, **kwargs))
-        patient_id = row["patient_id"]
-        return cohort.load_variants(
-            patients=[cohort.patient_from_id(patient_id)],
-            filter_fn=count_filter_fn,
-            **kwargs)
-    count.__name__ = function_name
-    count.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
-    return count
-
 
 def count_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None):
     """
@@ -146,35 +124,7 @@ def count_effects_function_builder(function_name, only_nonsynonymous, filterable
                      str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
     return count
 
-def weighted_variants_function_builder(function_name, filterable_variant_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
-    """
-    """
-    @agg_function(agg)
-    def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-        def variant_filter_fn(filterable_variant, **kwargs):
-            assert filter_fn is not None, "filter_fn should never be None, but it is."
-            return ((filterable_variant_function(filterable_variant) if filterable_variant_function is not None else True) and
-                    filter_fn(filterable_variant, **kwargs))
-        patient_id = row['patient_id']
-        variants = cohort.load_variants(
-            patients=[cohort.patient_from_id(patient_id)],
-            filter_fn=variant_filter_fn,
-            **kwargs)
-        try:
-            isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=variants[patient_id],
-                                                          epitope_lengths=[8,9,10,11])
-        except MissingBamFile as e:
-            logger.warning(str(e))
-            return {}
-        if len(isovar_df.index) == 0:
-            return {patient_id: [0]}
-        else:
-            return {patient_id: isovar_df.apply(data_trans, axis=1)}
-    agg_fn.__name__ = function_name
-    agg_fn.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
-    return agg_fn
-
-def weighted_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
+def read_count_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
     """
     """
     @agg_function(agg)
@@ -204,168 +154,74 @@ def weighted_effects_function_builder(function_name, only_nonsynonymous, filtera
                       str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
     return agg_fn
 
-weighted_variant_count = weighted_variants_function_builder("weighted_variant_count")
+def create_effect_filter(effect_name, effect_filter):
+    def filter_by_type(func, name=None):
+        @use_defaults
+        def filtered(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+            def new_filter_fn(filterable_effect, **kwargs):
+                assert filter_fn is not None, "filter_fn should never be None, but it is."
+                return filter_fn(filterable_effect) and effect_filter(filterable_effect)
+            return func(row=row,
+                        cohort=cohort,
+                        filter_fn=new_filter_fn,
+                        normalized_per_mb=normalized_per_mb,
+                        **kwargs)
+        if name is None:
+            name = "_".join([effect_name, func.__name__])
+        filtered.__name__ = name
+        filtered.__doc__ = func.__doc__ + "\nOnly {} effects.".format(effect_name)
+        return filtered
+    filter_by_type.__doc__ = "Return a new count function limited to {} effects".format(effect_name)
+    return filter_by_type
 
-variant_count = count_variants_function_builder("variant_count")
+only_exonic = create_effect_filter("exonic", lambda filterable_effect: isinstance(filterable_effect.effect, Exonic))
+only_frameshift = create_effect_filter("frameshift", lambda filterable_effect: isinstance(filterable_effect.effect, Frameshift))
+only_indel = create_effect_filter("indel", lambda filterable_effect: filterable_effect.variant.is_indel)
+only_missense = create_effect_filter("missense", lambda filterable_effect: type(filterable_effect.effect) == Substitution)
+only_insertion = create_effect_filter("insertion", lambda filterable_effect: filterable_effect.variant.is_insertion)
+only_deletion = create_effect_filter("deletion", lambda filterable_effect: filterable_effect.variant.is_deletion)
+only_stoploss = create_effect_filter("stoploss", lambda filterable_effect: isinstance(filterable_effect.effect, StopLoss))
+only_expressed = create_effect_filter("expressed", lambda filterable_effect: effect_expressed_filter(filterable_effect))
+only_nonsynonymous = create_effect_filter("nonsynonymous", lambda filterable_effect: filterable_effect.effect.modifies_protein_sequence)
 
-snv_count = count_variants_function_builder(
-    "snv_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_snv))
+## base count functions
+read_count = read_count_function_builder("read_count", only_nonsynonymous=False)
+nonsynonymous_read_count = read_count_function_builder("nonsynonymous_read_count", only_nonsynonymous=True)
+variant_count = count_effects_function_builder("effect_count", only_nonsynonymous=False)
+nonsynonymous_effect_count = count_effects_function_builder("nonsynonymous_effect_count", only_nonsynonymous=True)
+nonsynonymous_variant_count = nonsynonymous_effect_count
+nonsynonymous_variant_count.__name__ = "nonsynonymous_variant_count"
 
-indel_count = count_variants_function_builder(
-    "indel_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_indel))
+# main count functions, with custom names
+insertion_count = only_insertion(variant_count, name="insertion_count")
+snv_count = only_snv(variant_count, name="snv_count")
+indel_count = only_indel(variant_count, name="indel_count")
+deletion_count = only_deletion(variant_count, name="deletion_count")
+missense_snv_count = only_missense(snv_count)
 
-deletion_count = count_variants_function_builder(
-    "deletion_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_deletion))
+nonsynonymous_snv_count = only_nonsynonymous(snv_count)
+nonsynonymous_indel_count = only_nonsynonymous(indel_count)
+nonsynonymous_deletion_count = only_nonsynonymous(deletion_count)
+nonsynonymous_insertion_count = only_nonsynonymous(insertion_count)
 
-insertion_count = count_variants_function_builder(
-    "insertion_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_insertion))
+exonic_snv_count = only_exonic(snv_count)
+exonic_variant_count = only_exonic(variant_count)
+exonic_missense_snv_count = only_exonic(missense_snv_count)
+exonic_indel_count = only_exonic(indel_count)
+exonic_deletion_count = only_exonic(deletion_count)
+exonic_insertion_count = only_exonic(insertion_count)
+exonic_frameshift_deletion_count = only_exonic(only_frameshift(deletion_count))
+exonic_frameshift_insertion_count = only_exonic(only_frameshift(insertion_count))
+exonic_frameshift_indel_count = only_exonic(only_frameshift(indel_count))
 
-effect_count = count_effects_function_builder(
-    "effect_count",
-    only_nonsynonymous=False)
+expressed_missense_snv_count = only_expressed(missense_snv_count)
+expressed_exonic_snv_count = only_expressed(exonic_snv_count)
+expressed_exonic_indel_count = only_expressed(exonic_indel_count)
+expressed_exonic_insertion_count = only_expressed(exonic_insertion_count)
+expressed_exonic_deletion_count = only_expressed(exonic_deletion_count)
 
-weighted_effect_count = weighted_effects_function_builder(
-    "weighted_effect_count",
-    only_nonsynonymous=False)
-
-nonsynonymous_snv_count = count_effects_function_builder(
-    "nonsynonymous_snv_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_snv))
-
-missense_snv_count = count_effects_function_builder(
-    "missense_snv_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        type(filterable_effect.effect) == Substitution and
-        filterable_effect.variant.is_snv))
-
-nonsynonymous_indel_count = count_effects_function_builder(
-    "nonsynonymous_indel_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_indel))
-
-nonsynonymous_deletion_count = count_effects_function_builder(
-    "nonsynonymous_deletion_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_deletion))
-
-nonsynonymous_insertion_count = count_effects_function_builder(
-    "nonsynonymous_insertion_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_insertion))
-
-exonic_variant_count = count_effects_function_builder(
-    "exonic_variant_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic)))
-
-exonic_frameshift_variant_count = count_effects_function_builder(
-    "exonic_frameshift_variant_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic) and
-        isinstance(filterable_effect.effect, FrameShift)))
-
-exonic_snv_count = count_effects_function_builder(
-    "exonic_snv_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic) and
-        filterable_effect.variant.is_snv))
-
-weighted_exonic_snv_count = weighted_effects_function_builder(
-    "weighted_exonic_snv_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic) and
-        filterable_effect.variant.is_snv))
-
-exonic_indel_count = count_effects_function_builder(
-    "exonic_indel_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic) and
-        filterable_effect.variant.is_indel))
-
-weighted_exonic_indel_count = weighted_effects_function_builder(
-    "weighted_exonic_indel_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic) and 
-        filterable_effect.variant.is_indel))
-
-exonic_deletion_count = count_effects_function_builder(
-    "exonic_deletion_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic) and
-        filterable_effect.variant.is_deletion))
-
-exonic_insertion_count = count_effects_function_builder(
-    "exonic_insertion_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, Exonic) and
-        filterable_effect.variant.is_insertion))
-
-frameshift_count = count_effects_function_builder(
-    "frameshift_count",
-    only_nonsynonymous=False, # Should not matter, because FrameShift extends NonsilentCodingMutation
-    filterable_effect_function=lambda filterable_effect: (
-        isinstance(filterable_effect.effect, FrameShift)))
-
-frameshift_indel_count = count_effects_function_builder(
-    "frameshift_indel_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_indel and
-        isinstance(filterable_effect.effect, FrameShift)))
-
-exonic_frameshift_indel_count = count_effects_function_builder(
-    "exonic_frameshift_indel_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_indel and
-        isinstance(filterable_effect.effect, FrameShift) and
-        isinstance(filterable_effect.effect, Exonic)))
-
-exonic_frameshift_deletion_count = count_effects_function_builder(
-    "exonic_frameshift_deletion_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_deletion and
-        isinstance(filterable_effect.effect, FrameShift) and
-        isinstance(filterable_effect.effect, Exonic)))
-
-exonic_frameshift_insertion_count = count_effects_function_builder(
-    "exonic_frameshift_insertion_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_insertion and
-        isinstance(filterable_effect.effect, FrameShift) and
-        isinstance(filterable_effect.effect, Exonic)))
-
-exonic_frameshift_snv_count = count_effects_function_builder(
-    "exonic_frameshift_snv_count",
-    only_nonsynonymous=False,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_snv and
-        isinstance(filterable_effect.effect, Exonic) and
-        isinstance(filterable_effect.effect, FrameShift)))
+exonic_snv_read_count = only_exonic(only_snv(read_count))
+exonic_indel_read_count = only_exonic(only_indel(read_count))
 
 missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
     "missense_snv_and_nonsynonymous_indel_count",
@@ -383,26 +239,6 @@ def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
                                    **kwargs)
 
 @use_defaults
-def expressed_missense_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return missense_snv_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
-
-@use_defaults
-def expressed_exonic_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return exonic_snv_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
-
-@use_defaults
 def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     return neoantigen_count(row=row,
                             cohort=cohort,
@@ -410,68 +246,6 @@ def expressed_neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwar
                             normalized_per_mb=normalized_per_mb,
                             only_expressed=True,
                             **kwargs)
-
-@use_defaults
-def expressed_exonic_indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return exonic_indel_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
-
-@use_defaults
-def expressed_exonic_insertion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return exonic_insertion_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
-
-@use_defaults
-def expressed_exonic_variant_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return exonic_variant_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
-
-@use_defaults
-def expressed_exonic_frameshift_snv_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return exonic_frameshift_snv_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
-
-@use_defaults
-def expressed_exonic_frameshift_indel_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return exonic_frameshift_indel_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
-
-
-
-@use_defaults
-def expressed_exonic_deletion_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-    def expressed_filter_fn(filterable_effect, **kwargs):
-        assert filter_fn is not None, "filter_fn should never be None, but it is."
-        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
-    return exonic_deletion_count(row=row,
-                              cohort=cohort,
-                              filter_fn=expressed_filter_fn,
-                              normalized_per_mb=normalized_per_mb, **kwargs)
 
 def median_vaf_purity(row, cohort, **kwargs):
     """
@@ -492,3 +266,55 @@ def median_vaf_purity(row, cohort, **kwargs):
         return variant_stats_from_variant(variant, filterable_variant.variant_metadata).tumor_stats.variant_allele_frequency
     vafs = [grab_vaf(variant) for variant in variants]
     return 2 * pd.Series(vafs).median()
+
+## keep these around for testing
+@use_defaults
+def expressed_exonic_indel_count1(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_indel_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_insertion_count1(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_insertion_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_variant_count1(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_variant_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_frameshift_snv_count1(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_frameshift_snv_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
+@use_defaults
+def expressed_exonic_frameshift_indel_count1(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+    def expressed_filter_fn(filterable_effect, **kwargs):
+        assert filter_fn is not None, "filter_fn should never be None, but it is."
+        return filter_fn(filterable_effect) and effect_expressed_filter(filterable_effect)
+    return exonic_frameshift_indel_count(row=row,
+                              cohort=cohort,
+                              filter_fn=expressed_filter_fn,
+                              normalized_per_mb=normalized_per_mb, **kwargs)
+
