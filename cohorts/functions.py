@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 from varcode.effects import Substitution, FrameShift
 from varcode.common import memoize
-from varcode.effects.effect_classes import Exonic
+from varcode.effects.effect_classes import Exonic, StopLoss
 import inspect
 
 def use_defaults(func):
@@ -32,8 +32,12 @@ def use_defaults(func):
     """
     @wraps(func)
     def wrapper(row, cohort, filter_fn=None, normalized_per_mb=None, **kwargs):
+        logger.debug("applying defaults")
         filter_fn = first_not_none_param([filter_fn, cohort.filter_fn], no_filter)
         normalized_per_mb = first_not_none_param([normalized_per_mb, cohort.normalized_per_mb], False)
+        logger.debug("filter_fn set to: {}".format(str(filter_fn.__name__)))
+        logger.debug("filter_fn has content: {}".format(str(filter_fn)))
+        logger.debug("normalized_per_mb set to: {}".format(str(normalized_per_mb)))
         return func(row=row,
                     cohort=cohort,
                     filter_fn=filter_fn,
@@ -70,29 +74,6 @@ def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
 
-def count_variants_function_builder(function_name, only_nonsynonymous=False, filterable_variant_function=None):
-    """
-    Creates a function that counts variants that are filtered by the provided filterable_variant_function.
-    The filterable_variant_function is a function that takes a filterable_variant and returns True or False.
-
-    Users of this builder need not worry about applying e.g. the Cohort's default `filter_fn`. That will be applied as well.
-    """
-    @count_function
-    def count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
-        def count_filter_fn(filterable_variant, **kwargs):
-            assert filter_fn is not None, "filter_fn should never be None, but it is."
-            return ((filterable_variant_function(filterable_variant) if filterable_variant_function is not None else True) and
-                    filter_fn(filterable_variant, **kwargs))
-        patient_id = row["patient_id"]
-        return cohort.load_effects(
-            only_nonsynonymous=only_nonsynonymous,
-            patients=[cohort.patient_from_id(patient_id)],
-            filter_fn=count_filter_fn,
-            **kwargs)
-    count.__name__ = function_name
-    count.__doc__ = str("".join(inspect.getsourcelines(filterable_variant_function)[0])) if filterable_variant_function is not None else ""
-    return count
-
 def count_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None):
     """
     Create a function that counts effects that are filtered by the provided filterable_effect_function.
@@ -118,82 +99,35 @@ def count_effects_function_builder(function_name, only_nonsynonymous, filterable
                      str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
     return count
 
-variant_count = count_variants_function_builder("variant_count")
-
-snv_count = count_variants_function_builder(
-    "snv_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_snv))
-
-indel_count = count_variants_function_builder(
-    "indel_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_indel))
-
-deletion_count = count_variants_function_builder(
-    "deletion_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_deletion))
-
-insertion_count = count_variants_function_builder(
-    "insertion_count",
-    filterable_variant_function=lambda filterable_variant: (
-        filterable_variant.variant.is_insertion))
-
-effect_count = count_effects_function_builder(
-    "effect_count",
-    only_nonsynonymous=False)
-
-nonsynonymous_effect_count = count_effects_function_builder(
-    "nonsynonymous_effect_count",
-    only_nonsynonymous=True)
-
-nonsynonymous_snv_count = count_effects_function_builder(
-    "nonsynonymous_snv_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_snv))
-
-missense_snv_count = count_effects_function_builder(
-    "missense_snv_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        type(filterable_effect.effect) == Substitution and
-        filterable_effect.variant.is_snv))
-
-nonsynonymous_indel_count = count_effects_function_builder(
-    "nonsynonymous_indel_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_indel))
-
-nonsynonymous_deletion_count = count_effects_function_builder(
-    "nonsynonymous_deletion_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_deletion))
-
-nonsynonymous_insertion_count = count_effects_function_builder(
-    "nonsynonymous_insertion_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        filterable_effect.variant.is_insertion))
-
-missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
-    "missense_snv_and_nonsynonymous_indel_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        (filterable_effect.variant.is_indel) or
-         (type(filterable_effect.effect) == Substitution and
-          filterable_effect.variant.is_snv)))
-
 def create_effect_filter(effect_name, effect_filter):
+    """
+    Return a composable filter function that applies the provided effect_filter 
+    to variants/effects of the provided function.
+
+    For example:
+        only_snv = create_effect_filter("snv", is_snv)
+        snv_variant_count = only_snv(variant_count)
+        snv_read_count = only_snv(read_count)
+
+    Parameters
+    ---------
+    effect_name: (str)
+      description of the filter applied. Used to construct a default "__doc__" & "__name__" 
+      of the resulting function.
+    effect_filter: (function)
+      function taking a single input (filterable_effect) & returning a boolean
+      only effects for which the filter returns True will be utilized.
+
+    Returns
+    -------
+    A function that takes two parameters: func & (optionally) name
+    """
     def filter_by_type(func, name=None):
         @use_defaults
         def filtered(row, cohort, filter_fn, normalized_per_mb, **kwargs):
             def new_filter_fn(filterable_effect, **kwargs):
                 assert filter_fn is not None, "filter_fn should never be None, but it is."
-                return filter_fn(filterable_effect) and effect_filter(filterable_effect)
+                return filter_fn(filterable_effect, **kwargs) and effect_filter(filterable_effect)
             return func(row=row,
                         cohort=cohort,
                         filter_fn=new_filter_fn,
@@ -202,20 +136,67 @@ def create_effect_filter(effect_name, effect_filter):
         if name is None:
             name = "_".join([effect_name, func.__name__])
         filtered.__name__ = name
-        filtered.__doc__ = func.__doc__ + "\nOnly {} effects.".format(effect_name)
+        filtered.__doc__ = func.__doc__ + "; Only {} effects.".format(effect_name)
         return filtered
     filter_by_type.__doc__ = "Return a new count function limited to {} effects".format(effect_name)
     return filter_by_type
 
-only_exonic = create_effect_filter("exonic", lambda filterable_effect: isinstance(filterable_effect.effect, Exonic))
-only_frameshift = create_effect_filter("frameshift", lambda filterable_effect: isinstance(filterable_effect.effect, Frameshift))
-only_indel = create_effect_filter("indel", lambda filterable_effect: filterable_effect.variant.is_indel)
-only_missense = create_effect_filter("missense", lambda filterable_effect: type(filterable_effect.effect) == Substitution)
-only_insertion = create_effect_filter("insertion", lambda filterable_effect: filterable_effect.variant.is_insertion)
-only_deletion = create_effect_filter("deletion", lambda filterable_effect: filterable_effect.variant.is_deletion)
-only_stoploss = create_effect_filter("stoploss", lambda filterable_effect: isinstance(filterable_effect.effect, StopLoss))
-only_expressed = create_effect_filter("expressed", lambda filterable_effect: effect_expressed_filter(filterable_effect))
+def is_exonic(filterable_effect):
+    return isinstance(filterable_effect.effect, Exonic)
+def is_frameshift(filterable_effect):
+    return isinstance(filterable_effect.effect, Frameshift)
+def is_snv(filterable_effect):
+    return filterable_effect.variant.is_snv
+def is_indel(filterable_effect):
+    return filterable_effect.variant.is_indel
+def is_missense(filterable_effect):
+    return type(filterable_effect.effect) == Substitution
+def is_insertion(filterable_effect):
+    return filterable_effect.variant.is_insertion
+def is_deletion(filterable_effect):
+    return filterable_effect.variant.is_deletion
+def is_stoploss(filterable_effect):
+    return isinstance(filterable_effect.effect, StopLoss)
+def is_expressed(filterable_effect):
+    return effect_expressed_filter(filterable_effect)
+def is_nonsynonymous(filterable_effect):
+    return filterable_effect.effect.modifies_protein_sequence
 
+only_exonic = create_effect_filter("exonic", is_exonic)
+only_frameshift = create_effect_filter("frameshift", is_frameshift)
+only_snv = create_effect_filter("snv", is_snv)
+only_indel = create_effect_filter("indel", is_indel)
+only_missense = create_effect_filter("missense", is_missense)
+only_insertion = create_effect_filter("insertion", is_insertion)
+only_deletion = create_effect_filter("deletion", is_deletion)
+only_stoploss = create_effect_filter("stoploss", is_stoploss)
+only_expressed = create_effect_filter("expressed", is_expressed)
+only_nonsynonymous = create_effect_filter("nonsynonymous", is_nonsynonymous)
+
+## base count functions
+effect_count = count_effects_function_builder("effect_count", only_nonsynonymous=False)
+nonsynonymous_effect_count = count_effects_function_builder("nonsynonymous_effect_count", only_nonsynonymous=True)
+
+# for effect counts, make equivalent functions named "variants" (for backwards compat)
+nonsynonymous_variant_count = nonsynonymous_effect_count
+nonsynonymous_variant_count.__name__ = "nonsynonymous_variant_count"
+variant_count = effect_count
+variant_count.__name__ = "variant_count"
+
+# main count functions, with custom names
+insertion_count = only_insertion(variant_count, name="insertion_count")
+snv_count = only_snv(variant_count, name="snv_count")
+indel_count = only_indel(variant_count, name="indel_count")
+deletion_count = only_deletion(variant_count, name="deletion_count")
+
+# other common count functions
+missense_snv_count = only_missense(snv_count)
+nonsynonymous_snv_count = only_nonsynonymous(snv_count)
+nonsynonymous_indel_count = only_nonsynonymous(indel_count)
+nonsynonymous_deletion_count = only_nonsynonymous(deletion_count)
+nonsynonymous_insertion_count = only_nonsynonymous(insertion_count)
+
+# exonic counts
 exonic_snv_count = only_exonic(snv_count)
 exonic_variant_count = only_exonic(variant_count)
 exonic_missense_snv_count = only_exonic(missense_snv_count)
@@ -226,11 +207,21 @@ exonic_frameshift_deletion_count = only_exonic(only_frameshift(deletion_count))
 exonic_frameshift_insertion_count = only_exonic(only_frameshift(insertion_count))
 exonic_frameshift_indel_count = only_exonic(only_frameshift(indel_count))
 
+# expressed counts
 expressed_missense_snv_count = only_expressed(missense_snv_count)
+expressed_exonic_variant_count = only_expressed(exonic_variant_count)
 expressed_exonic_snv_count = only_expressed(exonic_snv_count)
 expressed_exonic_indel_count = only_expressed(exonic_indel_count)
 expressed_exonic_insertion_count = only_expressed(exonic_insertion_count)
 expressed_exonic_deletion_count = only_expressed(exonic_deletion_count)
+
+missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
+    "missense_snv_and_nonsynonymous_indel_count",
+    only_nonsynonymous=True,
+    filterable_effect_function=lambda filterable_effect: (
+        (filterable_effect.variant.is_indel) or
+         (type(filterable_effect.effect) == Substitution and
+          filterable_effect.variant.is_snv)))
 
 @count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
