@@ -14,7 +14,7 @@
 
 from .variant_filters import no_filter, effect_expressed_filter
 from .varcode_utils import FilterableVariant
-from .utils import first_not_none_param
+from .utils import first_not_none_param, get_logger
 from .variant_stats import variant_stats_from_variant
 
 from functools import wraps
@@ -24,6 +24,8 @@ from varcode.effects import Substitution, FrameShift
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic, StopLoss
 import inspect
+
+logger = get_logger(__name__)
 
 def use_defaults(func):
     """
