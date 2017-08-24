@@ -16,6 +16,7 @@ from .variant_filters import no_filter, effect_expressed_filter
 from .varcode_utils import FilterableVariant
 from .utils import first_not_none_param, get_logger
 from .variant_stats import variant_stats_from_variant
+from .compose import composable
 
 from functools import wraps
 import numpy as np
@@ -24,6 +25,7 @@ from varcode.effects import Substitution, FrameShift
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic, StopLoss
 import inspect
+import re
 
 logger = get_logger(__name__)
 
@@ -143,14 +145,19 @@ def create_effect_filter(effect_name, effect_filter):
     filter_by_type.__doc__ = "Return a new count function limited to {} effects".format(effect_name)
     return filter_by_type
 
+@composable
 def is_exonic(filterable_effect):
     return isinstance(filterable_effect.effect, Exonic)
+@composable
 def is_frameshift(filterable_effect):
     return isinstance(filterable_effect.effect, Frameshift)
+@composable
 def is_snv(filterable_effect):
     return filterable_effect.variant.is_snv
+@composable
 def is_indel(filterable_effect):
     return filterable_effect.variant.is_indel
+@composable
 def is_missense(filterable_effect):
     return type(filterable_effect.effect) == Substitution
 def is_insertion(filterable_effect):
