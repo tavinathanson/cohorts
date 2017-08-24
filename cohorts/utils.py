@@ -23,6 +23,7 @@ import pickle
 import hashlib
 import dill
 import inspect
+from varcode.common import memoize
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,7 @@ def get_function_name(fn, default="None"):
 def md5_hash(o):
     return hashlib.md5(pickle.dumps(o)).hexdigest()
 
+@memoize
 def hash_function(fn, **kwargs):
     """ Construct string representing state of a function `fn`
         Used to cache filtered variants or effects uniquely depending on fn passed through kwargs or in closure
