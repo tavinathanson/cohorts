@@ -159,7 +159,7 @@ def is_exonic(filterable_effect):
     return isinstance(filterable_effect.effect, Exonic)
 @composable
 def is_frameshift(filterable_effect):
-    return isinstance(filterable_effect.effect, Frameshift)
+    return isinstance(filterable_effect.effect, FrameShift)
 @composable
 def is_snv(filterable_effect):
     return filterable_effect.variant.is_snv
