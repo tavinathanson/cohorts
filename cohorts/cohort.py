@@ -49,7 +49,7 @@ from tqdm import tqdm
 
 from .dataframe_loader import DataFrameLoader
 from .utils import DataFrameHolder, first_not_none_param, filter_not_null, InvalidDataError, strip_column_names as _strip_column_names, get_logger, get_cache_dir
-from .utils import get_function_name, make_hash, hash_function
+from .utils import get_function_name, make_hash
 from .provenance import compare_provenance
 from .survival import plot_kmf
 from .plot import mann_whitney_plot, fishers_exact_plot, roc_curve_plot, stripboxplot, CorrelationResults
@@ -567,7 +567,7 @@ class Cohort(Collection):
             try:
                 ## try to load filtered variants from cache
                 filtered_cache_file_name = "%s-variants.%s.pkl" % (self.merge_type,
-                                                                   hash_function(filter_fn, **kwargs))
+                                                                   make_hash(filter_fn, **kwargs))
             except:
                 cache_logger.warning("error identifying filtered-cache file name for patient {}: {}".format(
                         patient.id, filter_fn_name))
@@ -852,7 +852,7 @@ class Cohort(Collection):
         filter_fn_name = get_function_name(filter_fn)
         logger.debug("loading effects for patient {} with filter_fn {}".format(patient.id, filter_fn_name))
 
-        cached_file_name = "{}-effects.{}.pkl".format(self.merge_type, hash_function(filter_fn, **kwargs))
+        cached_file_name = "{}-effects.{}.pkl".format(self.merge_type, make_hash(filter_fn, **kwargs))
         cache_logger.debug("filtered effects cache name set to: {}".format(cached_file_name))
 
         # try to get result from cache
