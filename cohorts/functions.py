@@ -146,7 +146,7 @@ def create_effect_filter(effect_name, effect_filter):
 def is_exonic(filterable_effect):
     return isinstance(filterable_effect.effect, Exonic)
 def is_frameshift(filterable_effect):
-    return isinstance(filterable_effect.effect, Frameshift)
+    return isinstance(filterable_effect.effect, FrameShift)
 def is_snv(filterable_effect):
     return filterable_effect.variant.is_snv
 def is_indel(filterable_effect):
