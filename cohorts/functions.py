@@ -109,7 +109,7 @@ def count_effects(filter_effects=None, function_name=None):
                                    "count"])
     else:
         count.__name__ = "effect_count"
-    count.__doc__ = "Number of variant effects, filtered: " + str("".join(filter_effects.__doc__) if filter_effects is not None else "")
+    count.__doc__ = "Number of variant effects, filtered: " + str(str(filter_effects.__doc__) if filter_effects is not None else "")
     return count
 
 def create_effect_filter(effect_name, effect_filter):
