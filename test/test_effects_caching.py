@@ -24,55 +24,59 @@ def test_effects_priority_caching():
     Make sure that effects are cached such that they are not filtered
     prematurely. See https://github.com/hammerlab/cohorts/issues/252.
     """
-    cohort = None
+    cohort_initial = None
+    cohort_reloaded = None
     try:
         # This variant has IntronicSpliceSite, Subsitution effects, and more.
         variant = Variant(contig=3, start=20212211, ref="C", alt="T", ensembl=75)
         patient = Patient(id="patient", os=3, pfs=2, deceased=False, progressed=False, variants=VariantCollection([variant]))
         cohort_cache_path = generated_data_path("cache")
-        cohort_initial = Cohort(
+        cohort = Cohort(
             patients=[patient],
             cache_dir=cohort_cache_path)
 
-        def test_cohort(cohort):
-            # All of the effects.
-            effects = cohort.load_effects(all_effects=True)[patient.id]
-            eq_(len(effects), 15)
+        # All of the effects.
+        effects = cohort.load_effects(all_effects=True)[patient.id]
+        eq_(len(effects), 15)
+        # Try again, pulling from the cache now.
+        effects = cohort.load_effects(all_effects=True)[patient.id]
+        eq_(len(effects), 15)
 
-            # Top priority effect.
-            effects = cohort.load_effects()[patient.id]
-            eq_(len(effects), 1)
-            eq_(type(effects[0]), IntronicSpliceSite)
+        # Clear the cache to compare creating from scratch vs. cache-pull results again.
+        cohort.clear_caches()
 
-            def missense_snv_filter(filterable_effect):
-                return (type(filterable_effect.effect) == Substitution and
-                        filterable_effect.variant.is_snv)
+        # Top priority effect.
+        effects = cohort.load_effects()[patient.id]
+        eq_(len(effects), 1)
+        eq_(type(effects[0]), IntronicSpliceSite)
+        # Try again, pulling from the cache now.
+        effects = cohort.load_effects()[patient.id]
+        eq_(len(effects), 1)
+        eq_(type(effects[0]), IntronicSpliceSite)
 
-            # All missense SNV effects, from the large cache.
-            effects = cohort.load_effects(all_effects=True, filter_fn=missense_snv_filter)[patient.id]
-            eq_(len(effects), 6)
+        def missense_snv_filter(filterable_effect):
+            return (type(filterable_effect.effect) == Substitution and
+                    filterable_effect.variant.is_snv)
 
-            # Top missense SNV effect, from the large cache.
-            effects = cohort.load_effects(filter_fn=missense_snv_filter)[patient.id]
-            eq_(len(effects), 1)
-            eq_(type(effects[0]), Substitution)
+        # All missense SNV effects, from the large cache.
+        effects = cohort.load_effects(all_effects=True, filter_fn=missense_snv_filter)[patient.id]
+        eq_(len(effects), 6)
 
-            # Top missense SNV effects, from the small nonsynonymous cache.
-            effects = cohort.load_effects(only_nonsynonymous=True, filter_fn=missense_snv_filter)[patient.id]
-            eq_(len(effects), 1)
-            eq_(type(effects[0]), Substitution)
+        # Top missense SNV effect, from the large cache.
+        effects = cohort.load_effects(filter_fn=missense_snv_filter)[patient.id]
+        eq_(len(effects), 1)
+        eq_(type(effects[0]), Substitution)
 
-            # All nonsynonymous effects, from the small nonsynonymous cache.
-            effects = cohort.load_effects(all_effects=True, only_nonsynonymous=True)[patient.id]
-            eq_(len(effects), 6)
+        # Top missense SNV effects, from the small nonsynonymous cache.
+        effects = cohort.load_effects(only_nonsynonymous=True, filter_fn=missense_snv_filter)[patient.id]
+        eq_(len(effects), 1)
+        eq_(type(effects[0]), Substitution)
 
-        test_cohort(cohort_initial)
-
-        cohort_reloaded = Cohort(
-            patients=[patient],
-            cache_dir=cohort_cache_path)
-
-        test_cohort(cohort_reloaded)
+        # All nonsynonymous effects, from the small nonsynonymous cache.
+        effects = cohort.load_effects(all_effects=True, only_nonsynonymous=True)[patient.id]
+        eq_(len(effects), 6)
     finally:
-        if cohort is not None:
-            cohort.clear_caches()
+        if cohort_initial is not None:
+            cohort_initial.clear_caches()
+        if cohort_reloaded is not None:
+            cohort_reloaded.clear_caches()

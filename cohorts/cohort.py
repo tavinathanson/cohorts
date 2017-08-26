@@ -826,14 +826,14 @@ class Cohort(Collection):
         if variants is None:
             return None
 
-        def top_priority_maybe(effects):
+        def top_priority_maybe(effect_collection):
             """
             Always (unless all_effects=True) take the top priority effect per variant
             so we end up with a single effect per variant.
             """
             if all_effects:
-                return effects
-            return EffectCollection(list(effects.top_priority_effect_per_variant().values()))
+                return effect_collection
+            return EffectCollection(list(effect_collection.top_priority_effect_per_variant().values()))
 
         if only_nonsynonymous:
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
