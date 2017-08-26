@@ -24,8 +24,7 @@ def test_effects_priority_caching():
     Make sure that effects are cached such that they are not filtered
     prematurely. See https://github.com/hammerlab/cohorts/issues/252.
     """
-    cohort_initial = None
-    cohort_reloaded = None
+    cohort = None
     try:
         # This variant has IntronicSpliceSite, Subsitution effects, and more.
         variant = Variant(contig=3, start=20212211, ref="C", alt="T", ensembl=75)
@@ -34,6 +33,7 @@ def test_effects_priority_caching():
         cohort = Cohort(
             patients=[patient],
             cache_dir=cohort_cache_path)
+        cohort.clear_caches()
 
         # All of the effects.
         effects = cohort.load_effects(all_effects=True)[patient.id]
@@ -76,7 +76,5 @@ def test_effects_priority_caching():
         effects = cohort.load_effects(all_effects=True, only_nonsynonymous=True)[patient.id]
         eq_(len(effects), 6)
     finally:
-        if cohort_initial is not None:
-            cohort_initial.clear_caches()
-        if cohort_reloaded is not None:
-            cohort_reloaded.clear_caches()
+        if cohort is not None:
+            cohort.clear_caches()
