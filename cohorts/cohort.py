@@ -826,25 +826,17 @@ class Cohort(Collection):
         if variants is None:
             return None
 
-        def top_priority_maybe(effect_collection):
-            """
-            Always (unless all_effects=True) take the top priority effect per variant
-            so we end up with a single effect per variant.
-            """
-            if all_effects:
-                return effect_collection
-            return EffectCollection(list(effect_collection.top_priority_effect_per_variant().values()))
-
         if only_nonsynonymous:
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
             cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            return top_priority_maybe(filter_effects(effect_collection=cached,
-                                                     variant_collection=variants,
-                                                     patient=patient,
-                                                     filter_fn=filter_fn,
-                                                     **kwargs))
+            return filter_effects(effect_collection=cached,
+                                  variant_collection=variants,
+                                  patient=patient,
+                                  filter_fn=filter_fn,
+                                  all_effects=all_effects,
+                                  **kwargs)
 
         effects = variants.effects()
 
@@ -855,13 +847,14 @@ class Cohort(Collection):
         nonsynonymous_effects = effects.drop_silent_and_noncoding()
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
 
-        return top_priority_maybe(filter_effects(
+        return filter_effects(
             effect_collection=(
                 nonsynonymous_effects if only_nonsynonymous else effects),
             variant_collection=variants,
             patient=patient,
             filter_fn=filter_fn,
-            **kwargs))
+            all_effects=all_effects,
+            **kwargs)
 
     def load_kallisto(self):
         """

@@ -104,7 +104,7 @@ def filter_variants(variant_collection, patient, filter_fn, **kwargs):
     else:
         return variant_collection
 
-def filter_effects(effect_collection, variant_collection, patient, filter_fn, **kwargs):
+def filter_effects(effect_collection, variant_collection, patient, filter_fn, all_effects, **kwargs):
     """Filter variants from the Effect Collection
 
     Parameters
@@ -112,24 +112,35 @@ def filter_effects(effect_collection, variant_collection, patient, filter_fn, **
     effect_collection : varcode.EffectCollection
     variant_collection : varcode.VariantCollection
     patient : cohorts.Patient
-    filter_fn: function
+    filter_fn : function
         Takes a FilterableEffect and returns a boolean. Only effects returning True are preserved.
+    all_effects : boolean
+        Return the single, top-priority effect if False. If True, return all effects (don't filter to top-priority).
 
     Returns
     -------
     varcode.EffectCollection
         Filtered effect collection, with only the variants passing the filter
     """
+    def top_priority_maybe(effect_collection):
+        """
+        Always (unless all_effects=True) take the top priority effect per variant
+        so we end up with a single effect per variant.
+        """
+        if all_effects:
+            return effect_collection
+        return EffectCollection(list(effect_collection.top_priority_effect_per_variant().values()))
+
     if filter_fn:
-        return EffectCollection([
+        return top_priority_maybe(EffectCollection([
             effect
             for effect in effect_collection
             if filter_fn(FilterableEffect(
                     effect=effect,
                     variant_collection=variant_collection,
-                    patient=patient), **kwargs)])
+                    patient=patient), **kwargs)]))
     else:
-        return effect_collection
+        return top_priority_maybe(effect_collection)
 
 def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
     if filter_fn:
