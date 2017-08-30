@@ -207,7 +207,6 @@ class Cohort(Collection):
 
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
-                            "all_effect": "cached-all-effects",
                             "nonsynonymous_effect": "cached-nonsynonymous-effects",
                             "neoantigen": "cached-neoantigens",
                             "expressed_neoantigen": "cached-expressed-neoantigens",
@@ -855,47 +854,34 @@ class Cohort(Collection):
             return None
 
         if only_nonsynonymous:
-            if all_effects:
-                raise ValueError("Cannot ask for all effects and only nonsynonymous effects at the same time")
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
-            if all_effects:
-                cached = self.load_from_cache(self.cache_names["all_effect"], patient.id, cached_file_name)
-            else:
-                cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
-            filtered_effects = filter_effects(effect_collection=cached,
-                                              variant_collection=variants,
-                                              patient=patient,
-                                              filter_fn=filter_fn,
-                                              **kwargs)
-        else:
+            return filter_effects(effect_collection=cached,
+                                  variant_collection=variants,
+                                  patient=patient,
+                                  filter_fn=filter_fn,
+                                  all_effects=all_effects,
+                                  **kwargs)
 
-            effects = variants.effects()
+        effects = variants.effects()
 
-            self.save_to_cache(effects, self.cache_names["all_effect"], patient.id, cached_file_name)
+        # Save all effects, rather than top priority only. See https://github.com/hammerlab/cohorts/issues/252.
+        self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
 
-            effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
-            self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
+        # Save all nonsynonymous effects, rather than top priority only.
+        nonsynonymous_effects = effects.drop_silent_and_noncoding()
+        self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
 
-            # Always take the top priority effect per variant so we end up with a single
-            # effect per variant.
-            nonsynonymous_effects = EffectCollection(
-                list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
-            self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
-
-            filtered_effects = filter_effects(
-                effect_collection=(
-                    nonsynonymous_effects if only_nonsynonymous else effects),
-                variant_collection=variants,
-                patient=patient,
-                filter_fn=filter_fn,
-                **kwargs)
-
-        if filtered_effects is None:
-            logger.info("Effects did not exist for patient {}".format(patient.id))
-
-        return filtered_effects
+        return filter_effects(
+            effect_collection=(
+                nonsynonymous_effects if only_nonsynonymous else effects),
+            variant_collection=variants,
+            patient=patient,
+            filter_fn=filter_fn,
+            all_effects=all_effects,
+            **kwargs)
 
     def load_kallisto(self):
         """
