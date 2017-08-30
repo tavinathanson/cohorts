@@ -1,5 +1,49 @@
 # Change Log
 
+## [0.7.0](https://github.com/hammerlab/cohorts/tree/0.7.0) (2017-08-29)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.4...0.7.0)
+
+**Fixed bugs:**
+
+- filter\_fn result caching should work for Python 2 and 3 [\#174](https://github.com/hammerlab/cohorts/issues/174)
+
+**Closed issues:**
+
+- ImportError: cannot import name 'AlleleParseError'  [\#233](https://github.com/hammerlab/cohorts/issues/233)
+- Invalid RGBA argument error using `plot\_survival` [\#221](https://github.com/hammerlab/cohorts/issues/221)
+- support plotting survival curves for more than 2 groups [\#217](https://github.com/hammerlab/cohorts/issues/217)
+- Add `cache\_root\_dir` attribute [\#214](https://github.com/hammerlab/cohorts/issues/214)
+- Cache sometimes fails if user interrupts writing process [\#170](https://github.com/hammerlab/cohorts/issues/170)
+- builds against latest versions of isovar fails [\#69](https://github.com/hammerlab/cohorts/issues/69)
+
+**Merged pull requests:**
+
+- Fix effect priority caching [\#254](https://github.com/hammerlab/cohorts/pull/254) ([tavinathanson](https://github.com/tavinathanson))
+- add get-blob method to gcio [\#244](https://github.com/hammerlab/cohorts/pull/244) ([jburos](https://github.com/jburos))
+- add `join\_on\_left` parameter to dataframe\_loader [\#242](https://github.com/hammerlab/cohorts/pull/242) ([jburos](https://github.com/jburos))
+- Expose gcloud utils [\#241](https://github.com/hammerlab/cohorts/pull/241) ([jburos](https://github.com/jburos))
+- Plot surv by strata [\#237](https://github.com/hammerlab/cohorts/pull/237) ([jburos](https://github.com/jburos))
+- allow median-vaf-purity with patients having no variants [\#236](https://github.com/hammerlab/cohorts/pull/236) ([jburos](https://github.com/jburos))
+- Fix mhcnames to v 0.1.0  [\#235](https://github.com/hammerlab/cohorts/pull/235) ([jburos](https://github.com/jburos))
+- "guess" at variant file format, if not obvious from filename [\#232](https://github.com/hammerlab/cohorts/pull/232) ([jburos](https://github.com/jburos))
+- Update warning and associated comment [\#230](https://github.com/hammerlab/cohorts/pull/230) ([tavinathanson](https://github.com/tavinathanson))
+- Gcloud batch downloads [\#229](https://github.com/hammerlab/cohorts/pull/229) ([jburos](https://github.com/jburos))
+- Feature plot\_survival by category \(clean branch\) [\#225](https://github.com/hammerlab/cohorts/pull/225) ([jburos](https://github.com/jburos))
+- Fix RGBA error with plot\_survival [\#223](https://github.com/hammerlab/cohorts/pull/223) ([jburos](https://github.com/jburos))
+- Warn on vcf errors [\#222](https://github.com/hammerlab/cohorts/pull/222) ([jburos](https://github.com/jburos))
+- Google Storage file access add-on for cohorts \(a.k.a. minibucket\) [\#219](https://github.com/hammerlab/cohorts/pull/219) ([armish](https://github.com/armish))
+
+## [0.6.4](https://github.com/hammerlab/cohorts/tree/0.6.4) (2017-06-05)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.3...0.6.4)
+
+**Closed issues:**
+
+- median\_vaf\_purity\(\) got an unexpected keyword argument 'normalized\_per\_mb' [\#212](https://github.com/hammerlab/cohorts/issues/212)
+
+**Merged pull requests:**
+
+- add cache\_root\_dir attribute & behavior [\#216](https://github.com/hammerlab/cohorts/pull/216) ([jburos](https://github.com/jburos))
+
 ## [0.6.3](https://github.com/hammerlab/cohorts/tree/0.6.3) (2017-05-28)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.2...0.6.3)
 
