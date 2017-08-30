@@ -189,7 +189,6 @@ class Cohort(Collection):
 
         self.cache_names = {"variant": "cached-variants",
                             "effect": "cached-effects",
-                            "all_effect": "cached-all-effects",
                             "nonsynonymous_effect": "cached-nonsynonymous-effects",
                             "neoantigen": "cached-neoantigens",
                             "expressed_neoantigen": "cached-expressed-neoantigens",
@@ -777,7 +776,7 @@ class Cohort(Collection):
                 patient_effects[patient.id] = effects
         return patient_effects
 
-    def _load_single_patient_effects_unfiltered(self, patient, only_nonsynonymous, all_effects):
+    def _load_single_patient_effects_unfiltered(self, patient, only_nonsynonymous):
         """
         Load single patient effects without applying a filter-function
         """
@@ -785,14 +784,9 @@ class Cohort(Collection):
 
         # get result from cache
         if only_nonsynonymous:
-            if all_effects:
-                raise ValueError("Cannot ask for all effects and only nonsynonymous effects at the same time")
             cached = self.load_from_cache(self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         else:
-            if all_effects:
-                cached = self.load_from_cache(self.cache_names["all_effect"], patient.id, cached_file_name)
-            else:
-                cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
+            cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
             return cached
 
@@ -805,23 +799,16 @@ class Cohort(Collection):
 
         ### all effects per variant (not the top priority)
         effects = variants.effects()
-        self.save_to_cache(effects, self.cache_names["all_effect"], patient.id, cached_file_name)
+        self.save_to_cache(effects, self.cache_names["effect"], patient.id, cached_file_name)
 
-        ### top priority effect per variant
-        top_effects = EffectCollection(list(effects.top_priority_effect_per_variant().values()))
-        self.save_to_cache(top_effects, self.cache_names["effect"], patient.id, cached_file_name)
-
-        ### top priority effect among nonsynonymous effects
-        nonsynonymous_effects = EffectCollection(
-            list(effects.drop_silent_and_noncoding().top_priority_effect_per_variant().values()))
+        # Save all nonsynonymous effects, rather than top priority only.
+        nonsynonymous_effects = effects.drop_silent_and_noncoding()
         self.save_to_cache(nonsynonymous_effects, self.cache_names["nonsynonymous_effect"], patient.id, cached_file_name)
         
-        if all_effects:
-            return effects
-        elif only_nonsynonymous:
+        if only_nonsynonymous:
             return nonsynonymous_effects
         else:
-            return top_effects
+            return effects
 
     def _load_single_patient_effects(self, patient, only_nonsynonymous, all_effects, filter_fn, **kwargs):
         filter_fn_name = get_function_name(filter_fn)
@@ -830,7 +817,7 @@ class Cohort(Collection):
         cached_file_name = "{}-effects.{}.pkl".format(self.merge_type, hash_function(filter_fn, **kwargs))
         cache_logger.debug("filtered effects cache name set to: {}".format(cached_file_name))
 
-        # try to get result from cache
+        # try to get filtered result from cache
         cached = self.load_from_cache(self.cache_names["effect"], patient.id, cached_file_name)
         if cached is not None:
             return cached
@@ -838,8 +825,8 @@ class Cohort(Collection):
         # get effects in absence of filter
         effects = self._load_single_patient_effects_unfiltered(
             patient=patient,
-            only_nonsynonymous=only_nonsynonymous,
-            all_effects=all_effects)
+            only_nonsynonymous=only_nonsynonymous)
+
         # (needed for metadata - should ideally be included in the `effects` object)
         variants = self._load_single_patient_variants(
             patient, filter_fn=None)
@@ -853,6 +840,7 @@ class Cohort(Collection):
             patient=patient,
             variant_collection=variants,
             filter_fn=filter_fn,
+            all_effects=all_effects,
             **kwargs)
 
         # save to cache
