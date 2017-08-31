@@ -74,7 +74,7 @@ def test_snv_counts():
 
         df = cohort.as_dataframe(missense_snv_count)
         eq_(len(df), 3)
-        eq_(list(df["missense_snv_count"]), [2, 2, 4])
+        eq_(list(df["missense_snv_count"]), [3, 3, 6])
     finally:
         if vcf_dir is not None and path.exists(vcf_dir):
             rmtree(vcf_dir)
@@ -169,7 +169,7 @@ def test_filter_effects():
 
         def filter_substitution_effects(filterable_effect):
             return type(filterable_effect.effect) == Substitution
-        missense_counts = {'1': 2, '4': 2, '5': 4}
+        missense_counts = {'1': 3, '4': 3, '5': 6}
 
         cohort_effects = cohort.load_effects(only_nonsynonymous=True, filter_fn=filter_substitution_effects)
         for (sample, effects) in cohort_effects.items():
