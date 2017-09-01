@@ -15,9 +15,62 @@
 from . import generated_data_path
 from cohorts import Patient, Cohort
 from varcode import Variant, VariantCollection
-from varcode.effects import Substitution, IntronicSpliceSite
+from varcode.effects import Substitution, FrameShift, IntronicSpliceSite
 import pandas as pd
 from nose.tools import eq_, ok_
+
+def test_splice_filtering_substitution():
+    """
+    Make sure that ExonicSpliceSite mutations with Substitution alternates are kept even when we filter to
+    only Substitution effects.
+    """
+    cohort = None
+    try:
+        variant = Variant(contig=10, start=124340409, ref="C", alt="A", ensembl=75)
+        patient = Patient(id="patient", os=3, pfs=2, deceased=False, progressed=False, variants=VariantCollection([variant]))
+        cohort_cache_path = generated_data_path("cache")
+        cohort = Cohort(
+            patients=[patient],
+            cache_dir=cohort_cache_path)
+
+        def missense_snv_filter(filterable_effect):
+            return (type(filterable_effect.effect) == Substitution and
+                    filterable_effect.variant.is_snv)
+
+        effects = cohort.load_effects(filter_fn=missense_snv_filter)[patient.id]
+        eq_(len(effects), 1)
+        all_effects = cohort.load_effects(filter_fn=missense_snv_filter,
+                                          all_effects=True)[patient.id]
+        eq_(len(all_effects), 7)
+    finally:
+        if cohort is not None:
+            cohort.clear_caches()
+
+def test_splice_filtering_frameshift():
+    """
+    Make sure that ExonicSpliceSite mutations with FrameShift alternates are kept even when we filter to
+    only FrameShift effects.
+    """
+    cohort = None
+    try:
+        variant = Variant(contig=8, start=145617535, ref="GGGGGTGCAAGGTGA", alt="", ensembl=75)
+        patient = Patient(id="patient", os=3, pfs=2, deceased=False, progressed=False, variants=VariantCollection([variant]))
+        cohort_cache_path = generated_data_path("cache")
+        cohort = Cohort(
+            patients=[patient],
+            cache_dir=cohort_cache_path)
+
+        def frameshift_filter(filterable_effect):
+            return (type(filterable_effect.effect) == FrameShift)
+
+        effects = cohort.load_effects(filter_fn=frameshift_filter)[patient.id]
+        eq_(len(effects), 1)
+        all_effects = cohort.load_effects(filter_fn=frameshift_filter,
+                                          all_effects=True)[patient.id]
+        eq_(len(all_effects), 1)
+    finally:
+        if cohort is not None:
+            cohort.clear_caches()
 
 def test_effects_priority_caching():
     """
