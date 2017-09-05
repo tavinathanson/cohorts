@@ -12,7 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .variant_filters import no_filter
+from .varcode_utils import FilterableVariant
+from .variant_stats import variant_stats_from_variant
 from .utils import require_id_str, set_attributes
+from collections import defaultdict, namedtuple
+
+FilterFnCol = namedtuple("FilterFnCol",
+                         ["filter_fn", "only_nonsynonymous", "col_name"])
+
+def build_filter_fn_col_from_count_fn(count_fn):
+    if "_count" not in count_fn.__name__:
+        raise ValueError("Cannot build a column from a count function without _count in its name: {}".format(count_fn.__name__))
+
+    name_prefix = count_fn.__name__.split("_count")[0]
+    return FilterFnCol(
+        filter_fn=count_fn.filterable_effect_function,
+        only_nonsynonymous=count_fn.only_nonsynonymous,
+        col_name=name_prefix)
+
+def build_filter_fn_cols_from_count_fns(count_fns):
+    cols = []
+    for count_fn in count_fns:
+        cols.append(build_filter_fn_col_from_count_fn(count_fn=count_fn))
+    return cols
 
 class Patient(object):
     """
@@ -87,6 +110,54 @@ class Patient(object):
     @property
     def variants_list(self):
         return self.variants if type(self.variants) == list else [self.variants]
+
+    def variants_dataframe(self, filter_fn_cols=[]):
+        effects_sets = {}
+
+        # Generate a set of unfiltered variants.
+        variants_no_filter = self.cohort.load_variants(
+            patients=[self],
+            filter_fn=no_filter)[self.id]
+        df_variants_no_filter = variants_no_filter.to_dataframe()[["chr", "start", "ref", "alt"]].drop_duplicates().reset_index(drop=True)
+
+
+        # First, add depth/VAF columns.
+        col_values = defaultdict(list)
+        for variant in variants_no_filter:
+            filterable_variant = FilterableVariant(variant, variants_no_filter, self.cohort)
+            somatic_stats = variant_stats_from_variant(filterable_variant.variant, filterable_variant.variant_metadata)
+            if somatic_stats.tumor_stats is not None:
+                col_values["tumor_vaf"].append(somatic_stats.tumor_stats.variant_allele_frequency)
+                col_values["tumor_depth"].append(somatic_stats.tumor_stats.depth)
+                col_values["tumor_alt_depth"].append(somatic_stats.tumor_stats.alt_depth)
+            if somatic_stats.normal_stats is not None:
+                col_values["normal_vaf"].append(somatic_stats.normal_stats.variant_allele_frequency)
+                col_values["normal_depth"].append(somatic_stats.normal_stats.depth)
+                col_values["normal_alt_depth"].append(somatic_stats.normal_stats.alt_depth)
+
+        # Generate filtered effect sets for every filter column.
+        for filter_fn_col in filter_fn_cols:
+            effect_set = set(self.cohort.load_effects(
+                only_nonsynonymous=filter_fn_col.only_nonsynonymous,
+                patients=[self],
+                filter_fn=filter_fn_col.filter_fn)[self.id])
+            effects_sets[filter_fn_col.col_name] = effect_set
+
+        # Look at each variant.
+        for variant in variants_no_filter:
+            # Check each effect in the effect set to see if it has this variant.
+            for filter_fn_col_name, effects_set in effects_sets.items():
+                variants_for_col = set([effect.variant for effect in effects_set])
+                col_values[filter_fn_col_name].append(variant in variants_for_col)
+
+        # Put new values back into the unfiltered variant DataFrame.
+        for col_name, col_value in col_values.items():
+            if len(col_value) != len(df_variants_no_filter):
+                raise ValueError("Trying to add a column that isn't the same length as the variants DataFrame: {} is {}".format(
+                    col_name, len(col_value)))
+            df_variants_no_filter[col_name] = col_value
+
+        return df_variants_no_filter
 
     def add_progressed_or_deceased(self):
         assert self.progressed is not None or self.progressed_or_deceased is not None, (
