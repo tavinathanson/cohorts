@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.7.1](https://github.com/hammerlab/cohorts/tree/0.7.1) (2017-09-01)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.7.0...0.7.1)
+
+**Fixed bugs:**
+
+- all\_effects caches, but does not return, all effects [\#253](https://github.com/hammerlab/cohorts/issues/253)
+- Don't cache after only top-priority effects; post-filter instead [\#252](https://github.com/hammerlab/cohorts/issues/252)
+
+**Merged pull requests:**
+
+- Fix effects filtering for splice sites [\#256](https://github.com/hammerlab/cohorts/pull/256) ([tavinathanson](https://github.com/tavinathanson))
+
 ## [0.7.0](https://github.com/hammerlab/cohorts/tree/0.7.0) (2017-08-29)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.6.4...0.7.0)
 
