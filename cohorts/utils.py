@@ -18,6 +18,13 @@ from collections import namedtuple
 import sys
 import logging
 from os import path
+import copy
+import pickle
+import hashlib
+import dill
+import inspect
+from varcode.common import memoize
+from .compose import ComposableBool
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +46,6 @@ def get_cache_dir(cache_dir, cache_root_dir=None, *args, **kwargs):
     else:
         logger.warning("cache dir is not full path & cache_root_dir not given. Caching may not work as expected!")
     return None
-
 
 class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
     """Holds a DataFrame along with associated columns of interest."""
@@ -217,3 +223,84 @@ def set_attributes(obj, additional_data):
         if hasattr(obj, key):
             raise ValueError("Key %s in additional_data already exists in this object" % key)
         setattr(obj, _strip_column_name(key), value)
+
+def get_function_name(fn, default="None"):
+    """ Return name of function, using default value if function not defined
+    """
+    if fn is None:
+        fn_name = default
+    else:
+        fn_name = fn.__name__
+    return fn_name
+
+def md5_hash(o):
+    return hashlib.md5(pickle.dumps(o)).hexdigest()
+
+def hash_function(fn, **kwargs):
+    """ Construct string representing state of a function `fn`
+        Used to cache filtered variants or effects uniquely depending on fn passed through kwargs or in closure
+    """
+    fn_name = get_function_name(fn, default="filter-none")
+    logger.debug("Computing hash for fn: {} with kwargs {}".format(fn_name, str(dict(**kwargs))))
+    # hash function source code
+    fn_source = str(dill.source.getsource(fn))
+    pickled_fn_source = pickle.dumps(fn_source) ## encode as byte string
+    hashed_fn_source = int(hashlib.sha1(pickled_fn_source).hexdigest(), 16) % (10 ** 11)
+    # hash kwarg values
+    kw_dict = dict(**kwargs)
+    kw_hash = list()
+    if not kw_dict:
+        kw_hash = "default"
+    else:
+        kw_hash = make_hash(kw_dict)
+    # hash closure vars - for case where fn is defined within closure of fn
+    closure = dict()
+    nonlocals = inspect.getclosurevars(fn).nonlocals
+    closure_hash = make_hash(nonlocals)
+    # construct final string comprising hashed components
+    fn_as_string = ".".join(["-".join([fn_name,
+                                    str(hashed_fn_source)]),
+                             kw_hash,
+                             closure_hash]
+                            )
+    return fn_as_string
+
+DictProxyType = type(object.__dict__)
+def make_hash(o, **kwargs):
+    """
+    Makes a hash from a dictionary, list, tuple or set to any level, that
+    contains only other hashable types (including any lists, tuples, sets, and
+    dictionaries). In the case where other kinds of objects (like classes) need
+    to be hashed, pass in a collection of object attributes that are pertinent.
+    For example, a class can be hashed in this fashion:
+
+    make_hash([cls.__dict__, cls.__name__])
+
+    A function can be hashed like so:
+
+    make_hash([fn.__dict__, fn.__code__])
+
+    (based on work by user jomido (https://stackoverflow.com/users/660554/jomido) 
+    in a post at https://stackoverflow.com/a/8714242/3457743)
+    """
+    if type(o) == DictProxyType:
+        o2 = {}
+        for k, v in o.items():
+            if not k.startswith("__"):
+                o2[k] = v
+        o = o2
+    if inspect.isfunction(o):
+        return hash_function(o, **kwargs)
+    elif isinstance(o, ComposableBool):
+        return hash_function(o.func, **kwargs)
+    if isinstance(o, (set, tuple, list)):
+        return tuple([make_hash(e) for e in o])
+    elif not isinstance(o, dict):
+        return md5_hash(o)
+    new_o = copy.deepcopy(o)
+    if len(new_o) == 0:
+        return md5_hash('{}')
+    else:
+        for k, v in new_o.items():
+            new_o[k] = make_hash(v)
+        return md5_hash(tuple(frozenset(sorted(new_o.items()))))
