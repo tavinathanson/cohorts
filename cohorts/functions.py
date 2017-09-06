@@ -16,6 +16,7 @@ from .variant_filters import no_filter, effect_expressed_filter
 from .varcode_utils import FilterableVariant
 from .utils import first_not_none_param, get_logger
 from .variant_stats import variant_stats_from_variant
+from .errors import BamFileNotFound
 from .compose import composable
 
 from functools import wraps
@@ -73,6 +74,31 @@ def count_function(func):
         return np.nan
     return wrapper
 
+def agg_function(agg):
+    """
+    Decorator for functions that return a Series to be aggregated (summed) up. 
+    Also automatically falls back to the Cohort-default filter_fn and normalized_per_mb if
+    not specified
+    """
+    def agg_function_decorator(func):
+        @use_defaults
+        @wraps(func)
+        def wrapper(row, cohort, filter_fn=None, normalized_per_mb=None, **kwargs):
+            per_patient_data = func(row=row,
+                                    cohort=cohort,
+                                    filter_fn=filter_fn,
+                                    normalized_per_mb=normalized_per_mb,
+                                    **kwargs)
+            patient_id = row["patient_id"]
+            if patient_id in per_patient_data:
+                res = agg(per_patient_data[patient_id])
+                if normalized_per_mb:
+                    res /= float(get_patient_to_mb(cohort)[patient_id])
+                return res
+            return np.nan
+        return wrapper
+    return agg_function_decorator
+
 @memoize
 def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
@@ -83,7 +109,7 @@ def count_effects(filter_effects=None, function_name=None):
     Create a function that counts effects that are filtered by the provided filter_effects function.
     The filter_effects function should take a filterable_effect and return a True or False for each variant.
 
-    May of the provided effect_filters are "composable", meaning you can call this as follows:
+    Many of the provided effect_filters are "composable", meaning you can call this as follows:
         `exonic_snv_count = count_effects(is_exonic & is_snv)`
         See `cohorts.composable` for more details.
 
@@ -111,6 +137,37 @@ def count_effects(filter_effects=None, function_name=None):
         count.__name__ = "effect_count"
     count.__doc__ = "Number of variant effects, filtered: " + str(str(filter_effects.__doc__) if filter_effects is not None else "")
     return count
+
+
+def count_reads(function_name, only_nonsynonymous, filterable_effect_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
+    """
+    """
+    @agg_function(agg)
+    def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
+        def effect_filter_fn(filterable_effect, **kwargs):
+            assert filter_fn is not None, "filter_fn should never be None, but it is."
+            return ((filterable_effect_function(filterable_effect) if filterable_effect_function is not None else True) and
+                    filter_fn(filterable_effect, **kwargs))
+        patient_id = row["patient_id"]
+        effects = cohort.load_effects(
+            only_nonsynonymous=only_nonsynonymous,
+            patients=[cohort.patient_from_id(patient_id)],
+            filter_fn=effect_filter_fn,
+            **kwargs)
+        try:
+            isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=[eff.variant for eff in effects[patient_id]],
+                                                          epitope_lengths=[8,9,10,11])
+        except BamFileNotFound as e:
+            logger.warning(str(e))
+            return {}
+        if len(isovar_df.index) == 0:
+            return {patient_id: [0]}
+        else:
+            return {patient_id: isovar_df.apply(data_trans, axis=1)}
+    agg_fn.__name__ = function_name
+    agg_fn.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) + 
+                      str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
+    return agg_fn
 
 def create_effect_filter(effect_name, effect_filter):
     """
@@ -204,6 +261,8 @@ only_nonsynonymous = create_effect_filter("nonsynonymous", is_nonsynonymous)
 ## base count functions
 effect_count = count_effects(function_name="effect_count")
 nonsynonymous_effect_count = count_effects(is_nonsynonymous, function_name="nonsynonymous_effect_count")
+read_count = count_reads(function_name="read_count")
+nonsynonymous_read_count = count_reads(is_nonsynonymous, "nonsynonymous_read_count")
 
 # for effect counts, make equivalent functions named "variants" (for backwards compat)
 nonsynonymous_variant_count = nonsynonymous_effect_count
@@ -243,7 +302,14 @@ expressed_exonic_indel_count = only_expressed(exonic_indel_count)
 expressed_exonic_insertion_count = only_expressed(exonic_insertion_count)
 expressed_exonic_deletion_count = only_expressed(exonic_deletion_count)
 
-missense_snv_and_nonsynonymous_indel_count = count_effects(is_missense_snv_or_nonsynonymous_indel)
+
+missense_snv_and_nonsynonymous_indel_count = count_effects(is_missense_snv_or_nonsynonymous_indel,
+                                                          function_name="missense_snv_and_nonsynonymous_indel_count")
+
+
+# expressed read counts
+exonic_snv_read_count = only_exonic(only_snv(read_count))
+exonic_indel_read_count = only_exonic(only_indel(read_count))
 
 @count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
