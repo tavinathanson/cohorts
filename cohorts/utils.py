@@ -206,11 +206,8 @@ def strip_column_names(cols, keep_paren_contents=True):
 
     return dict(zip(cols, new_cols))
 
-def get_logger(name, level=logging.INFO):
+def get_logger(name):
     logger = logging.getLogger(name)
-    if logger.handlers:
-        logger.handlers = []
-    logger.setLevel(level)
     return logger
 
 def set_attributes(obj, additional_data):
@@ -292,7 +289,7 @@ def make_hash(o):
         o = o2
     if inspect.isfunction(o):
         return hash_function(o)
-    if isinstance(o, (set, tuple, list)):
+    elif isinstance(o, (set, tuple, list)):
         return tuple([make_hash(e) for e in o])
     elif not isinstance(o, dict):
         return md5_hash(o)
@@ -303,3 +300,6 @@ def make_hash(o):
         for k, v in new_o.items():
             new_o[k] = make_hash(v)
         return md5_hash(tuple(frozenset(sorted(new_o.items()))))
+    for k, v in new_o.items():
+        new_o[k] = make_hash(v)
+    return md5_hash(tuple(frozenset(sorted(new_o.items()))))

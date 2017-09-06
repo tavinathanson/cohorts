@@ -23,7 +23,6 @@ from copy import copy
 import dill
 import hashlib
 import inspect
-import logging
 import pickle
 import numpy as np
 
@@ -62,6 +61,7 @@ from .variant_filters import no_filter
 from .styling import set_styling
 from . import variant_filters
 from .errors import MissingBamFile, MissingTumorBamFile, MissingRNABamFile, MissingHLAType, MissingVariantFile
+from .utils import make_hash
 
 logger = get_logger(__name__)
 cache_logger = get_logger(__name__ + '.caching')
@@ -583,20 +583,12 @@ class Cohort(Collection):
                     pass
 
         ## get merged variants
-        logger.debug("... getting merged variants for: {}".format(patient.id))
-        try:
-            merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
-        except MissingVariantFile as e:
-            if self.fail_on_missing_variants:
-                raise
-            else:
-                logger.info(str(e))
-                return None
+        merged_variants = self._load_single_patient_merged_variants(patient, use_cache=use_cache)
 
         # Note None here is different from 0. We want to preserve None
         assert merged_variants is not None, "Bug found - merged_variants should not be None. Please file an issue"
 
-        logger.debug("... applying filters to variants for: {}".format(patient.id))
+        logger.debug("applying filters to variants for: {}".format(patient.id))
         filtered_variants = filter_variants(variant_collection=merged_variants,
                                             patient=patient,
                                             filter_fn=filter_fn,
@@ -1003,6 +995,7 @@ class Cohort(Collection):
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
         cached_file_name = "%s-neoantigens.csv" % self.merge_type
+        logger.debug("loading neoantigens for patient {}".format(patient.id))
 
         # Don't filter here, as these variants are used to generate the
         # neoantigen cache; and cached items are never filtered.
@@ -1010,14 +1003,17 @@ class Cohort(Collection):
         if variants is None:
             return None
 
+        logger.debug("patient HLA alleles are: {}".format(str(patient.hla_alleles)))
         if patient.hla_alleles is None:
             raise MissingHLAType(patient_id=patient.id)
 
+        logger.debug("trying to load from cache")
         if only_expressed:
             cached = self.load_from_cache(self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
         else:
             cached = self.load_from_cache(self.cache_names["neoantigen"], patient.id, cached_file_name)
         if cached is not None:
+            logger.debug("filtering neoantigens from cached file")
             return filter_neoantigens(neoantigens_df=cached,
                                       variant_collection=variants,
                                       patient=patient,
@@ -1040,29 +1036,36 @@ class Cohort(Collection):
                                                          variants=variants,
                                                          epitope_lengths=epitope_lengths)
 
-            # Map from isovar rows to protein sequences
-            isovar_rows_to_protein_sequences = dict([
-                (frozenset(row.to_dict().items()), row["amino_acids"]) for (i, row) in df_isovar.iterrows()])
+            if len(df_isovar) == 0:
+                logger.warning("patient {} has no expressed variants".format(patient.id))
+                df_epitopes = pd.DataFrame(columns=["source_sequence_key", "source_sequence", "offset", "allele", "peptide",
+                                                    "length", "value", "measure", "percentile_rank", "prediction_method_name",
+                                                    "chr", "start", "ref", "alt", "patient_id"]
+                                                   )
+            else:
+                # Map from isovar rows to protein sequences
+                isovar_rows_to_protein_sequences = dict([
+                    (frozenset(row.to_dict().items()), row["amino_acids"]) for (i, row) in df_isovar.iterrows()])
 
-            # MHC binding prediction
-            epitopes = mhc_model.predict(isovar_rows_to_protein_sequences)
+                # MHC binding prediction
+                epitopes = mhc_model.predict(isovar_rows_to_protein_sequences)
 
-            # Call `get_filtered_isovar_epitopes` in order to only include peptides that
-            # overlap a variant; without this filter, when we use
-            # protein_sequence_length above, some 8mers generated from a 21mer source will
-            # not overlap a variant.
-            df_epitopes = self.get_filtered_isovar_epitopes(
-                epitopes, ic50_cutoff=ic50_cutoff).dataframe()
-            # Store chr/pos/ref/alt in the cached DataFrame so we can filter based on
-            # the variant later.
-            for variant_column in ["chr", "pos", "ref", "alt"]:
-                # Be consistent with Topiary's output of "start" rather than "pos".
-                # Isovar, on the other hand, outputs "pos".
-                # See https://github.com/hammerlab/topiary/blob/5c12bab3d47bd86d396b079294aff141265f8b41/topiary/converters.py#L50
-                df_column = "start" if variant_column == "pos" else variant_column
-                df_epitopes[df_column] = df_epitopes.source_sequence_key.apply(
-                    lambda key: dict(key)[variant_column])
-            df_epitopes["patient_id"] = patient.id
+                # Call `get_filtered_isovar_epitopes` in order to only include peptides that
+                # overlap a variant; without this filter, when we use
+                # protein_sequence_length above, some 8mers generated from a 21mer source will
+                # not overlap a variant.
+                df_epitopes = self.get_filtered_isovar_epitopes(
+                    epitopes, ic50_cutoff=ic50_cutoff).dataframe()
+                # Store chr/pos/ref/alt in the cached DataFrame so we can filter based on
+                # the variant later.
+                for variant_column in ["chr", "pos", "ref", "alt"]:
+                    # Be consistent with Topiary's output of "start" rather than "pos".
+                    # Isovar, on the other hand, outputs "pos".
+                    # See https://github.com/hammerlab/topiary/blob/5c12bab3d47bd86d396b079294aff141265f8b41/topiary/converters.py#L50
+                    df_column = "start" if variant_column == "pos" else variant_column
+                    df_epitopes[df_column] = df_epitopes.source_sequence_key.apply(
+                        lambda key: dict(key)[variant_column])
+                df_epitopes["patient_id"] = patient.id
 
             self.save_to_cache(df_epitopes, self.cache_names["expressed_neoantigen"], patient.id, cached_file_name)
         else:
@@ -1106,20 +1109,16 @@ class Cohort(Collection):
                 mutant_binding_predictions.append(binding_prediction)
         return EpitopeCollection(mutant_binding_predictions)
 
-    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
-        # TODO: different epitope lengths, and other parameters, should result in
-        # different caches
-        isovar_cached_file_name = "%s-isovar.csv" % self.merge_type
-        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
-        if df_isovar is not None:
-            return df_isovar
-
-        import logging
-        logging.disable(logging.INFO)
+    def _load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        """
+        Version of load_single_patient_isovar, without any caching (used by companion functions)
+        """
+        # load result from bam file
         if patient.tumor_sample is None:
             raise MissingTumorBamFile(patient_id=patient.id)
         if patient.tumor_sample.bam_path_rna is None:
             raise MissingRNABamFile(patient_id=patient.id)
+        logger.debug("loading RNA bam file: {}".format(patient.tumor_sample.bam_path_rna))
         rna_bam_file = AlignmentFile(patient.tumor_sample.bam_path_rna)
 
         # To ensure that e.g. 8-11mers overlap substitutions, we need at least this
@@ -1128,11 +1127,13 @@ class Cohort(Collection):
         # 123456789AB
         #           123456789AB
         # AAAAAAAAAAVAAAAAAAAAA
+        logger.debug("getting reads containing somatic variants")
         protein_sequence_length = (max(epitope_lengths) * 2) - 1
         allele_reads_generator = reads_overlapping_variants(
             variants=variants,
             samfile=rna_bam_file,
             min_mapping_quality=1)
+        logger.debug("determining protein sequences from reads")
         protein_sequences_generator = reads_generator_to_protein_sequences_generator(
             allele_reads_generator,
             protein_sequence_length=protein_sequence_length,
@@ -1140,7 +1141,32 @@ class Cohort(Collection):
             min_variant_sequence_coverage=3,
             max_protein_sequences_per_variant=1, # Otherwise we might have too much neoepitope diversity
             variant_sequence_assembly=False)
+        logger.debug("generating dataframe of results")
         df_isovar = protein_sequences_generator_to_dataframe(protein_sequences_generator)
+        return df_isovar
+
+    def load_single_patient_isovar(self, patient, variants, epitope_lengths):
+        """
+        Load isovar results for a patient, filtered to provided variants
+        """
+        logger.debug("Loading isovar for patient: {}".format(patient.id))
+
+        # different cache depending on epitope length & variant set
+        variant_hash = make_hash(frozenset(variants))
+        epitope_hash = make_hash(frozenset(epitope_lengths))
+        isovar_cached_file_name = "{}-isovar.{}-{}.csv".format(self.merge_type, str(epitope_hash), str(variant_hash))
+        logger.debug("isovar_cached_file_name set to: {}".format(isovar_cached_file_name))
+
+        # try to load filtered isovar result from cache
+        df_isovar = self.load_from_cache(self.cache_names["isovar"], patient.id, isovar_cached_file_name)
+        if df_isovar is not None:
+            logger.debug("returning result from cache")
+            return df_isovar
+
+        # get isovar results
+        df_isovar = self._load_single_patient_isovar(patient=patient, epitope_lengths=epitope_lengths, variants=variants)
+
+        logger.debug("saving results to cache: {}".format(isovar_cached_file_name))
         self.save_to_cache(df_isovar, self.cache_names["isovar"], patient.id, isovar_cached_file_name)
         return df_isovar
 
