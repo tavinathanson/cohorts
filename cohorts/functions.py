@@ -16,6 +16,7 @@ from .variant_filters import no_filter, effect_expressed_filter
 from .varcode_utils import FilterableVariant
 from .utils import first_not_none_param, get_logger
 from .variant_stats import variant_stats_from_variant
+from .compose import composable
 
 from functools import wraps
 import numpy as np
@@ -24,6 +25,7 @@ from varcode.effects import Substitution, FrameShift
 from varcode.common import memoize
 from varcode.effects.effect_classes import Exonic, StopLoss
 import inspect
+import re
 
 logger = get_logger(__name__)
 
@@ -76,10 +78,14 @@ def get_patient_to_mb(cohort):
     patient_to_mb = dict(cohort.as_dataframe(join_with="ensembl_coverage")[["patient_id", "MB"]].to_dict("split")["data"])
     return patient_to_mb
 
-def count_effects_function_builder(function_name, only_nonsynonymous, filterable_effect_function=None):
+def count_effects(filter_effects=None, function_name=None):
     """
-    Create a function that counts effects that are filtered by the provided filterable_effect_function.
-    The filterable_effect_function is a function that takes a filterable_effect and returns True or False.
+    Create a function that counts effects that are filtered by the provided filter_effects function.
+    The filter_effects function should take a filterable_effect and return a True or False for each variant.
+
+    May of the provided effect_filters are "composable", meaning you can call this as follows:
+        `exonic_snv_count = count_effects(is_exonic & is_snv)`
+        See `cohorts.composable` for more details.
 
     Users of this builder need not worry about applying e.g. the Cohort's default `filter_fn`. That will be applied as well.
     """
@@ -87,18 +93,23 @@ def count_effects_function_builder(function_name, only_nonsynonymous, filterable
     def count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         def count_filter_fn(filterable_effect, **kwargs):
             assert filter_fn is not None, "filter_fn should never be None, but it is."
-            return ((filterable_effect_function(filterable_effect) if filterable_effect_function is not None else True) and
+            return ((filter_effects(filterable_effect) if filter_effects is not None else True) and
                     filter_fn(filterable_effect, **kwargs))
         # This only loads one effect per variant.
         patient_id = row["patient_id"]
         return cohort.load_effects(
-            only_nonsynonymous=only_nonsynonymous,
+            only_nonsynonymous=False,
             patients=[cohort.patient_from_id(patient_id)],
             filter_fn=count_filter_fn,
             **kwargs)
-    count.__name__ = function_name
-    count.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) +
-                     str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
+    if function_name is not None:
+        count.__name__ = function_name
+    elif filter_effects is not None:
+        count.__name__ = "_".join([re.sub(string=filter_effects.__name__, pattern="is_", repl=""),
+                                   "count"])
+    else:
+        count.__name__ = "effect_count"
+    count.__doc__ = "Number of variant effects, filtered: " + str(str(filter_effects.__doc__) if filter_effects is not None else "")
     return count
 
 def create_effect_filter(effect_name, effect_filter):
@@ -143,26 +154,41 @@ def create_effect_filter(effect_name, effect_filter):
     filter_by_type.__doc__ = "Return a new count function limited to {} effects".format(effect_name)
     return filter_by_type
 
+@composable
 def is_exonic(filterable_effect):
     return isinstance(filterable_effect.effect, Exonic)
+@composable
 def is_frameshift(filterable_effect):
     return isinstance(filterable_effect.effect, FrameShift)
+@composable
 def is_snv(filterable_effect):
     return filterable_effect.variant.is_snv
+@composable
 def is_indel(filterable_effect):
     return filterable_effect.variant.is_indel
+@composable
 def is_missense(filterable_effect):
     return type(filterable_effect.effect) == Substitution
+@composable
 def is_insertion(filterable_effect):
     return filterable_effect.variant.is_insertion
+@composable
 def is_deletion(filterable_effect):
     return filterable_effect.variant.is_deletion
+@composable
 def is_stoploss(filterable_effect):
     return isinstance(filterable_effect.effect, StopLoss)
+@composable
 def is_expressed(filterable_effect):
     return effect_expressed_filter(filterable_effect)
+@composable
 def is_nonsynonymous(filterable_effect):
     return filterable_effect.effect.modifies_protein_sequence
+@composable
+def is_missense_snv_or_nonsynonymous_indel(filterable_effect):
+    return (filterable_effect.variant.is_indel or
+         (type(filterable_effect.effect) == Substitution and
+                    filterable_effect.variant.is_snv))
 
 only_exonic = create_effect_filter("exonic", is_exonic)
 only_frameshift = create_effect_filter("frameshift", is_frameshift)
@@ -176,8 +202,8 @@ only_expressed = create_effect_filter("expressed", is_expressed)
 only_nonsynonymous = create_effect_filter("nonsynonymous", is_nonsynonymous)
 
 ## base count functions
-effect_count = count_effects_function_builder("effect_count", only_nonsynonymous=False)
-nonsynonymous_effect_count = count_effects_function_builder("nonsynonymous_effect_count", only_nonsynonymous=True)
+effect_count = count_effects(function_name="effect_count")
+nonsynonymous_effect_count = count_effects(is_nonsynonymous, function_name="nonsynonymous_effect_count")
 
 # for effect counts, make equivalent functions named "variants" (for backwards compat)
 nonsynonymous_variant_count = nonsynonymous_effect_count
@@ -217,13 +243,7 @@ expressed_exonic_indel_count = only_expressed(exonic_indel_count)
 expressed_exonic_insertion_count = only_expressed(exonic_insertion_count)
 expressed_exonic_deletion_count = only_expressed(exonic_deletion_count)
 
-missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
-    "missense_snv_and_nonsynonymous_indel_count",
-    only_nonsynonymous=True,
-    filterable_effect_function=lambda filterable_effect: (
-        (filterable_effect.variant.is_indel) or
-         (type(filterable_effect.effect) == Substitution and
-          filterable_effect.variant.is_snv)))
+missense_snv_and_nonsynonymous_indel_count = count_effects(is_missense_snv_or_nonsynonymous_indel)
 
 @count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):

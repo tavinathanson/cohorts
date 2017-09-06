@@ -24,6 +24,7 @@ import hashlib
 import dill
 import inspect
 from varcode.common import memoize
+from .compose import ComposableBool
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,6 @@ def get_cache_dir(cache_dir, cache_root_dir=None, *args, **kwargs):
     else:
         logger.warning("cache dir is not full path & cache_root_dir not given. Caching may not work as expected!")
     return None
-
 
 class DataFrameHolder(namedtuple("DataFrameHolder", ["cols", "df"])):
     """Holds a DataFrame along with associated columns of interest."""
@@ -233,7 +233,6 @@ def get_function_name(fn, default="None"):
 def md5_hash(o):
     return hashlib.md5(pickle.dumps(o)).hexdigest()
 
-@memoize
 def hash_function(fn, **kwargs):
     """ Construct string representing state of a function `fn`
         Used to cache filtered variants or effects uniquely depending on fn passed through kwargs or in closure
@@ -264,7 +263,7 @@ def hash_function(fn, **kwargs):
     return fn_as_string
 
 DictProxyType = type(object.__dict__)
-def make_hash(o):
+def make_hash(o, **kwargs):
     """
     Makes a hash from a dictionary, list, tuple or set to any level, that
     contains only other hashable types (including any lists, tuples, sets, and
@@ -288,8 +287,10 @@ def make_hash(o):
                 o2[k] = v
         o = o2
     if inspect.isfunction(o):
-        return hash_function(o)
-    elif isinstance(o, (set, tuple, list)):
+        return hash_function(o, **kwargs)
+    elif isinstance(o, ComposableBool):
+        return hash_function(o.func, **kwargs)
+    if isinstance(o, (set, tuple, list)):
         return tuple([make_hash(e) for e in o])
     elif not isinstance(o, dict):
         return md5_hash(o)
