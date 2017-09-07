@@ -16,7 +16,7 @@ from .variant_filters import no_filter, effect_expressed_filter
 from .varcode_utils import FilterableVariant
 from .utils import first_not_none_param, get_logger
 from .variant_stats import variant_stats_from_variant
-from .errors import BamFileNotFound
+from .errors import MissingBamFile
 from .compose import composable
 
 from functools import wraps
@@ -139,14 +139,16 @@ def count_effects(filter_effects=None, function_name=None):
     return count
 
 
-def count_reads(function_name, only_nonsynonymous, filterable_effect_function=None, data_trans=lambda row: row['alt_reads'], agg=sum):
+def count_reads(filter_effects=None, function_name=None,
+                data_trans=lambda row: row['alt_reads'], agg=sum):
     """
     """
     @agg_function(agg)
     def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         def effect_filter_fn(filterable_effect, **kwargs):
             assert filter_fn is not None, "filter_fn should never be None, but it is."
-            return ((filterable_effect_function(filterable_effect) if filterable_effect_function is not None else True) and
+            return ((filterable_effect_function(filterable_effect) 
+                     if filterable_effect_function is not None else True) and
                     filter_fn(filterable_effect, **kwargs))
         patient_id = row["patient_id"]
         effects = cohort.load_effects(
@@ -155,18 +157,29 @@ def count_reads(function_name, only_nonsynonymous, filterable_effect_function=No
             filter_fn=effect_filter_fn,
             **kwargs)
         try:
-            isovar_df = cohort.load_single_patient_isovar(patient=cohort.patient_from_id(patient_id), variants=[eff.variant for eff in effects[patient_id]],
-                                                          epitope_lengths=[8,9,10,11])
-        except BamFileNotFound as e:
+            isovar_df = cohort.load_single_patient_isovar(
+                patient=cohort.patient_from_id(patient_id), 
+                variants=[eff.variant for eff in effects[patient_id]],
+                epitope_lengths=[8,9,10,11])
+        except MissingBamFile as e:
             logger.warning(str(e))
             return {}
         if len(isovar_df.index) == 0:
             return {patient_id: [0]}
         else:
             return {patient_id: isovar_df.apply(data_trans, axis=1)}
-    agg_fn.__name__ = function_name
-    agg_fn.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) + 
-                      str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
+    if function_name is not None:
+        agg_fn.__name__ = function_name
+    elif filter_effects is not None:
+        agg_fn.__name__ = "_".join([re.sub(string=filter_effects.__name__,
+                                           pattern="is_",
+                                           repl=""),
+                                    "count"])
+    else:
+        agg_fn.__name__ = "read_count"
+    agg_fn.__doc__ = "{} of reads ({}), filtered by {}".format(
+        agg.__name__, str(data_trans),
+        str(filter_effects.__doc__) if filter_effects is None else "(nothing)")
     return agg_fn
 
 def create_effect_filter(effect_name, effect_filter):
