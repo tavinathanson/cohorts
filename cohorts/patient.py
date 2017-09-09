@@ -118,8 +118,8 @@ class Patient(object):
         variants_no_filter = self.cohort.load_variants(
             patients=[self],
             filter_fn=no_filter)[self.id]
-        df_variants_no_filter = variants_no_filter.to_dataframe()[["chr", "start", "ref", "alt"]].drop_duplicates().reset_index(drop=True)
-
+        df_variants_no_filter = variants_no_filter.to_dataframe()
+        assert len(df_variants_no_filter) == len(variants_no_filter.to_dataframe()[["chr", "start", "ref", "alt"]].drop_duplicates())
 
         # First, add depth/VAF columns.
         col_values = defaultdict(list)
