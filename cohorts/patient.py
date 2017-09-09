@@ -17,6 +17,9 @@ from .varcode_utils import FilterableVariant
 from .variant_stats import variant_stats_from_variant
 from .utils import require_id_str, set_attributes
 from collections import defaultdict, namedtuple
+import pandas as pd
+from varcode.effects import EffectCollection, effect_sort_key
+from varcode.effects.effect_classes import KnownAminoAcidChange
 
 FilterFnCol = namedtuple("FilterFnCol",
                          ["filter_fn", "only_nonsynonymous", "col_name"])
@@ -134,6 +137,12 @@ class Patient(object):
                 col_values["normal_vaf"].append(somatic_stats.normal_stats.variant_allele_frequency)
                 col_values["normal_depth"].append(somatic_stats.normal_stats.depth)
                 col_values["normal_alt_depth"].append(somatic_stats.normal_stats.alt_depth)
+            assert len(filterable_variant.variant_metadata.keys()) == 1
+            inner_metadata_dict = filterable_variant.variant_metadata[list(filterable_variant.variant_metadata.keys())[0]]
+            dbnsfp_pred = inner_metadata_dict["i_dbNSFP_LR_pred"]
+            if pd.isnull(dbnsfp_pred):
+                dbnsfp_pred = "."
+            col_values["possibly_deleterious"].append("D" in dbnsfp_pred)
 
         # Generate filtered effect sets for every filter column.
         for filter_fn_col in filter_fn_cols:
@@ -143,12 +152,43 @@ class Patient(object):
                 filter_fn=filter_fn_col.filter_fn)[self.id])
             effects_sets[filter_fn_col.col_name] = effect_set
 
+        # Also keep track of all effects.
+        all_effects = self.cohort.load_effects(
+                only_nonsynonymous=False,
+                all_effects=True,
+                patients=[self],
+                filter_fn=no_filter)[self.id]
+        variant_to_effects = all_effects.groupby_variant()
+
         # Look at each variant.
         for variant in variants_no_filter:
             # Check each effect in the effect set to see if it has this variant.
             for filter_fn_col_name, effects_set in effects_sets.items():
                 variants_for_col = set([effect.variant for effect in effects_set])
                 col_values[filter_fn_col_name].append(variant in variants_for_col)
+
+            # Do things involving all of the variant's effects.
+            variant_effects = variant_to_effects[variant]
+            col_values["priority_effect"].append(variant_effects.top_priority_effect().short_description)
+
+            # Make sure the effect collection is sorted in priority order now that we're printing pieces of it out.
+            variant_effects = EffectCollection(variant_effects, sort_key=effect_sort_key, distinct=True)
+            def make_distinct(l):
+                seen = set()
+                return [elem for elem in l if not (elem in seen or seen.add(elem))]
+            # All effects, sorted and distinct
+            variant_effect_descriptions = make_distinct([effect.short_description for effect in variant_effects[::-1]])
+            # All AA-changing effects, sorted and distinct (including splice sites)
+            # TODO: Make the splice site part less hacky. See https://github.com/hammerlab/cohorts/issues/255
+            variant_effect_descriptions_aa = []
+            for effect in variant_effects[::-1]:
+                if isinstance(effect, KnownAminoAcidChange):
+                    variant_effect_descriptions_aa.append(effect.short_description)
+                elif hasattr(effect, "alternate_effect") and isinstance(effect.alternate_effect, KnownAminoAcidChange):
+                    variant_effect_descriptions_aa.append(effect.alternate_effect.short_description)
+            variant_effect_descriptions_aa = make_distinct(variant_effect_descriptions_aa)
+            col_values["all_effects"].append(";".join(variant_effect_descriptions))
+            col_values["all_aa_effects"].append(";".join(variant_effect_descriptions_aa))
 
         # Put new values back into the unfiltered variant DataFrame.
         for col_name, col_value in col_values.items():
