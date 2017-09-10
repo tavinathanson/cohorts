@@ -146,7 +146,7 @@ class Patient(object):
             col_values["possibly_deleterious"].append("D" in dbnsfp_pred)
 
         # If this column has no information, remove it (e.g. not using MAFs, etc.).
-        if set(col_values["possibly_deleterious"]) == set(["."]):
+        if set(col_values["possibly_deleterious"]) == set([False]):
             del col_values["possibly_deleterious"]
 
         # Generate filtered effect sets for every filter column.
