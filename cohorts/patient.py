@@ -172,7 +172,13 @@ class Patient(object):
             col_values["priority_effect"].append(variant_effects.top_priority_effect().short_description)
 
             # Make sure the effect collection is sorted in priority order now that we're printing pieces of it out.
-            variant_effects = EffectCollection(variant_effects, sort_key=effect_sort_key, distinct=True)
+            # Also, throw in all alternate_effect's as well.
+            expanded_effects = []
+            for effect in variant_effects:
+                expanded_effects.append(effect)
+                if hasattr(effect, "alternate_effect"):
+                    expanded_effects.append(effect.alternate_effect)
+            variant_effects = EffectCollection(expanded_effects, sort_key=effect_sort_key, distinct=True)
             def make_distinct(l):
                 seen = set()
                 return [elem for elem in l if not (elem in seen or seen.add(elem))]
@@ -180,13 +186,7 @@ class Patient(object):
             variant_effect_descriptions = make_distinct([effect.short_description for effect in variant_effects[::-1]])
             # All AA-changing effects, sorted and distinct (including splice sites)
             # TODO: Make the splice site part less hacky. See https://github.com/hammerlab/cohorts/issues/255
-            variant_effect_descriptions_aa = []
-            for effect in variant_effects[::-1]:
-                if isinstance(effect, KnownAminoAcidChange):
-                    variant_effect_descriptions_aa.append(effect.short_description)
-                elif hasattr(effect, "alternate_effect") and isinstance(effect.alternate_effect, KnownAminoAcidChange):
-                    variant_effect_descriptions_aa.append(effect.alternate_effect.short_description)
-            variant_effect_descriptions_aa = make_distinct(variant_effect_descriptions_aa)
+            variant_effect_descriptions_aa = make_distinct([effect.short_description for effect in variant_effects[::-1] if isinstance(effect, KnownAminoAcidChange)])
             col_values["all_effects"].append(";".join(variant_effect_descriptions))
             col_values["all_aa_effects"].append(";".join(variant_effect_descriptions_aa))
 
