@@ -137,12 +137,17 @@ class Patient(object):
                 col_values["normal_vaf"].append(somatic_stats.normal_stats.variant_allele_frequency)
                 col_values["normal_depth"].append(somatic_stats.normal_stats.depth)
                 col_values["normal_alt_depth"].append(somatic_stats.normal_stats.alt_depth)
+
             assert len(filterable_variant.variant_metadata.keys()) == 1
             inner_metadata_dict = filterable_variant.variant_metadata[list(filterable_variant.variant_metadata.keys())[0]]
-            dbnsfp_pred = inner_metadata_dict["i_dbNSFP_LR_pred"]
+            dbnsfp_pred = inner_metadata_dict.get("i_dbNSFP_LR_pred", ".") # Sometimes the key isn't even there
             if pd.isnull(dbnsfp_pred):
-                dbnsfp_pred = "."
+                dbnsfp_pred = "." # Or the key could be there, but value NaN
             col_values["possibly_deleterious"].append("D" in dbnsfp_pred)
+
+        # If this column has no information, remove it (e.g. not using MAFs, etc.).
+        if set(col_values["possibly_deleterious"]) == set(["."]):
+            del col_values["possibly_deleterious"]
 
         # Generate filtered effect sets for every filter column.
         for filter_fn_col in filter_fn_cols:
