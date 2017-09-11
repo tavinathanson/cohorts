@@ -18,6 +18,7 @@ from collections import namedtuple
 import sys
 import logging
 from os import path
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,9 @@ def get_cache_dir(cache_dir, cache_root_dir=None, *args, **kwargs):
     if cache_root_dir is not None:
         return path.join(cache_root_dir, cache_dir)
     else:
-        logger.warning("cache dir is not full path & cache_root_dir not given. Caching may not work as expected!")
+        cwd = os.getcwd()
+        logger.warning("cache dir is not full path & cache_root_dir not given. Using cwd ({}) as cache_root_dir".format(os.getcwd()))
+        return path.join(cwd, cache_dir)
     return None
 
 
