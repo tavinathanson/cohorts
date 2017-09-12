@@ -163,7 +163,8 @@ class Cohort(Collection):
                  merge_type="union",
                  fail_on_missing_bams=True,
                  fail_on_missing_variants=False,
-                 fail_on_missing_hla=False):
+                 fail_on_missing_hla=False,
+                 genome='reference'):
         Collection.__init__(
             self,
             elements=patients)
@@ -198,6 +199,7 @@ class Cohort(Collection):
         self.pageant_dir_fn = pageant_dir_fn
         self.benefit_plot_name = benefit_plot_name
         self.merge_type = merge_type
+        self.default_genome = genome
         self._genome = None
         self.fail_on_missing_bams = fail_on_missing_bams
         self.fail_on_missing_variants = fail_on_missing_variants
@@ -629,7 +631,7 @@ class Cohort(Collection):
                 if type(patient_variants) == str:
                     if ".vcf" in patient_variants:
                         try:
-                            variant_collections.append(varcode.load_vcf_fast(patient_variants))
+                            variant_collections.append(varcode.load_vcf(patient_variants, genome=self.default_genome))
                         # StopIteration is thrown for empty VCFs. For an empty VCF, don't append any variants,
                         # and don't throw an error. But do record a warning, in case the StopIteration was
                         # thrown for another reason.
