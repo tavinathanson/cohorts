@@ -182,7 +182,7 @@ def count_reads(filter_effects=None, function_name=None,
         str(filter_effects.__doc__) if filter_effects is None else "(nothing)")
     return agg_fn
 
-def create_effect_filter(effect_name, effect_filter):
+def create_effect_filter(effect_name, effect_filter, **effect_kwargs):
     """
     Return a composable filter function that applies the provided effect_filter 
     to variants/effects of the provided function.
@@ -210,7 +210,7 @@ def create_effect_filter(effect_name, effect_filter):
         def filtered(row, cohort, filter_fn, normalized_per_mb, **kwargs):
             def new_filter_fn(filterable_effect, **kwargs):
                 assert filter_fn is not None, "filter_fn should never be None, but it is."
-                return filter_fn(filterable_effect, **kwargs) and effect_filter(filterable_effect)
+                return filter_fn(filterable_effect, **kwargs) and effect_filter(filterable_effect, **effect_kwargs)
             return func(row=row,
                         cohort=cohort,
                         filter_fn=new_filter_fn,
@@ -259,6 +259,20 @@ def is_missense_snv_or_nonsynonymous_indel(filterable_effect):
     return (filterable_effect.variant.is_indel or
          (type(filterable_effect.effect) == Substitution and
                     filterable_effect.variant.is_snv))
+@composable
+def is_in_transcript(filterable_effect, transcript_name):
+    return (filterable_effect.effect.transcript_name == transcript_name)
+@composable
+def is_in_gene(filterable_effect, gene_name):
+    return (re.match(string=filterable_effect.effect.transcript_name, pattern='^[^-]+').group() == gene_name)
+@composable
+def not_in_genes(filterable_effect, gene_names):
+    not_in_gene = [!is_in_gene(filterable_effect, gene_name) for gene_name in gene_names]
+    return all(not_in_gene)
+@composable
+def is_in_genes(filterable_effect, gene_names):
+    in_genes = [is_in_gene(filterable_effect, gene_name) for gene_name in gene_names]
+    return any(in_genes)
 
 only_exonic = create_effect_filter("exonic", is_exonic)
 only_frameshift = create_effect_filter("frameshift", is_frameshift)
@@ -270,6 +284,12 @@ only_deletion = create_effect_filter("deletion", is_deletion)
 only_stoploss = create_effect_filter("stoploss", is_stoploss)
 only_expressed = create_effect_filter("expressed", is_expressed)
 only_nonsynonymous = create_effect_filter("nonsynonymous", is_nonsynonymous)
+only_pbrm1 = create_effect_filter("pbrm1", is_in_gene, "PBRM1")
+only_vhl = create_effect_filter("vhl", is_in_gene, "VHL")
+only_setd2 = create_effect_filter("setd2", is_in_gene, "SETD2")
+only_bap1 = create_effect_filter("bap1", is_in_gene, "BAP1")
+only_other = create_effect_filter("other", not_in_genes, ["PBRM1", "VHL", "SETD2", "BAP1"])
+only_top4 = create_effect_filter("top4", is_in_genes, ["PBRM1", "VHL", "SETD2", "BAP1"])
 
 ## base count functions
 effect_count = count_effects(function_name="effect_count")
