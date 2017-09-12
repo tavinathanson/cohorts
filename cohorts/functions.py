@@ -147,8 +147,8 @@ def count_reads(filter_effects=None, function_name=None,
     def agg_fn(row, cohort, filter_fn, normalized_per_mb, **kwargs):
         def effect_filter_fn(filterable_effect, **kwargs):
             assert filter_fn is not None, "filter_fn should never be None, but it is."
-            return ((filterable_effect_function(filterable_effect) 
-                     if filterable_effect_function is not None else True) and
+            return ((filter_effects(filterable_effect) 
+                     if filterable_effects is not None else True) and
                     filter_fn(filterable_effect, **kwargs))
         patient_id = row["patient_id"]
         effects = cohort.load_effects(
