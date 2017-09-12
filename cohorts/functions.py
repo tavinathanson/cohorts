@@ -148,11 +148,11 @@ def count_reads(filter_effects=None, function_name=None,
         def effect_filter_fn(filterable_effect, **kwargs):
             assert filter_fn is not None, "filter_fn should never be None, but it is."
             return ((filter_effects(filterable_effect) 
-                     if filterable_effects is not None else True) and
+                     if filter_effects is not None else True) and
                     filter_fn(filterable_effect, **kwargs))
         patient_id = row["patient_id"]
         effects = cohort.load_effects(
-            only_nonsynonymous=only_nonsynonymous,
+            only_nonsynonymous=False,
             patients=[cohort.patient_from_id(patient_id)],
             filter_fn=effect_filter_fn,
             **kwargs)
