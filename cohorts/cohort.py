@@ -539,7 +539,14 @@ class Cohort(Collection):
         patient_variants = {}
 
         for patient in self.iter_patients(patients):
-            variants = self._load_single_patient_variants(patient, filter_fn, **kwargs)
+            try:
+                variants = self._load_single_patient_variants(patient, filter_fn, **kwargs)
+            except MissingVariantFile as e:
+                if self.fail_on_missing_variants:
+                    raise
+                else:
+                    logger.info(str(e))
+                    variants = None
             if variants is not None:
                 patient_variants[patient.id] = variants
         return patient_variants
@@ -787,8 +794,15 @@ class Cohort(Collection):
         logger.debug("loading effects with filter_fn {}".format(filter_fn_name))
         patient_effects = {}
         for patient in self.iter_patients(patients):
-            effects = self._load_single_patient_effects(
-                patient, only_nonsynonymous, all_effects, filter_fn, **kwargs)
+            try:
+                effects = self._load_single_patient_effects(
+                    patient, only_nonsynonymous, all_effects, filter_fn, **kwargs)
+            except MissingVariantFile as e:
+                if self.fail_on_missing_variants is True:
+                    raise
+                else:
+                    logger.info(str(e))
+                    effects = None
             if effects is not None:
                 patient_effects[patient.id] = effects
         return patient_effects
