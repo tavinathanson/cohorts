@@ -261,10 +261,10 @@ def is_missense_snv_or_nonsynonymous_indel(filterable_effect):
                     filterable_effect.variant.is_snv))
 @composable
 def is_in_transcript(filterable_effect, transcript_name):
-    return (filterable_effect.effect.transcript_name == transcript_name)
+    return is_exonic(filterable_effect) and (filterable_effect.effect.transcript_name == transcript_name)
 @composable
 def is_in_gene(filterable_effect, gene_name):
-    return (re.match(string=filterable_effect.effect.transcript_name, pattern='^[^-]+').group() == gene_name)
+    return is_exonic(filterable_effect) and (filterable_effect.effect.gene_name == gene_name)
 @composable
 def not_in_genes(filterable_effect, gene_names):
     not_in_gene = [not(is_in_gene(filterable_effect, gene_name)) for gene_name in gene_names]
