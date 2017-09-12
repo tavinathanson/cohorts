@@ -182,7 +182,7 @@ def count_reads(filter_effects=None, function_name=None,
         str(filter_effects.__doc__) if filter_effects is None else "(nothing)")
     return agg_fn
 
-def create_effect_filter(effect_name, effect_filter, **effect_kwargs):
+def create_effect_filter(effect_name, effect_filter, *effect_args, **effect_kwargs):
     """
     Return a composable filter function that applies the provided effect_filter 
     to variants/effects of the provided function.
@@ -210,7 +210,7 @@ def create_effect_filter(effect_name, effect_filter, **effect_kwargs):
         def filtered(row, cohort, filter_fn, normalized_per_mb, **kwargs):
             def new_filter_fn(filterable_effect, **kwargs):
                 assert filter_fn is not None, "filter_fn should never be None, but it is."
-                return filter_fn(filterable_effect, **kwargs) and effect_filter(filterable_effect, **effect_kwargs)
+                return filter_fn(filterable_effect, **kwargs) and effect_filter(filterable_effect, *effect_args, **effect_kwargs)
             return func(row=row,
                         cohort=cohort,
                         filter_fn=new_filter_fn,
@@ -267,7 +267,7 @@ def is_in_gene(filterable_effect, gene_name):
     return (re.match(string=filterable_effect.effect.transcript_name, pattern='^[^-]+').group() == gene_name)
 @composable
 def not_in_genes(filterable_effect, gene_names):
-    not_in_gene = [!is_in_gene(filterable_effect, gene_name) for gene_name in gene_names]
+    not_in_gene = [not(is_in_gene(filterable_effect, gene_name)) for gene_name in gene_names]
     return all(not_in_gene)
 @composable
 def is_in_genes(filterable_effect, gene_names):
