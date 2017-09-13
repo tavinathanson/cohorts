@@ -164,7 +164,7 @@ class Cohort(Collection):
                  fail_on_missing_bams=True,
                  fail_on_missing_variants=False,
                  fail_on_missing_hla=False,
-                 genome='reference'):
+                 genome=None):
         Collection.__init__(
             self,
             elements=patients)
@@ -631,7 +631,10 @@ class Cohort(Collection):
                 if type(patient_variants) == str:
                     if ".vcf" in patient_variants:
                         try:
-                            variant_collections.append(varcode.load_vcf(patient_variants, genome=self.default_genome))
+                            if self.default_genome is not None:
+                                variant_collections.append(varcode.load_vcf(patient_variants, genome=self.default_genome))
+                            else:
+                                variant_collections.append(varcode.load_vcf(patient_variants))
                         # StopIteration is thrown for empty VCFs. For an empty VCF, don't append any variants,
                         # and don't throw an error. But do record a warning, in case the StopIteration was
                         # thrown for another reason.
