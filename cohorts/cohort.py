@@ -201,6 +201,9 @@ class Cohort(Collection):
 
         set_styling()
 
+    def select_cache_dir(self, patient_id):
+        return self.cache_dir
+
     def filter(self, filter_fn):
         new_cohort = copy(self)
         new_cohort.elements = [patient for patient in self if filter_fn(patient)]
@@ -430,7 +433,7 @@ class Cohort(Collection):
 
         logger.debug("loading patient {} data from {} cache: {}".format(patient_id, cache_name, file_name))
 
-        cache_dir = path.join(self.cache_dir, cache_name)
+        cache_dir = path.join(self.select_cache_dir(patient_id), cache_name)
         patient_cache_dir = path.join(cache_dir, str(patient_id))
         cache_file = path.join(patient_cache_dir, file_name)
 
@@ -467,7 +470,7 @@ class Cohort(Collection):
 
         logger.debug("saving patient {} data to {} cache: {}".format(patient_id, cache_name, file_name))
 
-        cache_dir = path.join(self.cache_dir, cache_name)
+        cache_dir = path.join(self.select_cache_dir(patient_id), cache_name)
         patient_cache_dir = path.join(cache_dir, str(patient_id))
         cache_file = path.join(patient_cache_dir, file_name)
 
@@ -1132,7 +1135,10 @@ class Cohort(Collection):
             self.clear_cache(cache)
 
     def clear_cache(self, cache):
-        cache_path = path.join(self.cache_dir, self.cache_names[cache])
+        self.clear_cache_helper(cache, self.cache_dir)
+
+    def clear_cache_helper(self, cache, cache_dir):
+        cache_path = path.join(cache_dir, self.cache_names[cache])
         if path.exists(cache_path):
             rmtree(cache_path)
 
@@ -1445,9 +1451,9 @@ class Cohort(Collection):
             cache_name = self.cache_names[cache]
             cache_provenance = None
             num_discrepant = 0
-            this_cache_dir = path.join(self.cache_dir, cache_name)
-            if path.exists(this_cache_dir):
-                for patient_id in self._list_patient_ids():
+            for patient_id in self._list_patient_ids():
+                this_cache_dir = self.select_cache_dir(patient_id)
+                if path.exists(this_cache_dir):
                     patient_cache_dir = path.join(this_cache_dir, patient_id)
                     try:
                         this_provenance = self.load_provenance(patient_cache_dir = patient_cache_dir)

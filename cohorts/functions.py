@@ -222,6 +222,10 @@ missense_snv_and_nonsynonymous_indel_count = count_effects_function_builder(
          (type(filterable_effect.effect) == Substitution and
           filterable_effect.variant.is_snv)))
 
+nonsynonymous_count = count_effects_function_builder(
+    "nonsynonymous_count",
+    only_nonsynonymous=True) # TODO: Is this is the same as using filter_fn?
+
 @count_function
 def neoantigen_count(row, cohort, filter_fn, normalized_per_mb, **kwargs):
     patient = cohort.patient_from_id(row["patient_id"])
