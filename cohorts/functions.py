@@ -219,7 +219,10 @@ def create_effect_filter(effect_name, effect_filter, *effect_args, **effect_kwar
         if name is None:
             name = "_".join([effect_name, func.__name__])
         filtered.__name__ = name
-        filtered.__doc__ = func.__doc__ + "; Only {} effects.".format(effect_name)
+        if func.__doc__:
+            filtered.__doc__ = func.__doc__ + "; Only {} effects.".format(effect_name)
+        else:
+            filtered.__doc__ = func.__name__ + "; Only {} effects.".format(effect_name)
         return filtered
     filter_by_type.__doc__ = "Return a new count function limited to {} effects".format(effect_name)
     return filter_by_type
