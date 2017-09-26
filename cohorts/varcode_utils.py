@@ -13,11 +13,11 @@
 # limitations under the License.
 
 from varcode import EffectCollection, Variant
+from varcode.effects import top_priority_effect, predict_variant_effects
 from .errors import MissingBamFile
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 def genome(variant_collection):
     return variant_collection[0].ensembl
@@ -49,7 +49,7 @@ class FilterableEffect(FilterableVariant):
                                    variant_collection=variant_collection,
                                    patient=patient)
 
-class FilterableNeoantigen(FilterableVariant):
+class FilterableNeoantigen(FilterableEffect):
     def __init__(self, neoantigen_row, variant_collection, patient):
         self.neoantigen_row = neoantigen_row
         def build_variant(row, genome):
@@ -60,12 +60,13 @@ class FilterableNeoantigen(FilterableVariant):
                 start=row["start"],
                 ensembl=genome)
         variant = build_variant(neoantigen_row, genome(variant_collection))
-        FilterableVariant.__init__(self,
-                                   variant=variant,
-                                   variant_collection=variant_collection,
-                                   patient=patient)
+        effect = top_priority_effect(predict_variant_effects(variant))
+        FilterableEffect.__init__(self,
+                                  effect=effect,
+                                  variant_collection=variant_collection,
+                                  patient=patient)
 
-class FilterablePolyphen(FilterableVariant):
+class FilterablePolyphen(FilterableEffect):
     def __init__(self, polyphen_row, variant_collection, patient):
         self.polyphen_row = polyphen_row
         def build_variant(row, genome):
@@ -76,10 +77,11 @@ class FilterablePolyphen(FilterableVariant):
                 start=row["pos"],
                 ensembl=genome)
         variant = build_variant(polyphen_row, genome(variant_collection))
-        FilterableVariant.__init__(self,
-                                   variant=variant,
-                                   variant_collection=variant_collection,
-                                   patient=patient)
+        effect = top_priority_effect(predict_variant_effects(variant))
+        FilterableEffect.__init__(self,
+                                  effect=effect,
+                                  variant_collection=variant_collection,
+                                  patient=patient)
 
 def filter_variants(variant_collection, patient, filter_fn, **kwargs):
     """Filter variants from the Variant Collection
