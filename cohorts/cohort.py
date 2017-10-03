@@ -300,7 +300,7 @@ class Cohort(Collection):
             if count > 1:
                 for df_loader, loaded_df in df_loader_dfs.items():
                     # Don't rename a column that will be joined on.
-                    if col != "patient_id" and col != df_loader.join_on:
+                    if col != "patient_id" and col not in [df_loader.join_on_left, df_loader.join_on_right]:
                         loaded_df.rename(columns={col: "%s_%s" % (col, df_loader.name)}, inplace=True)
 
         for df_loader, loaded_df in df_loader_dfs.items():
