@@ -175,6 +175,8 @@ def filter_effects(effect_collection, variant_collection, patient, filter_fn, al
         return top_priority_maybe(effect_collection)
 
 def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
+    if len(neoantigens_df) == 0:
+        return 0
     if filter_fn:
         try:
             filter_mask = neoantigens_df.apply(
