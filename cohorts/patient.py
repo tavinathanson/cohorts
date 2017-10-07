@@ -19,7 +19,8 @@ from .utils import require_id_str, set_attributes
 from collections import defaultdict, namedtuple
 import pandas as pd
 from varcode.effects import EffectCollection, effect_sort_key
-from varcode.effects.effect_classes import KnownAminoAcidChange
+from varcode.effects.effect_classes import KnownAminoAcidChange, FrameShift, Substitution
+import numpy as np
 
 FilterFnCol = namedtuple("FilterFnCol",
                          ["filter_fn", "only_nonsynonymous", "col_name"])
@@ -39,6 +40,25 @@ def build_filter_fn_cols_from_count_fns(count_fns):
     for count_fn in count_fns:
         cols.append(build_filter_fn_col_from_count_fn(count_fn=count_fn))
     return cols
+
+transitions = set(
+    ["C>T", "T>C", "G>A", "A>G"]
+)
+def is_transition(variant):
+    change = variant.ref + ">" + variant.alt
+    return change in transitions
+
+transversions = set(
+    ["C>G", "T>G", "C>A", "T>A", "G>C", "G>T", "A>C", "A>T"]
+)
+def is_transversion(variant):
+    change = variant.ref + ">" + variant.alt
+    return change in transversions
+
+def min_five_percent_tumor_vaf_filter(filterable_variant):
+    somatic_stats = variant_stats_from_variant(filterable_variant.variant,
+                                               filterable_variant.variant_metadata)
+    return (somatic_stats.tumor_stats.variant_allele_frequency >= 0.05)
 
 class Patient(object):
     """
@@ -124,10 +144,21 @@ class Patient(object):
         df_variants_no_filter = variants_no_filter.to_dataframe()
         assert len(df_variants_no_filter) == len(variants_no_filter.to_dataframe()[["chr", "start", "ref", "alt"]].drop_duplicates())
 
+        # Also keep track of all effects.
+        all_effects = self.cohort.load_effects(
+                only_nonsynonymous=True,
+                all_effects=True,
+                patients=[self],
+                filter_fn=no_filter)[self.id]
+        variant_to_effects = all_effects.groupby_variant()
+
         # First, add depth/VAF columns.
         col_values = defaultdict(list)
         for variant in variants_no_filter:
             filterable_variant = FilterableVariant(variant, variants_no_filter, self.cohort)
+            col_values["vaf_filter"].append(min_five_percent_tumor_vaf_filter(filterable_variant))
+            col_values["transition"].append(is_transition(variant))
+            col_values["transversion"].append(is_transversion(variant))
             somatic_stats = variant_stats_from_variant(filterable_variant.variant, filterable_variant.variant_metadata)
             if somatic_stats.tumor_stats is not None:
                 col_values["tumor_vaf"].append(somatic_stats.tumor_stats.variant_allele_frequency)
@@ -144,37 +175,8 @@ class Patient(object):
             if pd.isnull(dbnsfp_pred):
                 dbnsfp_pred = "." # Or the key could be there, but value NaN
             col_values["possibly_deleterious"].append("D" in dbnsfp_pred)
-
-        # If this column has no information, remove it (e.g. not using MAFs, etc.).
-        if set(col_values["possibly_deleterious"]) == set([False]):
-            del col_values["possibly_deleterious"]
-
-        # Generate filtered effect sets for every filter column.
-        for filter_fn_col in filter_fn_cols:
-            effect_set = set(self.cohort.load_effects(
-                only_nonsynonymous=filter_fn_col.only_nonsynonymous,
-                patients=[self],
-                filter_fn=filter_fn_col.filter_fn)[self.id])
-            effects_sets[filter_fn_col.col_name] = effect_set
-
-        # Also keep track of all effects.
-        all_effects = self.cohort.load_effects(
-                only_nonsynonymous=False,
-                all_effects=True,
-                patients=[self],
-                filter_fn=no_filter)[self.id]
-        variant_to_effects = all_effects.groupby_variant()
-
-        # Look at each variant.
-        for variant in variants_no_filter:
-            # Check each effect in the effect set to see if it has this variant.
-            for filter_fn_col_name, effects_set in effects_sets.items():
-                variants_for_col = set([effect.variant for effect in effects_set])
-                col_values[filter_fn_col_name].append(variant in variants_for_col)
-
-            # Do things involving all of the variant's effects.
-            variant_effects = variant_to_effects[variant]
-            col_values["priority_effect"].append(variant_effects.top_priority_effect().short_description)
+            # Now look at effects.
+            variant_effects = variant_to_effects.get(variant, EffectCollection([]))
 
             # Make sure the effect collection is sorted in priority order now that we're printing pieces of it out.
             # Also, throw in all alternate_effect's as well.
@@ -184,16 +186,22 @@ class Patient(object):
                 if hasattr(effect, "alternate_effect"):
                     expanded_effects.append(effect.alternate_effect)
             variant_effects = EffectCollection(expanded_effects, sort_key=effect_sort_key, distinct=True)
-            def make_distinct(l):
-                seen = set()
-                return [elem for elem in l if not (elem in seen or seen.add(elem))]
-            # All effects, sorted and distinct
-            variant_effect_descriptions = make_distinct([effect.short_description for effect in variant_effects[::-1]])
-            # All AA-changing effects, sorted and distinct (including splice sites)
-            # TODO: Make the splice site part less hacky. See https://github.com/hammerlab/cohorts/issues/255
-            variant_effect_descriptions_aa = make_distinct([effect.short_description for effect in variant_effects[::-1] if isinstance(effect, KnownAminoAcidChange)])
-            col_values["all_effects"].append(";".join(variant_effect_descriptions))
-            col_values["all_aa_effects"].append(";".join(variant_effect_descriptions_aa))
+
+            is_nonsynonymous = len(variant_effects.drop_silent_and_noncoding()) > 0
+            col_values["nonsynonymous"].append(is_nonsynonymous)
+            col_values["nonsynonymous_snv"].append(is_nonsynonymous and variant.is_snv)
+            col_values["missense_snv"].append(is_nonsynonymous and variant.is_snv and (len(variant_effects.filter(lambda effect: type(effect) == Substitution)) > 0))
+            col_values["nonsynonymous_indel"].append(is_nonsynonymous and variant.is_indel)
+            col_values["frameshift"].append(is_nonsynonymous and (len(variant_effects.filter(lambda effect: isinstance(effect, FrameShift))) > 0))
+
+            top_priority_effect = variant_effects.top_priority_effect() if len(variant_effects) > 0 else None
+            col_values["priority_nonsynonymous_effect"].append(top_priority_effect.short_description if top_priority_effect is not None else "")
+            col_values["priority_nonsynonymous_gene_id"].append(top_priority_effect.gene_id if top_priority_effect is not None else "")
+            col_values["priority_nonsynonymous_gene_name"].append(top_priority_effect.gene_name if top_priority_effect is not None else "")
+
+        # If this column has no information, remove it (e.g. not using MAFs, etc.).
+        if set(col_values["possibly_deleterious"]) == set([False]):
+            del col_values["possibly_deleterious"]
 
         # Put new values back into the unfiltered variant DataFrame.
         for col_name, col_value in col_values.items():
