@@ -293,6 +293,7 @@ only_setd2 = create_effect_filter("setd2", is_in_gene, "SETD2")
 only_bap1 = create_effect_filter("bap1", is_in_gene, "BAP1")
 only_other = create_effect_filter("other", not_in_genes, ["PBRM1", "VHL", "SETD2", "BAP1"])
 only_top4 = create_effect_filter("top4", is_in_genes, ["PBRM1", "VHL", "SETD2", "BAP1"])
+only_kdm5c = create_effect_filter("kdm5c", is_in_genes, ["KDM5C"])
 
 ## base count functions
 effect_count = count_effects(function_name="effect_count")
