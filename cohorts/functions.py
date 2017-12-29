@@ -115,6 +115,9 @@ def count_effects_function_builder(function_name, only_nonsynonymous, filterable
     count.__name__ = function_name
     count.__doc__ = (("only_nonsynonymous=%s\n" % only_nonsynonymous) +
                      str("".join(inspect.getsourcelines(filterable_effect_function)[0])) if filterable_effect_function is not None else "")
+    # Keep track of these to be able to query the returned function for these attributes
+    count.only_nonsynonymous = only_nonsynonymous
+    count.filterable_effect_function = filterable_effect_function
     return count
 
 variant_count = count_variants_function_builder("variant_count")

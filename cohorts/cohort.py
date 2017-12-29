@@ -115,6 +115,8 @@ class Cohort(Collection):
         Path to Pageant CoverageDepth output.
     pageant_dir_fn : function
         Function from patient to a specific Pageant CoverageDepth directory within the path. Defaults to the Patietn ID.
+    additional_maf_cols : list
+       If loading variants from MAFs, specify any additional columns to pull in from the MAFs.
     benefit_plot_name : str
         What word to use for "benefit" when plotting.
     merge_type : {"union", "intersection"}, optional
@@ -143,6 +145,7 @@ class Cohort(Collection):
                  polyphen_dump_path=None,
                  pageant_coverage_path=None,
                  pageant_dir_fn=None,
+                 additional_maf_cols=None,
                  benefit_plot_name="Benefit",
                  merge_type="union"):
         Collection.__init__(
@@ -177,6 +180,7 @@ class Cohort(Collection):
         self.polyphen_dump_path = polyphen_dump_path
         self.pageant_coverage_path = pageant_coverage_path
         self.pageant_dir_fn = pageant_dir_fn
+        self.additional_maf_cols = additional_maf_cols
         self.benefit_plot_name = benefit_plot_name
         self.merge_type = merge_type
         self._genome = None
@@ -639,6 +643,9 @@ class Cohort(Collection):
                     return merged_variants
             # get variant collections from file
             variant_collections = []
+            optional_maf_cols = ["t_ref_count", "t_alt_count", "n_ref_count", "n_alt_count"]
+            if self.additional_maf_cols is not None:
+                optional_maf_cols.extend(self.additional_maf_cols)
             for patient_variants in patient.variants_list:
                 if type(patient_variants) == str:
                     if ".vcf" in patient_variants:
@@ -655,8 +662,7 @@ class Cohort(Collection):
                         variant_collections.append(
                             varcode.load_maf(
                                 patient_variants,
-                                optional_cols=[
-                                    "t_ref_count", "t_alt_count", "n_ref_count", "n_alt_count"],
+                                optional_cols=optional_maf_cols,
                                 encoding="latin-1"))
                     else:
                         raise ValueError("Don't know how to read %s" % patient_variants)
