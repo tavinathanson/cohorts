@@ -1,5 +1,19 @@
 # Change Log
 
+## [0.7.3](https://github.com/hammerlab/cohorts/tree/0.7.3) (2017-12-29)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.7.2...0.7.3)
+
+**Merged pull requests:**
+
+- Allow additional MAF columns [\#257](https://github.com/hammerlab/cohorts/pull/257) ([tavinathanson](https://github.com/tavinathanson))
+
+## [0.7.2](https://github.com/hammerlab/cohorts/tree/0.7.2) (2017-12-28)
+[Full Changelog](https://github.com/hammerlab/cohorts/compare/0.7.1...0.7.2)
+
+**Fixed bugs:**
+
+- ExonicSpliceSite with Subsitution/etc. alternate\_effect is not included in filtering [\#255](https://github.com/hammerlab/cohorts/issues/255)
+
 ## [0.7.1](https://github.com/hammerlab/cohorts/tree/0.7.1) (2017-09-01)
 [Full Changelog](https://github.com/hammerlab/cohorts/compare/0.7.0...0.7.1)
 
