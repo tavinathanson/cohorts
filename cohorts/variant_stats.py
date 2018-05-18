@@ -56,6 +56,7 @@ def _varscan2_variant_stats(variant, sample_info):
     -------
     VariantStats
     """
+    import pdb; pdb.set_trace()
     depth = int(sample_info["RD"] + sample_info["AD"])
     alt_depth = int(sample_info["AD"])
     vaf = float(sample_info["FREQ"].replace("%", ""))/float(100)
@@ -163,7 +164,7 @@ def _mutect_variant_stats(variant, sample_info):
     """
 
     # Parse out the AD (or allele depth field), which is an array of [REF_DEPTH, ALT_DEPTH]
-    if len(sample_info["AD"]) == 1:
+    if isinstance(sample_info["AD"], int):
         import pdb; pdb.set_trace()
     ref_depth, alt_depth = sample_info["AD"]
     depth = int(ref_depth) + int(alt_depth)
@@ -253,7 +254,7 @@ def _vcf_is_mutect2(variant_file, variant_metadata):
     """
     if "mutect2" in variant_file.lower():
         return True
-    elif "TUMOR" in variant_metadata["sample_info"].keys() and "AD" in variant_metadata["sample_info"]["TUMOR"].keys():
+    elif "TUMOR" in variant_metadata["sample_info"].keys() and "AD" in variant_metadata["sample_info"]["TUMOR"].keys() and isinstance(variant_metadata["sample_info"]["TUMOR"]["AD"], list):
         return True
     return False
 
@@ -304,9 +305,9 @@ def variant_stats_from_variant(variant,
         elif _vcf_is_strelka(variant_file=variant_file,
                              variant_metadata=variant_metadata):
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
-        elif _vcf_is_mutect(variant_file=variant_file,
-                            variant_metadata=variant_metadata):
-            stats = mutect_somatic_variant_stats(variant, variant_metadata)
+        #elif _vcf_is_mutect(variant_file=variant_file,
+        #                    variant_metadata=variant_metadata):
+        #    stats = mutect_somatic_variant_stats(variant, variant_metadata)
         elif _vcf_is_mutect2(variant_file=variant_file,
                              variant_metadata=variant_metadata):
             stats = mutect_somatic_variant_stats(variant, variant_metadata)
