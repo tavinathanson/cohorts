@@ -15,7 +15,9 @@
 # pylint: disable=unsubscriptable-object
 from collections import namedtuple
 import vcf
-import warnings
+import logging
+
+logger = logging.getLogger(__name__)
 
 VariantStats = namedtuple("VariantStats",
                           ["depth", "alt_depth", "variant_allele_frequency"])
@@ -56,8 +58,10 @@ def _varscan2_variant_stats(variant, sample_info):
     -------
     VariantStats
     """
-    import pdb; pdb.set_trace()
-    depth = int(sample_info["RD"] + sample_info["AD"])
+    try:
+        depth = int(sample_info["RD"] + sample_info["AD"])
+    except:
+        import pdb; pdb.set_trace()
     alt_depth = int(sample_info["AD"])
     vaf = float(sample_info["FREQ"].replace("%", ""))/float(100)
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
@@ -117,6 +121,71 @@ def _strelka_variant_stats(variant, sample_info):
 
     return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
 
+def somaticsniper_somatic_variant_stats(variant, variant_metadata):
+    """Parse out the variant calling statistics for a given variant from a Mutect VCF
+    
+    Source: http://gmt.genome.wustl.edu/packages/somatic-sniper/documentation.html
+      and http://gmt.genome.wustl.edu/2015/07/16/somatic-sniper_v1.0.5.0_released.html
+
+    Parameters
+    ----------
+    variant : varcode.Variant
+    sample_info : dict
+        Dictionary of sample to variant calling statistics, corresponds to the sample columns
+        in a Mutect VCF
+
+    Returns
+    -------
+    SomaticVariantStats
+    """
+    sample_info = variant_metadata["sample_info"]
+    tumor_stats = _somaticsniper_variant_stats(variant, sample_info['TUMOR'])
+    normal_stats = _somaticsniper_variant_stats(variant, sample_info['NORMAL'])
+    return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
+    
+def _somaticsniper_variant_stats(variant, sample_info):
+    """ Parse a single sample's variant stats according to SomaticSniper's output format
+
+    Parameters
+    ----------
+    variant : varcode.Variant
+    sample_info : dict
+        Dictionary of Mutect-specific variant calling fields
+
+    Returns
+    -------
+    VariantStats
+    """
+    depth = sum(sample_info['BCOUNT'])
+    bcount_names = {'A':0, 'C':1, 'G':2, 'T':3}
+    alt_depth = sample_info['BCOUNT'][bcount_names[variant.alt]]
+    vaf = float(alt_depth)/depth
+    return VariantStats(depth=depth, alt_depth=alt_depth, variant_allele_frequency=vaf)
+
+
+def mutect2_somatic_variant_stats(variant, variant_metadata):
+    """Parse out the variant calling statistics for a given variant from a Mutect2 VCF
+      (or compatible VCF; e.g. MuSE)
+    Parameters
+    ----------
+    variant : varcode.Variant
+    sample_info : dict
+        Dictionary of sample to variant calling statistics, corresponds to the sample columns
+        in a Mutect VCF
+
+    Returns
+    -------
+    SomaticVariantStats
+    """
+
+    sample_info = variant_metadata["sample_info"]
+    # Ensure there are exactly two samples in the VCF, a tumor and normal
+    assert len(sample_info) == 2, "Expected to find exactly two samples found in the somatic VCF"
+    tumor_stats = _mutect_variant_stats(variant, sample_info['TUMOR'])
+    normal_stats = _mutect_variant_stats(variant, sample_info['NORMAL'])
+    return SomaticVariantStats(tumor_stats=tumor_stats, normal_stats=normal_stats)
+
+
 def mutect_somatic_variant_stats(variant, variant_metadata):
     """Parse out the variant calling statistics for a given variant from a Mutect VCF
 
@@ -140,6 +209,8 @@ def mutect_somatic_variant_stats(variant, variant_metadata):
     tumor_sample_infos = [info for info in sample_info.values() if info["GT"] == "0/1"]
 
     # Ensure there is only one such sample
+    if len(tumor_sample_infos) != 1:
+        import pdb; pdb.set_trace()
     assert len(tumor_sample_infos) == 1, "More than one tumor sample found in the VCF file"
 
     tumor_sample_info = tumor_sample_infos[0]
@@ -166,7 +237,11 @@ def _mutect_variant_stats(variant, sample_info):
     # Parse out the AD (or allele depth field), which is an array of [REF_DEPTH, ALT_DEPTH]
     if isinstance(sample_info["AD"], int):
         import pdb; pdb.set_trace()
-    ref_depth, alt_depth = sample_info["AD"]
+    if len(sample_info['AD'])>2:
+        logger.warning('More than one alternate allele identified - VAF may not be reported correctly')
+        ref_depth, alt_depth = sample_info['AD'][0:2] # ignore other alts
+    else:
+        ref_depth, alt_depth = sample_info["AD"]
     depth = int(ref_depth) + int(alt_depth)
     vaf = float(alt_depth) / depth
 
@@ -211,6 +286,15 @@ def _vcf_reader(variant_file, *args, **kwargs):
         vcf_reader = vcf.Reader(filename=variant_file, *args, **kwargs)
     return vcf_reader
 
+def _vcf_is_somaticsniper(variant_file, variant_metadata):
+    """Return True if variant_file given is in somaticSniper format
+    """
+    if "somaticsniper" in variant_file.lower():
+        return True
+    elif "TUMOR" in variant_metadata['sample_info'].keys() and 'BCOUNT' in variant_metadata['sample_info']['TUMOR'].keys() and len(variant_metadata['sample_info']['TUMOR']['BCOUNT'])==4:
+            return True
+    return False
+
 def _vcf_is_strelka(variant_file, variant_metadata):
     """Return True if variant_file given is in strelka format
     """
@@ -233,6 +317,8 @@ def _vcf_is_strelka(variant_file, variant_metadata):
                 return True
         if "strelka" in vcf_type.lower():
             return True
+        if 'TUMOR' in variant_metadata['sample_info'].keys() and 'TAR' in variant_metadata['sample_info']['TUMOR'].keys() and 'TIR' in variant_metadata['sample_info']['TUMOR'].keys():
+            return True
     return False
 
 def _vcf_is_maf(variant_file):
@@ -245,7 +331,7 @@ def _vcf_is_varscan2(variant_file, variant_metadata):
     """
     if "varscan2" in variant_file.lower():
         return True
-    elif "NORMAL" in variant_metadata['sample_info'].keys() and "DP4" in variant_metadata['sample_info']['NORMAL'].keys():
+    elif "NORMAL" in variant_metadata['sample_info'].keys() and "AD" in variant_metadata['sample_info']['NORMAL'].keys() and "RD" in variant_metadata['sample_info']['NORMAL'].keys() and 'FREQ' in variant_metadata['sample_info']['NORMAL'].keys():
         return True
     return False
 
@@ -254,7 +340,8 @@ def _vcf_is_mutect2(variant_file, variant_metadata):
     """
     if "mutect2" in variant_file.lower():
         return True
-    elif "TUMOR" in variant_metadata["sample_info"].keys() and "AD" in variant_metadata["sample_info"]["TUMOR"].keys() and isinstance(variant_metadata["sample_info"]["TUMOR"]["AD"], list):
+    elif "TUMOR" in variant_metadata["sample_info"].keys() and "AD" in variant_metadata["sample_info"]["TUMOR"].keys() and isinstance(variant_metadata["sample_info"]["TUMOR"]["AD"], list) and len(variant_metadata["sample_info"]["TUMOR"]["AD"]) >= 2:
+        ## TODO some variants have 2 alts; are these being counted correctly?
         return True
     return False
 
@@ -263,10 +350,10 @@ def _vcf_is_mutect(variant_file, variant_metadata):
     """
     if "mutect" in variant_file.lower() and "mutect2" not in variant_file.lower():
         return True
-    elif "GT" in variant_metadata["sample_info"].keys():
-        return True
-    elif "TUMOR" in variant_metadata["sample_info"].keys() and "GT" in variant_metadata["sample_info"]["TUMOR"].keys():
-        return True
+    #elif "GT" in variant_metadata["sample_info"].keys():
+    #    return True
+    #elif "TUMOR" in variant_metadata["sample_info"].keys() and "GT" in variant_metadata["sample_info"]["TUMOR"].keys():
+    #    return True
     else:
         vcf_reader = _vcf_reader(variant_file, "r")
         try:
@@ -301,19 +388,28 @@ def variant_stats_from_variant(variant,
     all_stats = []
     for (variant_file, variant_metadata) in metadata.items():
         if _vcf_is_maf(variant_file=variant_file):
+            logger.info('Parsing variant file %s as maf', variant_file)
             stats = maf_somatic_variant_stats(variant, variant_metadata)
         elif _vcf_is_strelka(variant_file=variant_file,
                              variant_metadata=variant_metadata):
+            logger.info('Parsing variant file %s as strelka', variant_file)
             stats = strelka_somatic_variant_stats(variant, variant_metadata)
-        #elif _vcf_is_mutect(variant_file=variant_file,
-        #                    variant_metadata=variant_metadata):
-        #    stats = mutect_somatic_variant_stats(variant, variant_metadata)
+        elif _vcf_is_mutect(variant_file=variant_file,
+                            variant_metadata=variant_metadata):
+            logger.info('Parsing variant file %s as mutect', variant_file)
+            stats = mutect_somatic_variant_stats(variant, variant_metadata)
         elif _vcf_is_mutect2(variant_file=variant_file,
                              variant_metadata=variant_metadata):
-            stats = mutect_somatic_variant_stats(variant, variant_metadata)
+            logger.info('Parsing variant file %s as mutect2', variant_file)
+            stats = mutect2_somatic_variant_stats(variant, variant_metadata)
         elif _vcf_is_varscan2(variant_file=variant_file,
                               variant_metadata=variant_metadata):
+            logger.info('Parsing variant file %s as varscan2', variant_file)
             stats = varscan2_somatic_variant_stats(variant, variant_metadata)
+        elif _vcf_is_somaticsniper(variant_file=variant_file,
+                                   variant_metadata=variant_metadata):
+            logger.info('Parsing variant file %s as SomaticSniper', variant_file)
+            stats = somaticsniper_somatic_variant_stats(variant, variant_metadata)
         else:
             import pdb; pdb.set_trace()
             raise ValueError("Cannot parse sample fields, variant file {} is from an unsupported caller.".format(variant_file))
