@@ -13,6 +13,11 @@
 # limitations under the License.
 
 from varcode import EffectCollection, Variant
+from .errors import MissingBamFile
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def genome(variant_collection):
     return variant_collection[0].ensembl
@@ -92,15 +97,22 @@ def filter_variants(variant_collection, patient, filter_fn, **kwargs):
         Filtered variant collection, with only the variants passing the filter
     """
     if filter_fn:
-        return variant_collection.clone_with_new_elements([
-            variant
-            for variant in variant_collection
-            if filter_fn(FilterableVariant(
+        try:
+            return variant_collection.clone_with_new_elements([
+                variant
+                for variant in variant_collection
+                if filter_fn(FilterableVariant(
                         variant=variant,
                         variant_collection=variant_collection,
                         patient=patient,
                         ), **kwargs)
-        ])
+            ])
+        except MissingBamFile as e:
+            if patient.cohort.fail_on_missing_bams:
+                raise
+            else:
+                logger.info(str(e))
+                return None
     else:
         return variant_collection
 
@@ -149,24 +161,32 @@ def filter_effects(effect_collection, variant_collection, patient, filter_fn, al
         return applied
 
     if filter_fn:
-        return top_priority_maybe(EffectCollection([
-            effect
-            for effect in effect_collection
-            if apply_filter_fn(filter_fn, effect)]))
+        try:
+            return top_priority_maybe(EffectCollection([
+                effect
+                for effect in effect_collection
+                if apply_filter_fn(filter_fn, effect)]))
+        except MissingBamFile as e:
+            logger.warning(str(e))
+            return None
     else:
         return top_priority_maybe(effect_collection)
 
 def filter_neoantigens(neoantigens_df, variant_collection, patient, filter_fn):
     if filter_fn:
-        filter_mask = neoantigens_df.apply(
-            lambda row: filter_fn(
-                FilterableNeoantigen(neoantigen_row=row,
-                                     variant_collection=variant_collection,
-                                     patient=patient)),
-            axis=1,
-            # reduce ensures that an empty result is a Series vs. a DataFrame
-            reduce=True)
-        return neoantigens_df[filter_mask]
+        try:
+            filter_mask = neoantigens_df.apply(
+                lambda row: filter_fn(
+                    FilterableNeoantigen(neoantigen_row=row,
+                                         variant_collection=variant_collection,
+                                         patient=patient)),
+                axis=1,
+                # reduce ensures that an empty result is a Series vs. a DataFrame
+                reduce=True)
+            return neoantigens_df[filter_mask]
+        except MissingBamFile as e:
+            logger.warning(str(e))
+            return None
     else:
         return neoantigens_df
 
