@@ -1014,6 +1014,8 @@ class Cohort(Collection):
                                          ic50_cutoff, process_limit, max_file_records,
                                          filter_fn):
         cached_file_name = "%s-neoantigens.csv" % self.merge_type
+        if ic50_cutoff != 500:
+            cached_file_name = "{}-{}-neoantigens.csv".format(self.merge_type, ic50_cutoff)
         logger.debug("loading neoantigens for patient {}".format(patient.id))
 
         # Don't filter here, as these variants are used to generate the
