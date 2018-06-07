@@ -1,7 +1,10 @@
 import pandas as pd
-import path
+from os import path
+from .utils import get_logger
 
-def mean_ensembl_coverage(cohort, coverage_path=None,
+logger = get_logger(__name__)
+
+def mean_ensembl_coverage(cohort, coverage_path=None, use_tumor_only=True,
                           pageant_dir_fn=None):
     """
     calculate mean coverage using Pageant CoverageDepth results with Ensembl loci.
@@ -20,7 +23,7 @@ def mean_ensembl_coverage(cohort, coverage_path=None,
     if pageant_dir_fn is None:
         pageant_dir_fn = lambda patient: patient.id
     if coverage_path is None:
-        coverage_path = cohort.coverage_path
+        coverage_path = cohort.pageant_coverage_path
 
     columns_both = [
         "depth1", # Normal
@@ -52,12 +55,16 @@ def mean_ensembl_coverage(cohort, coverage_path=None,
     columns = columns_single if use_tumor_only else columns_both
     ensembl_loci_dfs = []
     for patient in cohort:
-        patient_ensembl_loci_df = pd.read_csv(
-            path.join(coverage_path, pageant_dir_fn(patient), "cdf.csv"),
-            names=columns,
-            header=1)
-        patient_ensembl_loci_df["patient_id"] = patient.id
-        ensembl_loci_dfs.append(patient_ensembl_loci_df)
+        try:
+            patient_ensembl_loci_df = pd.read_csv(
+              path.join(coverage_path, pageant_dir_fn(patient), "cdf.csv"),
+              names=columns,
+              header=1)
+        except:
+            logger.warning('Coverage file for patient {} does not exist'.format(patient.id))
+        finally:
+            patient_ensembl_loci_df["patient_id"] = patient.id
+            ensembl_loci_dfs.append(patient_ensembl_loci_df)
     ensembl_loci_df = pd.concat(ensembl_loci_dfs)
     ensembl_loci_df["MB"] = ensembl_loci_df.numOnLoci / 1000000.0
     return ensembl_loci_df.groupby("patient_id").apply(wavg, "depth", "numOnLoci").mean()
