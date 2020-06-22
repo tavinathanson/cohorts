@@ -18,6 +18,9 @@ from collections import namedtuple
 import sys
 import logging
 from os import path
+import copy
+import pickle
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -200,11 +203,8 @@ def strip_column_names(cols, keep_paren_contents=True):
 
     return dict(zip(cols, new_cols))
 
-def get_logger(name, level=logging.INFO):
+def get_logger(name):
     logger = logging.getLogger(name)
-    if logger.handlers:
-        logger.handlers = []
-    logger.setLevel(level)
     return logger
 
 def set_attributes(obj, additional_data):
@@ -217,3 +217,39 @@ def set_attributes(obj, additional_data):
         if hasattr(obj, key):
             raise ValueError("Key %s in additional_data already exists in this object" % key)
         setattr(obj, _strip_column_name(key), value)
+
+def md5_hash(o):
+    return hashlib.md5(pickle.dumps(o)).hexdigest()
+
+DictProxyType = type(object.__dict__)
+def make_hash(o):
+    """
+    Makes a hash from a dictionary, list, tuple or set to any level, that
+    contains only other hashable types (including any lists, tuples, sets, and
+    dictionaries). In the case where other kinds of objects (like classes) need
+    to be hashed, pass in a collection of object attributes that are pertinent.
+    For example, a class can be hashed in this fashion:
+
+    make_hash([cls.__dict__, cls.__name__])
+
+    A function can be hashed like so:
+
+    make_hash([fn.__dict__, fn.__code__])
+
+    (based on work by user jomido (https://stackoverflow.com/users/660554/jomido) 
+    in a post at https://stackoverflow.com/a/8714242/3457743)
+    """
+    if type(o) == DictProxyType:
+        o2 = {}
+        for k, v in o.items():
+            if not k.startswith("__"):
+                o2[k] = v
+        o = o2
+    if isinstance(o, (set, tuple, list)):
+        return tuple([make_hash(e) for e in o])
+    elif not isinstance(o, dict):
+        return md5_hash(o)
+    new_o = copy.deepcopy(o)
+    for k, v in new_o.items():
+        new_o[k] = make_hash(v)
+    return md5_hash(tuple(frozenset(sorted(new_o.items()))))
